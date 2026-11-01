@@ -1,0 +1,6 @@
+{
+  "appId": "com.atlasai.prototype",
+  "appName": "ATLAS AI",
+  "webDir": "dist",
+  "bundledWebRuntime": false
+}
