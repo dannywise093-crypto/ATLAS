@@ -19,7 +19,7 @@ export default function App() {
   const [notice,setNotice] = useState("");
   useEffect(()=>localStorage.setItem("atlas-messages",JSON.stringify(messages)),[messages]);
   useEffect(()=>localStorage.setItem("atlas-memory",JSON.stringify(memory)),[memory]);
-  function send(e){e.preventDefault();const v=input.trim();if(!v)return;setMessages(m=>[...m,{role:"user",text:v}]);setInput("");const result=runAtlasCore(v,memory);if(result.action==="save_memory"&&result.memory){setMemory(m=>m.includes(result.memory)?m:[...m,result.memory]);}setMessages(m=>[...m,{role:"atlas",text:result.text}]);}
+  function send(e){e.preventDefault();const v=input.trim();if(!v)return;setMessages(m=>[...m,{role:"user",text:v}]);setInput("");const result=runAtlasCore(v,memory,messages);if(result.action==="save_memory"&&result.memory){setMemory(m=>m.includes(result.memory)?m:[...m,result.memory]);}setMessages(m=>[...m,{role:"atlas",text:result.text}]);}
   function addMemory(){const v=prompt("What should ATLAS save in project memory?");if(v?.trim())setMemory(m=>[...m,v.trim()])}
   function heading(title,sub,badge){return <header className="pagehead"><div className="headicon"><BrainCircuit/></div><div><div className="headrow"><h1>{title}</h1>{badge&&<span className="badge">{badge}</span>}</div><p>{sub}</p></div></header>}
   function card(icon,title,desc,status="Planned"){return <article className="card"><div className="cardtop"><span className="cardicon">{icon}</span><span className="badge">{status}</span></div><h3>{title}</h3><p>{desc}</p></article>}
