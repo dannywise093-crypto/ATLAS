@@ -26,7 +26,7 @@ test("clarifies a previous reply", () => {
 test("expands on a previous reply without claiming neural reasoning", () => {
   const result = runAtlasCore("Tell me more", [], historyWith("ATLAS has a local memory feature."));
   assert.match(result.text, /A little more context/);
-  assert.match(result.text, /not implemented/);
+  assert.match(result.text, /future work/);
 });
 
 test("does not invent context when there is no previous ATLAS reply", () => {
