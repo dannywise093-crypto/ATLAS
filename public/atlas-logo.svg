@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+<defs>
+ <linearGradient id="silver" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff"/><stop offset=".48" stop-color="#aeb8c8"/><stop offset="1" stop-color="#f5fbff"/></linearGradient>
+ <linearGradient id="blue" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#b9eaff"/><stop offset=".48" stop-color="#168bff"/><stop offset="1" stop-color="#063c9b"/></linearGradient>
+ <filter id="glow"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+</defs>
+<circle cx="256" cy="256" r="220" fill="none" stroke="url(#silver)" stroke-width="17" stroke-dasharray="630 22 250 22" transform="rotate(-90 256 256)"/>
+<path d="M256 48v416M256 48C165 95 113 166 113 256s52 165 143 208M256 48c91 47 143 118 143 208s-52 165-143 208M91 164h330M65 256h382M91 348h330" fill="none" stroke="url(#blue)" stroke-width="9" stroke-linecap="round" filter="url(#glow)" opacity=".95"/>
+<path d="M256 48v416M256 48C165 95 113 166 113 256s52 165 143 208" fill="none" stroke="#cceeff" stroke-width="5" opacity=".8"/>
+<g fill="none" stroke="url(#blue)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+<path d="M53 196v83l40 39h72l42 42v83M77 161v62l37 36h54M61 334h71l42 41v65M202 303l-43 44M202 303l-38 0M102 390h59l46 47"/>
+<path d="M256 112L318 83 377 127 420 196 393 272 421 345 356 405 256 464M256 190l62-107M256 190l121-63M256 190l137 82M256 270l137 2 28 73M256 350l100 55M318 83l75 189M377 127l16 145M420 196l-27 76M393 272l28 73M318 83l75 44 27 69M256 112l0 78 0 80 0 80"/>
+</g>
+<g fill="url(#silver)" stroke="#0c69d4" stroke-width="3" filter="url(#glow)">
+<circle cx="256" cy="112" r="10"/><circle cx="318" cy="83" r="10"/><circle cx="377" cy="127" r="10"/><circle cx="420" cy="196" r="10"/><circle cx="393" cy="272" r="10"/><circle cx="421" cy="345" r="10"/><circle cx="356" cy="405" r="10"/><circle cx="256" cy="190" r="10"/><circle cx="256" cy="270" r="10"/><circle cx="256" cy="350" r="10"/>
+</g>
+<g fill="#07101f" stroke="url(#silver)" stroke-width="6"><circle cx="53" cy="196" r="9"/><circle cx="77" cy="161" r="9"/><circle cx="202" cy="303" r="9"/><circle cx="102" cy="390" r="9"/></g>
+</svg>
