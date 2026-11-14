@@ -137,7 +137,8 @@ real_stdout, real_stderr = sys.stdout, sys.stderr
 sys.stdout, sys.stderr = LimitedWriter(20000), LimitedWriter(20000)
 main_module = types.ModuleType("__main__")
 sys.modules["__main__"] = main_module
-namespace = main_module.__dict__\nnamespace["__builtins__"] = safe_builtins
+namespace = main_module.__dict__
+namespace["__builtins__"] = safe_builtins
 exit_code = 0
 try:
     exec(compile(source, "<atlas-user-code>", "exec"), namespace, namespace)
