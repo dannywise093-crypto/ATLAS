@@ -102,3 +102,25 @@ test("chat rejects a conversation that does not end with a user message", async 
   }), envWith(async () => ({})));
   assert.equal(response.status, 400);
 });
+
+
+test("five consecutive chat requests each receive a fresh model response", async () => {
+  let callCount = 0;
+  const env = envWith(async (_model, input) => {
+    callCount += 1;
+    const userText = input.messages.at(-1).content;
+    return { choices: [{ message: { content: `Reply ${callCount}: ${userText}` } }] };
+  });
+
+  for (let index = 1; index <= 5; index += 1) {
+    const response = await worker.fetch(request("/api/chat", {
+      method: "POST",
+      body: { messages: [{ role: "user", content: `Consecutive test ${index}` }] },
+    }), env);
+    const body = await response.json();
+    assert.equal(response.status, 200, `request ${index} should succeed`);
+    assert.equal(body.answer, `Reply ${index}: Consecutive test ${index}`);
+    assert.equal(body.fallbackUsed, false);
+  }
+  assert.equal(callCount, 5);
+});
