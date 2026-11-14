@@ -86,6 +86,10 @@ async function runModelWithDeadline(env, model, messages, timeoutMs) {
         messages: [{ role: "system", content: SYSTEM_PROMPT }, ...messages],
         max_tokens: 1800,
         temperature: 0.55,
+        // GLM-4.7-Flash otherwise may spend its entire token budget in
+        // hidden reasoning and return message.content=null.
+        reasoning_effort: null,
+        chat_template_kwargs: { enable_thinking: false, clear_thinking: true },
       }, { rejectIfBusy: true }),
       timeout,
     ]);
