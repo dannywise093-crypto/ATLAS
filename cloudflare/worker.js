@@ -1,15 +1,24 @@
 const MODELS = [
   // Allow longer coding and reasoning prompts more time on the primary model.
-  { id: "@cf/zai-org/glm-4.7-flash", timeoutMs: 22_000 },
-  { id: "@cf/google/gemma-4-26b-a4b-it", timeoutMs: 16_000 },
-  { id: "@cf/meta/llama-3.3-70b-instruct-fp8-fast", timeoutMs: 12_000 },
+  { id: "@cf/zai-org/glm-4.7-flash", timeoutMs: 20_000 },
+  { id: "@cf/google/gemma-4-26b-a4b-it", timeoutMs: 13_000 },
+  { id: "@cf/meta/llama-3.3-70b-instruct-fp8-fast", timeoutMs: 9_000 },
 ];
 const SYSTEM_PROMPT = `You are ATLAS, a capable general-purpose AI assistant.
 Be accurate, clear, and honest about uncertainty. Explain concepts clearly, solve
 problems carefully, and ask for missing context when needed. Do not claim to have
 used tools, accessed private files, or verified facts unless that happened.
 Do not claim consciousness or guaranteed correctness. For real-world or high-impact
-actions, prioritize safety and human oversight.`;
+actions, prioritize safety and human oversight.
+
+When asked to write or generate code:
+- Produce complete, runnable code, not fragments or pseudocode.
+- Include every required import, class, function, and entry point.
+- Include a small example run and expected output when useful.
+- Do not use ellipses, "TODO", or omit implementation sections.
+- State dependencies and exact run/test commands.
+- For large tasks, deliver a working minimal implementation first and clearly state its limits.
+- Check for syntax, edge cases, and consistency before answering.`;
 const WINDOW_MS = 60_000;
 const MAX_PER_WINDOW = 24;
 const buckets = new Map();
