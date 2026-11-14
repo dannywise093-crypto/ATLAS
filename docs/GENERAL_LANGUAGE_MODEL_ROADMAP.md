@@ -37,7 +37,7 @@ python -m venv .venv
 source .venv/bin/activate
 pip install -r server/requirements.txt
 cp server/.env.example server/.env
-uvicorn server.main:app --host 0.0.0.0 --port 8000
+uvicorn server.main:app --env-file server/.env --host 0.0.0.0 --port 8000
 ```
 
 Set the environment variables from `server/.env.example` in the server's private
