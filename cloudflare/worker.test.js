@@ -53,6 +53,7 @@ test("chat uses the primary model and enables capacity-aware rejection", async (
   assert.equal(calledWith.input.messages.at(-1).role, "user");
   assert.deepEqual(calledWith.options, { rejectIfBusy: true });
   assert.equal(calledWith.input.max_tokens, 1800);
+  assert.match(calledWith.input.messages[0].content, /complete, runnable code/);
 });
 
 test("chat falls back when the primary model is unavailable", async () => {
