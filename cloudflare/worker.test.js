@@ -141,3 +141,22 @@ test("chat accepts the native Workers AI response field", async () => {
   assert.equal(body.answer, "Native Workers AI response");
   assert.equal(body.fallbackUsed, false);
 });
+
+
+test("chat falls back instead of returning a truncated model response", async () => {
+  const attempts = [];
+  const env = envWith(async (model) => {
+    attempts.push(model);
+    if (model === "@cf/zai-org/glm-4.7-flash") {
+      return { choices: [{ message: { content: "partial code" }, finish_reason: "length" }] };
+    }
+    return { choices: [{ message: { content: "Complete backup answer" }, finish_reason: "stop" }] };
+  });
+  const response = await worker.fetch(request("/api/chat", { method: "POST", body: validBody }), env);
+  const body = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(body.answer, "Complete backup answer");
+  assert.equal(body.model, "@cf/google/gemma-4-26b-a4b-it");
+  assert.equal(body.fallbackUsed, true);
+  assert.equal(attempts.length, 2);
+});
