@@ -1,8 +1,9 @@
 const MODELS = [
-  // Allow longer coding and reasoning prompts more time on the primary model.
-  { id: "@cf/zai-org/glm-4.7-flash", timeoutMs: 20_000 },
-  { id: "@cf/google/gemma-4-26b-a4b-it", timeoutMs: 13_000 },
-  { id: "@cf/meta/llama-3.3-70b-instruct-fp8-fast", timeoutMs: 9_000 },
+  // Live Workers AI measurement: Llama returned a complete 920-token code answer
+  // in ~29 seconds. The previous 9-second deadline guaranteed false timeouts.
+  { id: "@cf/meta/llama-3.3-70b-instruct-fp8-fast", timeoutMs: 40_000 },
+  { id: "@cf/google/gemma-4-26b-a4b-it", timeoutMs: 32_000 },
+  { id: "@cf/zai-org/glm-4.7-flash", timeoutMs: 32_000 },
 ];
 const SYSTEM_PROMPT = `You are ATLAS, a capable general-purpose AI assistant.
 Be accurate, clear, and honest about uncertainty. Explain concepts clearly, solve
@@ -98,10 +99,8 @@ async function runModelWithDeadline(env, model, messages, timeoutMs) {
         messages: [{ role: "system", content: SYSTEM_PROMPT }, ...messages],
         max_tokens: 3000,
         temperature: 0.55,
-        // GLM-4.7-Flash otherwise may spend its entire token budget in
-        // hidden reasoning and return message.content=null.
-        reasoning_effort: null,
-        chat_template_kwargs: { enable_thinking: false, clear_thinking: true },
+        // Keep the request to documented chat-completion parameters. Model-
+        // specific reasoning flags are not portable across Workers AI models.
       }, { rejectIfBusy: true }),
       timeout,
     ]);
@@ -151,10 +150,13 @@ export default {
 
     const failures = [];
     for (const model of MODELS) {
+      const startedAt = Date.now();
       try {
         const result = await runModelWithDeadline(env, model.id, messages, model.timeoutMs);
+        const durationMs = Date.now() - startedAt;
         if (isTruncated(result)) {
-          failures.push(`${model.id}: response reached the output token limit`);
+          failures.push({ model: model.id, status: "truncated", durationMs });
+          console.warn("ATLAS model returned truncated output", model.id, durationMs);
           continue;
         }
         const answer = extractAnswer(result);
@@ -165,16 +167,20 @@ export default {
             fallbackUsed: model.id !== MODELS[0].id,
           });
         }
-        failures.push(`${model.id}: empty response`);
+        failures.push({ model: model.id, status: "empty_response", durationMs });
+        console.warn("ATLAS model returned an empty response", model.id, durationMs);
       } catch (error) {
-        failures.push(`${model.id}: ${error?.message || "inference failed"}`);
-        console.warn("ATLAS model attempt failed", model.id, error?.message || "unknown error");
+        const durationMs = Date.now() - startedAt;
+        const timedOut = /deadline exceeded/i.test(error?.message || "");
+        failures.push({ model: model.id, status: timedOut ? "timeout" : "inference_error", durationMs });
+        console.warn("ATLAS model attempt failed", model.id, timedOut ? "timeout" : "inference_error", durationMs);
       }
     }
-    console.error("All ATLAS model attempts failed", failures.join("; "));
+    console.error("All ATLAS model attempts failed", JSON.stringify(failures));
     return json({
       error: "ATLAS is temporarily busy. The request was tried against the primary model and backup models. Please retry in a moment.",
       retryable: true,
+      diagnostics: failures,
     }, 503, { "retry-after": "3" });
   },
 };
