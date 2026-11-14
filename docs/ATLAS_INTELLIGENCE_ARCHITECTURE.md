@@ -32,13 +32,16 @@ Separate:
 
 Memory must be inspectable, editable and deletable by the user. Retrieval should show which saved note or document informed an answer.
 
-### 5. Perception
+### 5. Continuous Knowledge Engine (ACKE)
+Request-time web retrieval for current and explicitly researched questions. Search snippets are untrusted evidence with source URLs and retrieval timestamps. Historical knowledge remains distinct from live evidence. This is retrieval-augmented generation, not model retraining. Persistent source archives and scheduled ingestion require a configured durable store and are not yet enabled.
+
+### 6. Perception
 Image and audio processing should be independent modules with clear permission prompts and on-device privacy choices. Current image support is only a local preview.
 
-### 6. Evaluation
+### 7. Evaluation
 Every capability needs repeatable tests for correctness, uncertainty, latency, offline behavior, privacy and failure handling. Never label a planned feature as operational.
 
-### 7. Physical AI
+### 8. Physical AI
 Robotics stays disconnected while the project is software-only. Future integration must begin in simulation and require an independent safety controller, physical emergency stop, bounded movement, watchdogs and supervised testing. The language model must never be the sole safety mechanism.
 
 ## Development sequence

@@ -24,6 +24,21 @@ allocation requires the Workers Paid plan for additional usage. Review the
 official [Workers AI pricing](https://developers.cloudflare.com/workers-ai/platform/pricing/)
 before enabling paid usage.
 
+## Continuous Knowledge Engine (ACKE)
+
+ATLAS now has an on-demand, source-aware web retrieval foundation in
+`cloudflare/knowledge.js`. Requests asking for current, recent, live, or
+explicitly researched information trigger a web search before model inference.
+The model receives bounded evidence snippets and exact source URLs, and its
+response includes a research status and retrieval timestamp.
+
+This is retrieval-augmented generation, not continuous model retraining. The
+underlying model weights do not automatically update. Persistent historical
+source archives, scheduled ingestion, full-page validation, and D1-backed
+knowledge storage are planned next; they are not yet enabled.
+
+See [docs/ATLAS_CONTINUOUS_KNOWLEDGE_ENGINE.md](docs/ATLAS_CONTINUOUS_KNOWLEDGE_ENGINE.md).
+
 ## Cloudflare Worker
 
 Worker source: `cloudflare/worker.js`
