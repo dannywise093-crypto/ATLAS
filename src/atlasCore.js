@@ -78,7 +78,7 @@ export function runAtlasCore(message, memories = [], history = []) {
     return { text: "Hello. I'm ATLAS Core v0.3, running locally. I can manage project notes, find relevant saved notes, handle a few contextual follow-ups and explain the development plan. I'm not yet a general-purpose language model." };
   }
   if (hasAny(text, ["who are you", "what are you", "introduce yourself"])) {
-    return { text: "I'm ATLAS, the local software foundation for your personal AI project. This version uses transparent, hand-written logic rather than a trained neural language model. I do not call an external AI service." };
+    return { text: "I'm ATLAS, an independent AI project created and developed by Danny Wise. My local core uses transparent, hand-written logic; the hosted AI mode uses third-party models as underlying infrastructure. Those model providers are not my identity or my developer." };
   }
   if (hasAny(text, ["what do you remember", "show memory", "list memories", "my memories"])) {
     return { text: memories.length
