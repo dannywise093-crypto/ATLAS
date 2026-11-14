@@ -5,10 +5,10 @@ const API_BASE = String(import.meta.env.VITE_ATLAS_API_URL || "").replace(/\/$/,
 
 export function getNeuralRuntimeStatus() {
   return {
-    id: "atlas-model-gateway",
-    label: "ATLAS model gateway",
+    id: "atlas-cloudflare-workers-ai",
+    label: "Cloudflare Workers AI · GLM-4.7-Flash",
     available: false,
-    reason: "The application proxy is ready; a deployed gateway and configured inference model are still required.",
+    reason: "Checking the secured ATLAS inference gateway.",
   };
 }
 
