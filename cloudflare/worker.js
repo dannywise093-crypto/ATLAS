@@ -1,6 +1,7 @@
 const MODELS = [
-  { id: "@cf/zai-org/glm-4.7-flash", timeoutMs: 18_000 },
-  { id: "@cf/google/gemma-4-26b-a4b-it", timeoutMs: 18_000 },
+  // Allow longer coding and reasoning prompts more time on the primary model.
+  { id: "@cf/zai-org/glm-4.7-flash", timeoutMs: 22_000 },
+  { id: "@cf/google/gemma-4-26b-a4b-it", timeoutMs: 16_000 },
   { id: "@cf/meta/llama-3.3-70b-instruct-fp8-fast", timeoutMs: 12_000 },
 ];
 const SYSTEM_PROMPT = `You are ATLAS, a capable general-purpose AI assistant.
@@ -49,6 +50,20 @@ function rateLimited(request) {
     }
   }
   return false;
+}
+
+function extractAnswer(result) {
+  // Accept both OpenAI chat-completion and native Workers AI text outputs.
+  const candidates = [
+    result?.choices?.[0]?.message?.content,
+    result?.response,
+    result?.result?.response,
+    result?.output_text,
+  ];
+  for (const value of candidates) {
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return "";
 }
 
 async function runModelWithDeadline(env, model, messages, timeoutMs) {
@@ -113,8 +128,8 @@ export default {
     for (const model of MODELS) {
       try {
         const result = await runModelWithDeadline(env, model.id, messages, model.timeoutMs);
-        const answer = result?.choices?.[0]?.message?.content;
-        if (typeof answer === "string" && answer.trim()) {
+        const answer = extractAnswer(result);
+        if (answer) {
           return json({
             answer: answer.trim(),
             model: model.id,
