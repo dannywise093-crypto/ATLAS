@@ -75,7 +75,7 @@ async function runModelWithDeadline(env, model, messages, timeoutMs) {
     return await Promise.race([
       env.AI.run(model, {
         messages: [{ role: "system", content: SYSTEM_PROMPT }, ...messages],
-        max_tokens: 900,
+        max_tokens: 1800,
         temperature: 0.55,
       }, { rejectIfBusy: true }),
       timeout,
