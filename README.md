@@ -14,6 +14,7 @@ open-weight model; this repository does not claim to train its own LLM weights.
 - Server-side bearer authentication, input validation, and best-effort rate limits.
 - Local project notes and memory commands stored in browser localStorage.
 - Explicit errors instead of fabricated model responses when the service fails.
+- Python Code Lab with captured subprocess output, bounded runtime, restricted imports, and one optional model-assisted repair attempt.
 
 ## Hosted model
 
@@ -55,6 +56,10 @@ npm run build
 
 For a local Worker, use Wrangler with the `AI` binding configured for remote
 development and set a local `ATLAS_GATEWAY_TOKEN` secret.
+
+## Python Code Lab
+
+Open **Code Lab** in the app to run Python source and view actual stdout/stderr, exit status, and duration. The UI marks execution verified only after a successful subprocess run. See docs/PYTHON_EXECUTION_SECURITY.md for the important isolation limitations and deployment requirements.
 
 ## Android
 

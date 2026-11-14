@@ -3,6 +3,9 @@
   "functions": {
     "api/chat.js": {
       "maxDuration": 120
+    },
+    "api/execute.js": {
+      "maxDuration": 120
     }
   }
 }

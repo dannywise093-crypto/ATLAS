@@ -34,6 +34,13 @@ test("does not invent context when there is no previous ATLAS reply", () => {
   assert.match(result.text, /don't know how to answer that yet/i);
 });
 
+test("identifies ATLAS as created and developed by Danny Wise", () => {
+  const result = runAtlasCore("Who are you?", [], []);
+  assert.match(result.text, /ATLAS/);
+  assert.match(result.text, /created and developed by Danny Wise/);
+  assert.match(result.text, /model providers are not my identity/);
+});
+
 test("keeps memory saving available", () => {
   const result = runAtlasCore("Remember that tests are important", [], []);
   assert.equal(result.action, "save_memory");

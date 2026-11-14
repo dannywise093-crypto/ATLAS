@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { runAtlasCore } from "./atlasCore.js";
 import { getNeuralRuntimeStatus, checkAtlasBackend, generateAtlasResponse } from "./modelRuntime.js";
-import { Activity, Bot, BrainCircuit, Camera, Database, Eye, GraduationCap, Home, Menu, MessageSquare, Mic, Radio, Send, Settings, ShieldCheck, Sparkles, Volume2, X } from "lucide-react";
+import { Activity, Bot, BrainCircuit, Camera, Database, Eye, GraduationCap, Home, Menu, MessageSquare, Mic, Radio, Send, Settings, ShieldCheck, Sparkles, Volume2, X, Terminal, Play } from "lucide-react";
 
 function AtlasLogo({ className = "" }) {
   return <img className={className} src="/atlas-logo.svg" alt="ATLAS logo" />;
@@ -11,7 +11,7 @@ const initial = [
   { role: "atlas", text: "ATLAS is connected to Cloudflare Workers AI using the GLM-4.7-Flash open-weight foundation model. Local project memory remains available on this device." },
   { role: "atlas", text: "Try saying “help” or “Remember that ATLAS is my personal AI project.”" }
 ];
-const nav = [["Overview",Home],["AI Assistant",MessageSquare],["Vision Center",Eye],["Voice Center",Mic],["Memory",Database],["Learning",GraduationCap],["Robotics",Bot],["Settings",Settings]];
+const nav = [["Overview",Home],["AI Assistant",MessageSquare],["Code Lab",Terminal],["Vision Center",Eye],["Voice Center",Mic],["Memory",Database],["Learning",GraduationCap],["Robotics",Bot],["Settings",Settings]];
 
 export default function App() {
   const [page,setPage] = useState("Overview");
@@ -24,6 +24,10 @@ export default function App() {
   const [generating,setGenerating] = useState(false);
   const [gatewayReady,setGatewayReady] = useState(false);
   const [gatewayMessage,setGatewayMessage] = useState("Checking the hosted model gateway…");
+  const [pythonCode,setPythonCode] = useState("import unittest\n\ndef factorial(n):\n    if type(n) is not int:\n        raise TypeError(\"n must be an integer\")\n    if n < 0:\n        raise ValueError(\"n must be non-negative\")\n    return 1 if n < 2 else n * factorial(n - 1)\n\nclass FactorialTests(unittest.TestCase):\n    def test_five(self): self.assertEqual(factorial(5), 120)\n    def test_seven(self): self.assertEqual(factorial(7), 5040)\n    def test_ten(self): self.assertEqual(factorial(10), 3628800)\n    def test_negative(self):\n        with self.assertRaises(ValueError): factorial(-1)\n    def test_float(self):\n        with self.assertRaises(TypeError): factorial(2.5)\n\nif __name__ == \"__main__\":\n    print(\"5! =\", factorial(5))\n    print(\"7! =\", factorial(7))\n    print(\"10! =\", factorial(10))\n    unittest.main(argv=[\"ignored\"], verbosity=2, exit=False)\n");
+  const [pythonResult,setPythonResult] = useState(null);
+  const [runningPython,setRunningPython] = useState(false);
+
   useEffect(()=>{const controller=new AbortController();checkAtlasBackend(controller.signal).then(status=>{const ready=status.status==="configured";setGatewayReady(ready);setGatewayMessage(ready?"Cloudflare Workers AI · GLM-4.7-Flash is connected.":"The hosted model is not configured.");}).catch(error=>{setGatewayReady(false);setGatewayMessage(error.message);});return()=>controller.abort();},[]);
   useEffect(()=>localStorage.setItem("atlas-messages",JSON.stringify(messages)),[messages]);
   useEffect(()=>localStorage.setItem("atlas-memory",JSON.stringify(memory)),[memory]);
@@ -54,6 +58,18 @@ export default function App() {
       setGenerating(false);
     }
   }
+  async function runPython(){
+    if(runningPython||!pythonCode.trim())return;
+    setRunningPython(true);setPythonResult(null);
+    try{
+      const response=await fetch("/api/execute",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({code:pythonCode,auto_repair:true})});
+      const data=await response.json();
+      if(!response.ok)throw new Error(data.error||"Python execution request failed.");
+      setPythonResult(data);
+      if(data.code&&data.code!==pythonCode)setPythonCode(data.code);
+    }catch(error){setPythonResult({status:"unavailable",execution_verified:false,error:error.message,output:"",attempts:[]});}
+    finally{setRunningPython(false);}
+  }
   function addMemory(){const v=prompt("What should ATLAS save in project memory?");if(v?.trim())setMemory(m=>[...m,v.trim()])}
   function heading(title,sub,badge){return <header className="pagehead"><div className="headicon"><AtlasLogo className="logo-head"/></div><div><div className="headrow"><h1>{title}</h1>{badge&&<span className="badge">{badge}</span>}</div><p>{sub}</p></div></header>}
   function card(icon,title,desc,status="Planned"){return <article className="card"><div className="cardtop"><span className="cardicon">{icon}</span><span className="badge">{status}</span></div><h3>{title}</h3><p>{desc}</p></article>}
@@ -64,6 +80,7 @@ export default function App() {
     <h2>DEVELOPMENT MODULES</h2><div className="grid two">{card(<MessageSquare/>,"Conversational intelligence","Hosted GLM-4.7-Flash foundation model through Cloudflare Workers AI.","Interface ready")}{card(<Eye/>,"Perception & vision","Prepare image inputs for future computer vision.","Preview ready")}{card(<GraduationCap/>,"Learning system","Plan supervised demonstrations and evaluation.","Planned")}{card(<Bot/>,"Robotics integration","A safe bridge to controllers after simulation and testing.","Not connected")}</div>
     <div className="safety"><ShieldCheck/><div><b>Safety-first development</b><p>This is a software prototype. It does not control physical devices. Real robot movement must use independent safety limits and supervised testing.</p></div></div>
   </section> : page==="AI Assistant" ? <section className="stack">{heading(page,"General-purpose conversation powered by the hosted GLM-4.7-Flash model.","MODEL GATEWAY")}<div className="chat"><div className="messages">{messages.map((m,i)=><div className={"msg "+m.role} key={i}><b>{m.role==="atlas"?"ATLAS":"YOU"}</b><p>{m.text}</p></div>)}</div><form className="composer" onSubmit={send}><input value={input} onChange={e=>setInput(e.target.value)} placeholder="Ask ATLAS anything..."/><button disabled={!input.trim()||generating}><Send/></button></form><small>{generating?"ATLAS is generating a response…":"General chat uses Cloudflare Workers AI · GLM-4.7-Flash. Memory commands remain on this device."}</small></div></section>
+  : page==="Code Lab" ? <section className="stack">{heading("Python Code Lab","Run Python in ATLAS, capture real output, and request one automatic repair.","RESTRICTED RUNNER")}<div className="code-panel"><div className="code-toolbar"><span><Terminal size={15}/> Python 3 · Restricted execution</span><button onClick={runPython} disabled={runningPython||!pythonCode.trim()}><Play size={15}/>{runningPython?"Running…":"Run & verify"}</button></div><textarea className="code-editor" spellCheck="false" value={pythonCode} onChange={e=>setPythonCode(e.target.value)} aria-label="Python source code"/><p className="code-hint">Maximum 20,000 characters · 5-second runtime limit · standard-library allowlist · one AI repair attempt after a failed run.</p></div>{pythonResult&&<div className="execution-card"><div className="execution-heading"><b>Execution result</b><span className={"execution-status "+(pythonResult.execution_verified?"passed":"failed")}>{pythonResult.execution_verified?"EXECUTED · VERIFIED":"NOT VERIFIED"}</span></div><p className="execution-note">{pythonResult.execution_verified?"The server ran this code and captured the process output.":"The code did not complete successfully. Output below is only what the runner actually captured."}</p>{pythonResult.output&&<><label>STDOUT</label><pre>{pythonResult.output}</pre></>}{pythonResult.error&&<><label>STDERR / ERROR</label><pre className="stderr">{pythonResult.error}</pre></>}{pythonResult.attempts?.length>1&&<p className="code-hint">Automatic repair was attempted. {pythonResult.execution_verified?"The repaired version passed execution.":"The repaired version did not pass."}</p>}{pythonResult.security_note&&<p className="notice">{pythonResult.security_note}</p>}</div>}<div className="safety"><ShieldCheck/><div><b>Execution safety</b><p>ATLAS uses a restricted subprocess with time and resource limits. This is not yet a hardened isolation boundary for hostile code; do not submit secrets or sensitive files.</p></div></div></section>
   : page==="Vision Center" ? <section className="stack">{heading(page,"Prepare image input for future computer-vision features.","NOT CONNECTED")}<div className="panel"><Camera size={30}/><h3>Image input</h3><p>Choose a picture from your phone to preview it here. This prototype does not send images to an AI model.</p><label className="button">Choose image<input hidden type="file" accept="image/*" onChange={e=>{const f=e.target.files?.[0];if(f){setImage(URL.createObjectURL(f));setNotice("Local preview only. AI analysis is not connected.")}}}/></label>{image&&<img className="preview" src={image} alt="Selected preview"/>}{notice&&<p className="notice">{notice}</p>}</div>{card(<ShieldCheck/>,"Planned vision capabilities","Object recognition, camera integration, visual Q&A and privacy controls.")}</section>
   : page==="Voice Center" ? <section className="stack">{heading(page,"Voice interaction will be added after the AI backend.","COMING NEXT")}<div className="panel"><Mic size={36}/><h3>Voice interface</h3><p>Microphone capture and spoken responses are not connected yet. Permissions will be requested only when implemented.</p><button onClick={()=>setNotice("Voice features are planned for a later milestone.")}><Volume2 size={16}/> Check status</button>{notice&&<p className="notice">{notice}</p>}</div></section>
   : page==="Memory" ? <section className="stack">{heading("Project Memory","Notes are stored in this browser on this device.")}<div className="toolbar"><span>{memory.length} saved notes</span><button onClick={addMemory}>+ Add memory</button></div>{memory.map((m,i)=><div className="memory" key={i}><Database/><p>{m}</p><button className="delete" onClick={()=>setMemory(a=>a.filter((_,n)=>n!==i))}>Delete</button></div>)}<p className="notice">Notes are stored locally. They are not synced to a server or shared across devices.</p></section>
