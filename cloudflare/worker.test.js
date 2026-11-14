@@ -31,7 +31,7 @@ test("health endpoint advertises the primary and backup models", async () => {
   const body = await response.json();
   assert.equal(response.status, 200);
   assert.equal(body.status, "configured");
-  assert.equal(body.model, "@cf/google/gemma-4-26b-a4b-it");
+  assert.equal(body.model, "@cf/meta/llama-3.3-70b-instruct-fp8-fast");
   assert.deepEqual(body.fallbackModels, [
     "@cf/google/gemma-4-26b-a4b-it",
     "@cf/zai-org/glm-4.7-flash",
