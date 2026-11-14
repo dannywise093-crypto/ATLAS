@@ -25,7 +25,7 @@ train or bundle a general-purpose model.
    - `ATLAS_MODEL_ID`: the exact model identifier exposed by that service.
    - `ATLAS_UPSTREAM_API_KEY`: only if the inference provider requires it.
 3. Wait for the Render service to become healthy. The health endpoint is
-   `/api/health`; it requires the gateway bearer token when deployed.
+   `/api/health`; it is public so Render can run its health check. Chat requests require the gateway bearer token.
 
 The repository does not create a model-hosting account, purchase inference, or
 supply model weights. A compatible inference endpoint and its credentials must
