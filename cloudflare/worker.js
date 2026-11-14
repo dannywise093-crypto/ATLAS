@@ -88,7 +88,7 @@ async function runModelWithDeadline(env, model, messages, timeoutMs) {
     return await Promise.race([
       env.AI.run(model, {
         messages: [{ role: "system", content: SYSTEM_PROMPT }, ...messages],
-        max_tokens: 1800,
+        max_tokens: 3000,
         temperature: 0.55,
         // GLM-4.7-Flash otherwise may spend its entire token budget in
         // hidden reasoning and return message.content=null.
