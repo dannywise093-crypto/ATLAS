@@ -84,6 +84,7 @@ export async function callGateway(path, body) {
           ? payload.error
           : typeof payload.detail === "string" ? payload.detail : "ATLAS backend request failed.",
         ...(payload.retryable === true ? { retryable: true } : {}),
+        ...(Array.isArray(payload.diagnostics) ? { diagnostics: payload.diagnostics } : {}),
       },
     };
   }
