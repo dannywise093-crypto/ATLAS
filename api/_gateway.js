@@ -35,8 +35,6 @@ export function checkRateLimit(req, res) {
   } else {
     bucket.count += 1;
   }
-  // Bound memory growth. This is a best-effort per-instance guard; configure
-  // Vercel Firewall/edge rate limiting for durable public traffic protection.
   if (rateBuckets.size > 5000) {
     for (const [key, value] of rateBuckets) {
       if (now - value.start >= WINDOW_MS) rateBuckets.delete(key);
@@ -71,17 +69,22 @@ export async function callGateway(path, body) {
         Authorization: `Bearer ${token}`,
       },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-      signal: AbortSignal.timeout(55_000),
+      signal: AbortSignal.timeout(52_000),
     });
   } catch {
-    return { status: 502, body: { error: "ATLAS backend is unavailable or timed out." } };
+    return { status: 502, body: { error: "ATLAS backend could not be reached before the request deadline. Please retry." , retryable: true } };
   }
 
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
     return {
       status: response.status,
-      body: { error: typeof payload.detail === "string" ? payload.detail : "ATLAS backend request failed." },
+      body: {
+        error: typeof payload.error === "string"
+          ? payload.error
+          : typeof payload.detail === "string" ? payload.detail : "ATLAS backend request failed.",
+        ...(payload.retryable === true ? { retryable: true } : {}),
+      },
     };
   }
   return { status: 200, body: payload };
