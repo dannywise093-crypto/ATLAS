@@ -92,6 +92,11 @@ test("chat tries the final backup and returns a retryable error only if every mo
   assert.equal(body.retryable, true);
   assert.equal(attempts.length, 3);
   assert.equal(attempts[2], "@cf/zai-org/glm-4.7-flash");
+  assert.deepEqual(body.diagnostics.map((item) => item.status), [
+    "inference_error",
+    "inference_error",
+    "inference_error",
+  ]);
 });
 
 test("chat rejects malformed message roles", async () => {
