@@ -26,7 +26,7 @@ jobs:
         run: python -m compileall -q server && python -m unittest server.test_python_runner
 
       - name: Check Vercel serverless function syntax
-        run: node --check api/_gateway.js && node --check api/chat.js && node --check api/health.js && node --check cloudflare/worker.js && node --check cloudflare/worker.test.js
+        run: node --check api/_gateway.js && node --check api/chat.js && node --check api/execute.js && node --check api/health.js && node --check cloudflare/worker.js && node --check cloudflare/worker.test.js
 
       - name: Install dependencies
         run: npm ci
