@@ -8,8 +8,8 @@ export function getNeuralRuntimeStatus() {
   return {
     id: "atlas-model-gateway",
     label: "ATLAS model gateway",
-    available: true,
-    reason: "The app is configured to call the ATLAS server gateway. Model availability is verified by the server health endpoint.",
+    available: false,
+    reason: "Gateway client implemented; the backend and a compatible inference model still need to be configured and verified.",
   };
 }
 
