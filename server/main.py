@@ -63,7 +63,7 @@ def require_gateway_access(authorization: str | None = Header(default=None)) -> 
         raise HTTPException(status_code=401, detail="Unauthorized gateway request.")
 
 
-@app.get("/api/health", dependencies=[Depends(require_gateway_access)])
+@app.get("/api/health")
 async def health():
     configured = bool(UPSTREAM_BASE_URL and UPSTREAM_MODEL)
     return {
