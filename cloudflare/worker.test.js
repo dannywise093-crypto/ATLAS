@@ -53,6 +53,8 @@ test("chat uses the primary model and enables capacity-aware rejection", async (
   assert.equal(calledWith.input.messages.at(-1).role, "user");
   assert.deepEqual(calledWith.options, { rejectIfBusy: true });
   assert.equal(calledWith.input.max_tokens, 1800);
+  assert.equal(calledWith.input.reasoning_effort, null);
+  assert.deepEqual(calledWith.input.chat_template_kwargs, { enable_thinking: false, clear_thinking: true });
   assert.match(calledWith.input.messages[0].content, /complete, runnable code/);
 });
 
