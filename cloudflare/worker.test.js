@@ -31,10 +31,10 @@ test("health endpoint advertises the primary and backup models", async () => {
   const body = await response.json();
   assert.equal(response.status, 200);
   assert.equal(body.status, "configured");
-  assert.equal(body.model, "@cf/zai-org/glm-4.7-flash");
+  assert.equal(body.model, "@cf/google/gemma-4-26b-a4b-it");
   assert.deepEqual(body.fallbackModels, [
     "@cf/google/gemma-4-26b-a4b-it",
-    "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+    "@cf/zai-org/glm-4.7-flash",
   ]);
 });
 
@@ -48,13 +48,13 @@ test("chat uses the primary model and enables capacity-aware rejection", async (
   const body = await response.json();
   assert.equal(response.status, 200);
   assert.equal(body.answer, "ATLAS test response");
-  assert.equal(body.model, "@cf/zai-org/glm-4.7-flash");
+  assert.equal(body.model, "@cf/meta/llama-3.3-70b-instruct-fp8-fast");
   assert.equal(body.fallbackUsed, false);
   assert.equal(calledWith.input.messages.at(-1).role, "user");
   assert.deepEqual(calledWith.options, { rejectIfBusy: true });
   assert.equal(calledWith.input.max_tokens, 3000);
-  assert.equal(calledWith.input.reasoning_effort, null);
-  assert.deepEqual(calledWith.input.chat_template_kwargs, { enable_thinking: false, clear_thinking: true });
+  assert.equal("reasoning_effort" in calledWith.input, false);
+  assert.equal("chat_template_kwargs" in calledWith.input, false);
   assert.match(calledWith.input.messages[0].content, /complete, runnable code/);
   assert.match(calledWith.input.messages[0].content, /keep code and data memory regions separate/);
   assert.match(calledWith.input.messages[0].content, /instruction widths/);
@@ -65,7 +65,7 @@ test("chat falls back when the primary model is unavailable", async () => {
   const attempts = [];
   const env = envWith(async (model) => {
     attempts.push(model);
-    if (model === "@cf/zai-org/glm-4.7-flash") throw new Error("capacity unavailable");
+    if (model === "@cf/meta/llama-3.3-70b-instruct-fp8-fast") throw new Error("capacity unavailable");
     return { choices: [{ message: { content: "Backup model response" } }] };
   });
   const response = await worker.fetch(request("/api/chat", { method: "POST", body: validBody }), env);
@@ -75,7 +75,7 @@ test("chat falls back when the primary model is unavailable", async () => {
   assert.equal(body.model, "@cf/google/gemma-4-26b-a4b-it");
   assert.equal(body.fallbackUsed, true);
   assert.deepEqual(attempts, [
-    "@cf/zai-org/glm-4.7-flash",
+    "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
     "@cf/google/gemma-4-26b-a4b-it",
   ]);
 });
@@ -91,7 +91,7 @@ test("chat tries the final backup and returns a retryable error only if every mo
   assert.equal(response.status, 503);
   assert.equal(body.retryable, true);
   assert.equal(attempts.length, 3);
-  assert.equal(attempts[2], "@cf/meta/llama-3.3-70b-instruct-fp8-fast");
+  assert.equal(attempts[2], "@cf/zai-org/glm-4.7-flash");
 });
 
 test("chat rejects malformed message roles", async () => {
@@ -147,7 +147,7 @@ test("chat falls back instead of returning a truncated model response", async ()
   const attempts = [];
   const env = envWith(async (model) => {
     attempts.push(model);
-    if (model === "@cf/zai-org/glm-4.7-flash") {
+    if (model === "@cf/meta/llama-3.3-70b-instruct-fp8-fast") {
       return { choices: [{ message: { content: "partial code" }, finish_reason: "length" }] };
     }
     return { choices: [{ message: { content: "Complete backup answer" }, finish_reason: "stop" }] };
