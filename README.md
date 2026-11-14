@@ -1,81 +1,78 @@
 # ATLAS AI — General Language Model Foundation
 
-ATLAS is a mobile-friendly React + Capacitor AI workspace. It uses an open-weight
-foundation model through a server-side gateway; this repository does not claim to
-train or bundle a general-purpose model.
+ATLAS is a mobile-friendly React + Capacitor AI workspace. Its first hosted
+foundation model is **GLM-4.7-Flash** through Cloudflare Workers AI. ATLAS builds
+its own application, memory, retrieval, evaluation, and tool systems around this
+open-weight model; this repository does not claim to train its own LLM weights.
 
-## Current capabilities
+## Current architecture
 
-- Responsive React interface and Android Capacitor wrapper.
+- React web application and Android Capacitor wrapper.
+- Cloudflare Worker gateway with a Workers AI binding.
+- GLM-4.7-Flash inference through Cloudflare Workers AI.
+- Same-origin Vercel API routes keep the gateway token out of browser code.
+- Server-side bearer authentication, input validation, and best-effort rate limits.
 - Local project notes and memory commands stored in browser localStorage.
-- Same-origin Vercel serverless proxy for browser chat and health requests.
-- FastAPI gateway that forwards requests to an OpenAI-compatible inference service.
-- Server-side-only gateway and model credentials.
-- Input validation and best-effort per-instance proxy rate limiting.
-- Explicit errors when the backend or model is not configured.
+- Explicit errors instead of fabricated model responses when the service fails.
 
-## Deploy the backend on Render
+## Hosted model
 
-1. In Render, create a **Blueprint** from this repository and use the included
-   `render.yaml`. It creates `atlas-model-gateway` and generates
-   `ATLAS_GATEWAY_TOKEN`.
-2. In the Render service environment, set:
-   - `ATLAS_UPSTREAM_BASE_URL`: the OpenAI-compatible API base URL, including
-     `/v1` (for example, `https://your-inference-host.example/v1`).
-   - `ATLAS_MODEL_ID`: the exact model identifier exposed by that service.
-   - `ATLAS_UPSTREAM_API_KEY`: only if the inference provider requires it.
-3. Wait for the Render service to become healthy. The health endpoint is
-   `/api/health`; it is public so Render can run its health check. Chat requests require the gateway bearer token.
+The active model is `@cf/zai-org/glm-4.7-flash`. Cloudflare's current Workers AI
+pricing includes 10,000 Neurons per account per day at no charge. Usage is shared
+across Workers AI on the account and resets at 00:00 UTC. Exceeding the free
+allocation requires the Workers Paid plan for additional usage. Review the
+official [Workers AI pricing](https://developers.cloudflare.com/workers-ai/platform/pricing/)
+before enabling paid usage.
 
-The repository does not create a model-hosting account, purchase inference, or
-supply model weights. A compatible inference endpoint and its credentials must
-be provided before chat can work.
+## Cloudflare Worker
 
-## Connect Vercel to Render
+Worker source: `cloudflare/worker.js`
+Wrangler configuration: `wrangler.jsonc`
+Worker URL: `https://atlas-model-gateway.dannywise093.workers.dev`
 
-In **both** Vercel projects that serve ATLAS, add these server-side environment
-variables to Production and Preview:
+The Worker uses an AI binding named `AI` and a server-side secret named
+`ATLAS_GATEWAY_TOKEN`. The token is not included in source control.
 
-- `ATLAS_GATEWAY_URL`: the Render service base URL, without a trailing slash.
-- `ATLAS_GATEWAY_TOKEN`: copy the generated secret from the Render service.
+## Vercel projects
 
-Do not prefix either variable with `VITE_`. Do not expose the token to browser code.
-Redeploy both Vercel projects after setting the variables. The frontend calls
-same-origin `/api/chat` and `/api/health` routes; those Vercel functions securely
-forward requests to Render.
+Both `atlas` and `atlas-cqig` use server-side environment variables in Production
+and Preview:
+
+- `ATLAS_GATEWAY_URL`
+- `ATLAS_GATEWAY_TOKEN`
+
+The frontend calls same-origin `/api/chat` and `/api/health`. Vercel forwards
+requests to Cloudflare and never sends the gateway token to the browser. Redeploy
+the Vercel projects after changing environment variables.
 
 ## Local development
 
-Install dependencies and run the frontend:
-
 ```bash
 npm ci
-npm run dev
 npm test
 npm run build
 ```
 
-For an end-to-end local deployment test, run the FastAPI service using
-`server/.env` (copied from `server/.env.example`) and use Vercel's local
-development server so the `api/` serverless proxy routes are available.
+For a local Worker, use Wrangler with the `AI` binding configured for remote
+development and set a local `ATLAS_GATEWAY_TOKEN` secret.
 
-## Android test APK
+## Android
 
-The GitHub Actions workflow builds a debug APK and uploads it as
-`atlas-ai-debug-apk`. Download it from the completed workflow run. It is a
-debug/test APK, not a Play Store release. Configure the Vercel environment
-variables and redeploy before installing the APK if it should use the live AI.
+GitHub Actions builds a debug APK and uploads it as `atlas-ai-debug-apk`.
+The Android app uses the hosted model through the Vercel API, so it requires an
+internet connection. This is not yet offline/local Android inference and is not
+a Play Store release build.
 
-## Security notes
+## Security and limitations
 
-The Vercel proxy keeps the Render gateway token out of the browser. The proxy's
-in-memory rate limit is only a best-effort guard because serverless instances do
-not share state. Before public launch, configure durable Vercel Firewall or
-equivalent edge rate limiting, usage quotas, monitoring, and billing alerts.
-Keep all provider keys server-side. Never commit `server/.env`.
+The Worker requires bearer authentication and the Vercel proxy keeps the token
+server-side. The in-memory rate limiter is best-effort because isolates do not
+share state; configure durable edge rate limiting and monitor usage before public
+launch. Never commit secrets or expose them through `VITE_*` variables.
 
-## Architecture and roadmap
+The hosted model is a real inference service, but it is not a model trained by
+ATLAS. The separate local quantized Android model, vision, voice, retrieval,
+persistent cross-device memory, and fine-tuning remain future milestones.
 
-See [docs/GENERAL_LANGUAGE_MODEL_ROADMAP.md](docs/GENERAL_LANGUAGE_MODEL_ROADMAP.md).
-The current integration does not train ATLAS model weights or make the experimental
-ATLAS-1 checkpoint a general language model.
+See [docs/CLOUDFLARE_WORKERS_AI.md](docs/CLOUDFLARE_WORKERS_AI.md) and
+[docs/GENERAL_LANGUAGE_MODEL_ROADMAP.md](docs/GENERAL_LANGUAGE_MODEL_ROADMAP.md).
