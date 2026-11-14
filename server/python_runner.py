@@ -87,6 +87,7 @@ _CHILD = r"""
 import builtins
 import sys
 import traceback
+import types
 source = sys.stdin.read()
 allowed = {
     "abs", "all", "any", "bool", "callable", "chr", "dict", "divmod",
@@ -134,7 +135,9 @@ class LimitedWriter:
 
 real_stdout, real_stderr = sys.stdout, sys.stderr
 sys.stdout, sys.stderr = LimitedWriter(20000), LimitedWriter(20000)
-main_module = types.ModuleType("__main__")\nsys.modules["__main__"] = main_module\nnamespace = main_module.__dict__\nnamespace["__builtins__"] = safe_builtins
+main_module = types.ModuleType("__main__")
+sys.modules["__main__"] = main_module
+namespace = main_module.__dict__\nnamespace["__builtins__"] = safe_builtins
 exit_code = 0
 try:
     exec(compile(source, "<atlas-user-code>", "exec"), namespace, namespace)
