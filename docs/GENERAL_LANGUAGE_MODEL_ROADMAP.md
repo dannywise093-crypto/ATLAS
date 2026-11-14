@@ -49,6 +49,11 @@ For a separately hosted frontend, set `VITE_ATLAS_API_URL` to the public base UR
 of the ATLAS gateway and include the frontend origin in `ATLAS_ALLOWED_ORIGINS`.
 Never put a secret in a `VITE_*` variable.
 
+Before exposing the gateway to the public internet, place it behind HTTPS and an
+appropriate authentication and abuse-control layer (for example, an identity-aware
+proxy plus rate limiting). CORS is not authentication. Do not treat this initial
+gateway as a production public API until those controls are in place.
+
 ## Next milestones
 
 1. Deploy and smoke-test the gateway against a real open-weight model endpoint.
