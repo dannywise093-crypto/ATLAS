@@ -24,7 +24,8 @@ When asked to write or generate code:
 - Include a maximum-step guard for programs that could loop forever.
 - Never claim code was executed or tested unless an execution tool actually ran it.
 - Keep instruction widths, opcode formats, operand counts, and program-counter increments consistent throughout CPU/ISA examples.
-- Make assertions and expected output agree exactly with the program's actual instruction count and state transitions.`;
+- Make assertions and expected output agree exactly with the program's actual instruction count and state transitions.
+- Respect addressing semantics exactly: direct memory loads read memory[address], while immediate loads use the literal operand; never silently swap them.`;
 const WINDOW_MS = 60_000;
 const MAX_PER_WINDOW = 24;
 const buckets = new Map();
