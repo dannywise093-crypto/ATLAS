@@ -86,6 +86,7 @@ def validate_source(source: str) -> None:
 _CHILD = r"""
 import builtins
 import sys
+import traceback
 source = sys.stdin.read()
 allowed = {
     "abs", "all", "any", "bool", "callable", "chr", "dict", "divmod",
@@ -108,8 +109,41 @@ def safe_import(name, globals=None, locals=None, fromlist=(), level=0):
         raise ImportError("Import is not allowed: " + name)
     return real_import(name, globals, locals, fromlist, level)
 safe_builtins["__import__"] = safe_import
+
+class LimitedWriter:
+    encoding = "utf-8"
+    def __init__(self, limit):
+        self.limit = limit
+        self.parts = []
+        self.size = 0
+    def write(self, value):
+        value = str(value)
+        remaining = self.limit - self.size
+        if remaining > 0:
+            piece = value[:remaining]
+            self.parts.append(piece)
+            self.size += len(piece)
+        return len(value)
+    def getvalue(self):
+        return "".join(self.parts)
+    def flush(self):
+        pass
+    def isatty(self):
+        return False
+
+real_stdout, real_stderr = sys.stdout, sys.stderr
+sys.stdout, sys.stderr = LimitedWriter(20000), LimitedWriter(20000)
 namespace = {"__builtins__": safe_builtins, "__name__": "__main__"}
-exec(compile(source, "<atlas-user-code>", "exec"), namespace, namespace)
+exit_code = 0
+try:
+    exec(compile(source, "<atlas-user-code>", "exec"), namespace, namespace)
+except BaseException:
+    traceback.print_exc(file=sys.stderr)
+    exit_code = 1
+finally:
+    real_stdout.write(sys.stdout.getvalue())
+    real_stderr.write(sys.stderr.getvalue())
+sys.exit(exit_code)
 """
 
 
