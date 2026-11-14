@@ -1,43 +1,64 @@
-# ATLAS AI — Version 1.0 prototype
+# ATLAS AI — General Language Model Foundation
 
-A mobile-friendly React interface prototype for a future general-purpose Physical AI platform.
+ATLAS is a mobile-friendly React + Capacitor AI workspace. The project is moving
+from a rule-based demo toward a general-purpose assistant powered by an open-weight
+foundation model through a secure, model-agnostic gateway.
 
-## What works in this prototype
-- Responsive dashboard and navigation
-- Local demo chat interface (responses are placeholders, not a connected AI model)
-- Project notes stored in this browser using localStorage
-- Local image preview (images are not uploaded or analyzed)
-- Robotics status and safety information screens
+## Current capabilities
 
-## What is not connected yet
-- Cloud AI provider / real model responses
-- Server-side database and account authentication
-- Live camera stream or AI image analysis
-- Microphone / speech recognition / text-to-speech
-- ROS 2, robot hardware, motors or sensors
+- Responsive React interface and Android Capacitor wrapper.
+- Local project notes and memory commands stored in browser localStorage.
+- General chat client connected to the ATLAS server gateway.
+- FastAPI gateway for OpenAI-compatible model inference services.
+- Server-side model credentials; no provider key is exposed in frontend code.
+- Experimental ATLAS-1 architecture and training research code remain separate.
 
-The Robotics screen is informational only. This app cannot control physical hardware.
+## Model service setup
 
-## Run locally
+The repository does not bundle model weights or host an inference server. Configure
+a compatible inference service (for example, llama.cpp server or vLLM), then configure
+the ATLAS gateway:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r server/requirements.txt
+cp server/.env.example server/.env
+uvicorn server.main:app --host 0.0.0.0 --port 8000
+```
+
+Set `ATLAS_UPSTREAM_BASE_URL` and `ATLAS_MODEL_ID` to match your inference service.
+If authentication is required, set `ATLAS_UPSTREAM_API_KEY` only in the backend's
+private environment. Never put secrets in frontend variables or commit them.
+
+For a frontend hosted separately from the gateway, set `VITE_ATLAS_API_URL` to the
+gateway's public base URL and add the frontend origin to `ATLAS_ALLOWED_ORIGINS`.
+
+## Run the frontend
+
 Requires Node.js 18 or newer.
 
 ```bash
 npm install
 npm run dev
-```
-
-## Build for deployment
-```bash
+npm test
 npm run build
 ```
-Production files are generated in `dist/`.
 
 ## Android test APK
-A Capacitor Android wrapper and GitHub Actions workflow are included.
-Open **Actions → Build ATLAS Android test APK → Run workflow**. When complete,
-download the `atlas-ai-debug-apk` artifact. This is a debug/test APK, not a Play Store release.
+
+A Capacitor Android wrapper and GitHub Actions workflow are included. Open
+**Actions → Build ATLAS Android test APK → Run workflow**. Download the
+`atlas-ai-debug-apk` artifact when the workflow completes. This is a debug/test APK,
+not a Play Store release.
+
+## Architecture and roadmap
+
+See [docs/GENERAL_LANGUAGE_MODEL_ROADMAP.md](docs/GENERAL_LANGUAGE_MODEL_ROADMAP.md)
+for the chosen model strategy, deployment configuration, and milestones.
 
 ## Safety
-Do not connect this prototype directly to motors or actuators. Any future physical
-control system should include an independent emergency stop, speed/force limits,
-watchdogs, safe states and supervised testing. Never put API keys in frontend code.
+
+The Robotics screen is informational only. Do not connect this model directly to
+motors or actuators. Any future physical control system must use an independent
+safety controller, emergency stop, bounded movement, watchdogs, and supervised tests.
