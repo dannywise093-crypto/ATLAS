@@ -55,6 +55,10 @@ test("chat uses the primary model and enables capacity-aware rejection", async (
   assert.equal(calledWith.input.max_tokens, 3000);
   assert.equal("reasoning_effort" in calledWith.input, false);
   assert.equal("chat_template_kwargs" in calledWith.input, false);
+  assert.match(calledWith.input.messages[0].content, /Your name and product identity are ATLAS/);
+  assert.match(calledWith.input.messages[0].content, /created and developed by Danny Wise/);
+  assert.match(calledWith.input.messages[0].content, /not Meta AI, not Llama/);
+  assert.match(calledWith.input.messages[0].content, /primary inference model is Meta's Llama 3.3 70B/);
   assert.match(calledWith.input.messages[0].content, /complete, runnable code/);
   assert.match(calledWith.input.messages[0].content, /reject booleans, floats, and strings/);
   assert.match(calledWith.input.messages[0].content, /keep code and data memory regions separate/);
