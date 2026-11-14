@@ -7,7 +7,7 @@
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0",
-    "test": "node --test src/atlasCore.test.js cloudflare/worker.test.js"
+    "test": "node --test src/atlasCore.test.js cloudflare/worker.test.js && python -m unittest server.test_python_runner"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",
