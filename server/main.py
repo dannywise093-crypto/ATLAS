@@ -58,7 +58,6 @@ async def health():
         "status": "configured" if UPSTREAM_BASE_URL and UPSTREAM_MODEL else "not_configured",
         "provider_configured": bool(UPSTREAM_BASE_URL and UPSTREAM_MODEL),
         "model": UPSTREAM_MODEL,
-        
     }
 
 
