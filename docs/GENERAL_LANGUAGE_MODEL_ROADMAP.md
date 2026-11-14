@@ -3,60 +3,56 @@
 ## Chosen direction: open-weight foundation model + ATLAS systems
 
 ATLAS uses an existing open-weight model as its initial language foundation while
-developing its own application, gateway, memory, retrieval, evaluation, and tool
-interfaces. This does not mean the current experimental ATLAS-1 checkpoint is
-already a capable general-purpose LLM.
+developing its own application, memory, retrieval, evaluation, and tool interfaces.
+This does not mean ATLAS trains or owns the foundation model weights.
 
-## Implemented integration
+## Implemented foundation
 
-- FastAPI model gateway in `server/main.py`.
-- Optional bearer-token authentication; the Render Blueprint generates a token.
-- Vercel serverless routes in `api/` keep the gateway token out of browser code.
-- Request validation and best-effort per-instance rate limiting at the proxy.
-- OpenAI-compatible upstream chat-completions contract.
-- Honest frontend errors when the backend or model is not configured.
+- Hosted foundation model: `@cf/zai-org/glm-4.7-flash` through Cloudflare Workers AI.
+- Cloudflare Worker gateway with the `AI` binding.
+- Server-side bearer authentication; the secret is stored in Cloudflare and Vercel,
+  never in frontend code or the Git repository.
+- Vercel server-side API routes forward browser requests to the Worker.
+- Request validation, bounded conversation history, and best-effort throttling.
+- Live health check in the ATLAS dashboard.
+- Automated Worker tests for authentication, health, valid chat, and invalid inputs.
 - Local memory commands remain on-device.
 
-## Deployment sequence
+## Current hosted inference configuration
 
-1. Create the Render Blueprint from `render.yaml`.
-2. Set the real inference service's `ATLAS_UPSTREAM_BASE_URL` and exact
-   `ATLAS_MODEL_ID` in Render; set its private API key only if required.
-3. Copy Render's generated `ATLAS_GATEWAY_TOKEN` into both Vercel projects as
-   server-side `ATLAS_GATEWAY_TOKEN`, and set `ATLAS_GATEWAY_URL`.
-4. Redeploy Vercel and verify `/api/health` reports `status: configured`.
-5. Send a real test prompt and verify the response came from the selected model.
-6. Add durable edge rate limiting, quotas, monitoring, and billing alerts before
-   inviting public traffic.
+The Worker URL is `https://atlas-model-gateway.dannywise093.workers.dev`.
+Vercel projects `atlas` and `atlas-cqig` receive the server-side environment
+variables `ATLAS_GATEWAY_URL` and `ATLAS_GATEWAY_TOKEN` in Production and Preview.
 
-No model weights, hosting account, provider account, or paid inference is supplied
-by this repository. A real compatible inference endpoint is still required.
+Cloudflare Workers AI currently includes 10,000 free Neurons per account per day.
+The quota is shared across Workers AI usage and resets at 00:00 UTC. Usage beyond
+the free allocation requires the Workers Paid plan for additional usage. Monitor
+usage and confirm pricing before enabling paid usage.
 
-## Model selection policy
+## Deployment and verification
 
-Do not assume one model will fit every target. Evaluate candidate open-weight
-instruction models using the same benchmark set. Record exact model ID, license,
-quantization, context length, RAM/VRAM use, tokens per second, latency, and cost.
-
-For Android, begin with a small quantized model and benchmark on the exact phone.
-For stronger reasoning and broader knowledge, use a larger hosted/self-hosted model
-through the same gateway. The current Android app uses the remote gateway; offline
-local-model inference is a separate milestone and is not yet implemented.
+1. Cloudflare Worker deployed with Workers AI binding and bearer secret.
+2. Vercel server-side proxy variables configured in both ATLAS projects.
+3. Redeploy Vercel projects and verify `/api/health`.
+4. Send real test prompts from web and Android and check actual model responses.
+5. Add durable edge rate limiting, quotas, monitoring, and billing alerts before
+   public traffic.
 
 ## Next milestones
 
-1. Deploy and smoke-test the gateway against a real open-weight model endpoint.
-2. Select a local Android model after measuring target device RAM, storage, speed,
-   and thermal limits.
-3. Add streaming responses, cancellation, and conversation context management.
-4. Add source-aware document retrieval and user-controlled persistent memory.
-5. Add automated quality, safety, latency, and regression evaluations.
+1. Verify the Vercel preview and production endpoints end-to-end after deployment.
+2. Benchmark response quality, latency, model limits, and neuron consumption.
+3. Add streaming responses, cancellation, and robust conversation persistence.
+4. Select a quantized local Android model after measuring target-device RAM,
+   storage, speed, and thermal limits.
+5. Add source-aware document retrieval and user-controlled persistent memory.
 6. Add vision and voice as separate model capabilities.
 7. Consider ATLAS-specific fine-tuning only after licensed data and evaluation
    baselines exist.
 
 ## Important limitations
 
-The gateway forwards requests; it does not create or train new model weights.
-No inference server or model weights are bundled in this repository. A compatible
-model service must be configured before general-purpose chat is available.
+The hosted model is a real inference service, but it is not trained by ATLAS.
+The current Android app requires internet access for hosted inference. Offline
+local-model inference is not yet implemented. The in-memory rate limiter is
+best-effort; configure durable edge protection before public launch.
