@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { runAtlasCore } from "./atlasCore.js";
-import { getNeuralRuntimeStatus } from "./modelRuntime.js";
+import { getNeuralRuntimeStatus, generateAtlasResponse } from "./modelRuntime.js";
 import { Activity, Bot, BrainCircuit, Camera, Database, Eye, GraduationCap, Home, Menu, MessageSquare, Mic, Radio, Send, Settings, ShieldCheck, Sparkles, Volume2, X } from "lucide-react";
 
 function AtlasLogo({ className = "" }) {
@@ -8,7 +8,7 @@ function AtlasLogo({ className = "" }) {
 }
 
 const initial = [
-  { role: "atlas", text: "ATLAS Core v0.2 is running locally. I can recognise a small set of intents and save or recall project notes on this device. I am not yet a full language model." },
+  { role: "atlas", text: "ATLAS model gateway client is ready. Connect a compatible open-weight model server to enable general-purpose chat. Local project memory remains available on this device." },
   { role: "atlas", text: "Try saying “help” or “Remember that ATLAS is my personal AI project.”" }
 ];
 const nav = [["Overview",Home],["AI Assistant",MessageSquare],["Vision Center",Eye],["Voice Center",Mic],["Memory",Database],["Learning",GraduationCap],["Robotics",Bot],["Settings",Settings]];
@@ -21,9 +21,36 @@ export default function App() {
   const [image,setImage] = useState("");
   const [menu,setMenu] = useState(false);
   const [notice,setNotice] = useState("");
+  const [generating,setGenerating] = useState(false);
   useEffect(()=>localStorage.setItem("atlas-messages",JSON.stringify(messages)),[messages]);
   useEffect(()=>localStorage.setItem("atlas-memory",JSON.stringify(memory)),[memory]);
-  function send(e){e.preventDefault();const v=input.trim();if(!v)return;setMessages(m=>[...m,{role:"user",text:v}]);setInput("");const result=runAtlasCore(v,memory,messages);if(result.action==="save_memory"&&result.memory){setMemory(m=>m.includes(result.memory)?m:[...m,result.memory]);}setMessages(m=>[...m,{role:"atlas",text:result.text}]);}
+  async function send(e){
+    e.preventDefault();
+    const value=input.trim();
+    if(!value||generating)return;
+    const userMessage={role:"user",text:value};
+    const nextMessages=[...messages,userMessage];
+    setMessages(nextMessages);
+    setInput("");
+    const localCommand=/^(remember that|remember|save this|store this|what do you remember|show memory|list memories|my memories|find |search memory for |do you remember |help$|roadmap$|development plan$)/i.test(value);
+    if(localCommand){
+      const result=runAtlasCore(value,memory,messages);
+      if(result.action==="save_memory"&&result.memory){
+        setMemory(items=>items.includes(result.memory)?items:[...items,result.memory]);
+      }
+      setMessages(items=>[...items,{role:"atlas",text:result.text}]);
+      return;
+    }
+    setGenerating(true);
+    try{
+      const reply=await generateAtlasResponse(nextMessages);
+      setMessages(items=>[...items,{role:"atlas",text:reply}]);
+    }catch(error){
+      setMessages(items=>[...items,{role:"atlas",text:`I couldn't reach the ATLAS language-model service. ${error.message} Your message remains in this chat. The local notes and memory commands still work, but I won't pretend the rule-based core generated a general AI answer.`}]);
+    }finally{
+      setGenerating(false);
+    }
+  }
   function addMemory(){const v=prompt("What should ATLAS save in project memory?");if(v?.trim())setMemory(m=>[...m,v.trim()])}
   function heading(title,sub,badge){return <header className="pagehead"><div className="headicon"><AtlasLogo className="logo-head"/></div><div><div className="headrow"><h1>{title}</h1>{badge&&<span className="badge">{badge}</span>}</div><p>{sub}</p></div></header>}
   function card(icon,title,desc,status="Planned"){return <article className="card"><div className="cardtop"><span className="cardicon">{icon}</span><span className="badge">{status}</span></div><h3>{title}</h3><p>{desc}</p></article>}
@@ -33,12 +60,12 @@ export default function App() {
     <h2>SYSTEM OVERVIEW</h2><div className="grid four">{card(<BrainCircuit/>,"AI Core","Local intent engine connected","Local v0.2")}{card(<Sparkles/>,"Neural Runtime",neuralStatus.reason,neuralStatus.available?"Ready":"Not installed")}{card(<Database/>,"Project Memory",memory.length+" notes on this device","Local")}{card(<Eye/>,"Vision","Image preview only","Standby")}{card(<Bot/>,"Robotics","No hardware connected","Offline")}</div>
     <h2>DEVELOPMENT MODULES</h2><div className="grid two">{card(<MessageSquare/>,"Conversational intelligence","Chat workspace; connect a real AI model in a later step.","Interface ready")}{card(<Eye/>,"Perception & vision","Prepare image inputs for future computer vision.","Preview ready")}{card(<GraduationCap/>,"Learning system","Plan supervised demonstrations and evaluation.","Planned")}{card(<Bot/>,"Robotics integration","A safe bridge to controllers after simulation and testing.","Not connected")}</div>
     <div className="safety"><ShieldCheck/><div><b>Safety-first development</b><p>This is a software prototype. It does not control physical devices. Real robot movement must use independent safety limits and supervised testing.</p></div></div>
-  </section> : page==="AI Assistant" ? <section className="stack">{heading(page,"Talk with ATLAS Core v0.2: local notes, memory search and project roadmap.","LOCAL CORE v0.2")}<div className="chat"><div className="messages">{messages.map((m,i)=><div className={"msg "+m.role} key={i}><b>{m.role==="atlas"?"ATLAS":"YOU"}</b><p>{m.text}</p></div>)}</div><form className="composer" onSubmit={send}><input value={input} onChange={e=>setInput(e.target.value)} placeholder="Ask ATLAS about your project..."/><button disabled={!input.trim()}><Send/></button></form><small>Runs locally on this device · Rule-based local engine · No neural model or robot control.</small></div></section>
+  </section> : page==="AI Assistant" ? <section className="stack">{heading(page,"General-purpose conversation through your configured open-weight model service.","MODEL GATEWAY")}<div className="chat"><div className="messages">{messages.map((m,i)=><div className={"msg "+m.role} key={i}><b>{m.role==="atlas"?"ATLAS":"YOU"}</b><p>{m.text}</p></div>)}</div><form className="composer" onSubmit={send}><input value={input} onChange={e=>setInput(e.target.value)} placeholder="Ask ATLAS about your project..."/><button disabled={!input.trim()||generating}><Send/></button></form><small>{generating?"ATLAS is generating a response…":"General chat uses the configured ATLAS model service. Memory commands remain on this device."}</small></div></section>
   : page==="Vision Center" ? <section className="stack">{heading(page,"Prepare image input for future computer-vision features.","NOT CONNECTED")}<div className="panel"><Camera size={30}/><h3>Image input</h3><p>Choose a picture from your phone to preview it here. This prototype does not send images to an AI model.</p><label className="button">Choose image<input hidden type="file" accept="image/*" onChange={e=>{const f=e.target.files?.[0];if(f){setImage(URL.createObjectURL(f));setNotice("Local preview only. AI analysis is not connected.")}}}/></label>{image&&<img className="preview" src={image} alt="Selected preview"/>}{notice&&<p className="notice">{notice}</p>}</div>{card(<ShieldCheck/>,"Planned vision capabilities","Object recognition, camera integration, visual Q&A and privacy controls.")}</section>
   : page==="Voice Center" ? <section className="stack">{heading(page,"Voice interaction will be added after the AI backend.","COMING NEXT")}<div className="panel"><Mic size={36}/><h3>Voice interface</h3><p>Microphone capture and spoken responses are not connected yet. Permissions will be requested only when implemented.</p><button onClick={()=>setNotice("Voice features are planned for a later milestone.")}><Volume2 size={16}/> Check status</button>{notice&&<p className="notice">{notice}</p>}</div></section>
   : page==="Memory" ? <section className="stack">{heading("Project Memory","Notes are stored in this browser on this device.")}<div className="toolbar"><span>{memory.length} saved notes</span><button onClick={addMemory}>+ Add memory</button></div>{memory.map((m,i)=><div className="memory" key={i}><Database/><p>{m}</p><button className="delete" onClick={()=>setMemory(a=>a.filter((_,n)=>n!==i))}>Delete</button></div>)}<p className="notice">Notes are stored locally. They are not synced to a server or shared across devices.</p></section>
   : page==="Learning" ? <section className="stack">{heading("Learning Lab","Plan skills and training experiments for ATLAS.","PLANNING")}<div className="grid two">{card(<Sparkles/>,"Demonstration learning","Record human demonstrations and turn them into reviewed task examples.")}{card(<Activity/>,"Feedback & evaluation","Track outcomes in simulation and compare test runs.")}{card(<BrainCircuit/>,"Skill library","Store versioned, reviewed skills with clear permissions.")}{card(<ShieldCheck/>,"Safe testing","Require simulation, supervised trials and an emergency stop.","Required")}</div></section>
   : page==="Robotics" ? <section className="stack">{heading("Robotics Center","Hardware integration workspace.","NO ROBOT CONNECTED")}<div className="panel"><Bot size={44}/><h3>No robot connected</h3><p>ATLAS has no connection to motors, sensors or a robot controller.</p></div><div className="grid two">{card(<Radio/>,"Device connection","Future secure connection to supported robot controllers.","Not connected")}{card(<Activity/>,"Telemetry","Sensor readings and robot health when hardware is connected.","Unavailable")}</div><div className="safety"><ShieldCheck/><div><b>Physical controls are disabled</b><p>This prototype cannot move a robot. Future motion commands need an independent safety controller, limits and human confirmation.</p></div></div></section>
-  : <section className="stack">{heading("Settings","Prototype configuration and system information.")}<div className="panel settings">{[["Application","ATLAS AI v1.0 prototype"],["Architecture","Hybrid cloud + edge (planned)"],["AI engine","ATLAS Local Core v0.2 · Neural runtime not installed"],["Memory storage","This device / browser"],["Robot connection","Disabled"],["Safety mode","Physical actions disabled"]].map(([a,b])=><div className="setting" key={a}><span>{a}</span><b>{b}</b></div>)}</div><p className="notice">Never paste API keys or passwords into chat messages or public code. Store future credentials as private server-side environment variables.</p></section>;
-  return <div className="app"><aside className={menu?"sidebar open":"sidebar"}><div className="brand"><AtlasLogo className="logo-brand"/><div><b>ATLAS<span>AI</span></b><small>PHYSICAL INTELLIGENCE</small></div><button className="x" onClick={()=>setMenu(false)}><X/></button></div><label>WORKSPACE</label><nav>{nav.map(([n,I])=><button className={page===n?"active":""} key={n} onClick={()=>{setPage(n);setMenu(false)}}><I size={18}/>{n}</button>)}</nav><div className="sidefoot"><b>● Local core online</b><p>ATLAS Core v0.2 is running on this device. Full language model and robot hardware are not connected.</p><small>ATLAS BUILD 0.3.0 · LOCAL CORE</small></div></aside><main><header className="top"><button className="hamb" onClick={()=>setMenu(true)}><Menu/></button><span>ATLAS　›　<b>{page}</b></span><small>● Prototype</small></header><div className="content">{content}</div></main>{menu&&<button className="scrim" onClick={()=>setMenu(false)} aria-label="Close navigation"/>}</div>;
+  : <section className="stack">{heading("Settings","Prototype configuration and system information.")}<div className="panel settings">{[["Application","ATLAS AI v1.0 prototype"],["Architecture","Hybrid cloud + edge (planned)"],["AI engine","ATLAS model gateway · inference endpoint must be configured"],["Memory storage","This device / browser"],["Robot connection","Disabled"],["Safety mode","Physical actions disabled"]].map(([a,b])=><div className="setting" key={a}><span>{a}</span><b>{b}</b></div>)}</div><p className="notice">Never paste API keys or passwords into chat messages or public code. Store model-provider credentials only in private server-side environment variables.</p></section>;
+  return <div className="app"><aside className={menu?"sidebar open":"sidebar"}><div className="brand"><AtlasLogo className="logo-brand"/><div><b>ATLAS<span>AI</span></b><small>PHYSICAL INTELLIGENCE</small></div><button className="x" onClick={()=>setMenu(false)}><X/></button></div><label>WORKSPACE</label><nav>{nav.map(([n,I])=><button className={page===n?"active":""} key={n} onClick={()=>{setPage(n);setMenu(false)}}><I size={18}/>{n}</button>)}</nav><div className="sidefoot"><b>● Model gateway client ready</b><p>General chat requires a configured ATLAS server and open-weight model endpoint. Local memory remains on this device.</p><small>ATLAS BUILD 0.4.0 · MODEL GATEWAY</small></div></aside><main><header className="top"><button className="hamb" onClick={()=>setMenu(true)}><Menu/></button><span>ATLAS　›　<b>{page}</b></span><small>● Prototype</small></header><div className="content">{content}</div></main>{menu&&<button className="scrim" onClick={()=>setMenu(false)} aria-label="Close navigation"/>}</div>;
 }

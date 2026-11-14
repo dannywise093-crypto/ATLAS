@@ -1,56 +1,44 @@
-// ATLAS Neural Runtime boundary (v0.1)
-//
-// This module defines the app-side contract for a future on-device model.
-// It intentionally does not download models, call external AI APIs, or claim
-// that neural inference is available. A native Android runtime must be added
-// and benchmarked before this status can change.
+// ATLAS model gateway client.
+// The browser never receives an upstream model-provider secret. The backend
+// owns provider credentials and forwards requests to an OpenAI-compatible
+// inference server (for example llama.cpp, vLLM, or a hosted open-weight model).
+const API_BASE = String(import.meta.env.VITE_ATLAS_API_URL || "").replace(/\/$/, "");
 
-const unavailableRuntime = {
-  id: "none",
-  label: "No neural model installed",
-  available: false,
-  reason:
-    "ATLAS currently uses its transparent rule-based core. Android model runtime support has not been integrated or benchmarked on this device.",
-};
-
-let activeRuntime = unavailableRuntime;
-
-/**
- * Return a safe, displayable summary of the configured model runtime.
- * Do not expose file paths, credentials, or private device data here.
- */
 export function getNeuralRuntimeStatus() {
-  return { ...activeRuntime };
-}
-
-/**
- * Register a future local runtime adapter.
- * Adapter contract:
- *   { id, label, available: true, generate: async ({ prompt, signal }) => string }
- * The adapter must run locally and must not silently send prompts to a server.
- */
-export function registerLocalRuntime(adapter) {
-  if (!adapter || typeof adapter.id !== "string" ||
-      typeof adapter.label !== "string" ||
-      typeof adapter.generate !== "function") {
-    throw new TypeError("A local runtime needs id, label, and generate().");
-  }
-  activeRuntime = {
-    id: adapter.id,
-    label: adapter.label,
-    available: true,
-    generate: adapter.generate,
+  return {
+    id: "atlas-model-gateway",
+    label: "ATLAS model gateway",
+    available: false,
+    reason: "Gateway client implemented; the backend and a compatible inference model still need to be configured and verified.",
   };
 }
 
-/**
- * Ask the configured local model. Returns null while no runtime is installed,
- * allowing the UI to fall back honestly to ATLAS Core.
- */
-export async function generateWithLocalModel(prompt, signal) {
-  if (!activeRuntime.available || typeof activeRuntime.generate !== "function") {
-    return null;
+export async function checkAtlasBackend(signal) {
+  const response = await fetch(`${API_BASE}/api/health`, { signal, headers: { Accept: "application/json" } });
+  if (!response.ok) throw new Error(`ATLAS service health check failed (HTTP ${response.status}).`);
+  return response.json();
+}
+
+export async function generateAtlasResponse(history, signal) {
+  const messages = history
+    .filter((item) => item && (item.role === "user" || item.role === "atlas" || item.role === "assistant"))
+    .slice(-24)
+    .map((item) => ({ role: item.role === "atlas" ? "assistant" : item.role, content: String(item.text || "").slice(0, 12000) }));
+
+  const response = await fetch(`${API_BASE}/api/chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({ messages }),
+    signal,
+  });
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload.detail || `ATLAS model service returned HTTP ${response.status}.`);
   }
-  const result = await activeRuntime.generate({ prompt: String(prompt || ""), signal });
-  return typeof result === "string" ? result : String(result ?? "");
+  const answer = payload.answer;
+  if (typeof answer !== "string" || !answer.trim()) {
+    throw new Error("The configured model returned an empty response.");
+  }
+  return answer.trim();
 }
