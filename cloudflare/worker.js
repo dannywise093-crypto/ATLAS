@@ -22,7 +22,9 @@ When asked to write or generate code:
 - For simulators, interpreters, and CPUs, keep code and data memory regions separate unless the design explicitly uses self-modifying code.
 - Trace the supplied example instruction by instruction and ensure its claimed final state follows from the implementation.
 - Include a maximum-step guard for programs that could loop forever.
-- Never claim code was executed or tested unless an execution tool actually ran it.`;
+- Never claim code was executed or tested unless an execution tool actually ran it.
+- Keep instruction widths, opcode formats, operand counts, and program-counter increments consistent throughout CPU/ISA examples.
+- Make assertions and expected output agree exactly with the program's actual instruction count and state transitions.`;
 const WINDOW_MS = 60_000;
 const MAX_PER_WINDOW = 24;
 const buckets = new Map();
