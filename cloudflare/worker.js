@@ -68,6 +68,11 @@ function rateLimited(request) {
   return false;
 }
 
+function isTruncated(result) {
+  const finishReason = result?.choices?.[0]?.finish_reason || result?.finish_reason;
+  return finishReason === "length" || finishReason === "max_tokens";
+}
+
 function extractAnswer(result) {
   // Accept both OpenAI chat-completion and native Workers AI text outputs.
   const candidates = [
@@ -148,6 +153,10 @@ export default {
     for (const model of MODELS) {
       try {
         const result = await runModelWithDeadline(env, model.id, messages, model.timeoutMs);
+        if (isTruncated(result)) {
+          failures.push(`${model.id}: response reached the output token limit`);
+          continue;
+        }
         const answer = extractAnswer(result);
         if (answer) {
           return json({
