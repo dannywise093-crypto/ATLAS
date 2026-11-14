@@ -1,7 +1,6 @@
 // ATLAS model gateway client.
-// The browser never receives an upstream model-provider secret. The backend
-// owns provider credentials and forwards requests to an OpenAI-compatible
-// inference server (for example llama.cpp, vLLM, or a hosted open-weight model).
+// Production requests use same-origin Vercel serverless routes. The gateway
+// token and model-provider credentials remain server-side and never enter VITE_*.
 const API_BASE = String(import.meta.env.VITE_ATLAS_API_URL || "").replace(/\/$/, "");
 
 export function getNeuralRuntimeStatus() {
@@ -9,36 +8,60 @@ export function getNeuralRuntimeStatus() {
     id: "atlas-model-gateway",
     label: "ATLAS model gateway",
     available: false,
-    reason: "Gateway client implemented; the backend and a compatible inference model still need to be configured and verified.",
+    reason: "The application proxy is ready; a deployed gateway and configured inference model are still required.",
   };
 }
 
+async function requestJson(path, options = {}) {
+  let response;
+  try {
+    response = await fetch(`${API_BASE}${path}`, {
+      ...options,
+      headers: { Accept: "application/json", ...(options.headers || {}) },
+    });
+  } catch {
+    throw new Error("The ATLAS application server could not be reached. Check the deployment and try again.");
+  }
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(
+      typeof payload.error === "string"
+        ? payload.error
+        : typeof payload.detail === "string"
+          ? payload.detail
+          : `ATLAS service returned HTTP ${response.status}.`
+    );
+  }
+  return payload;
+}
+
 export async function checkAtlasBackend(signal) {
-  const response = await fetch(`${API_BASE}/api/health`, { signal, headers: { Accept: "application/json" } });
-  if (!response.ok) throw new Error(`ATLAS service health check failed (HTTP ${response.status}).`);
-  return response.json();
+  return requestJson("/api/health", { signal });
 }
 
 export async function generateAtlasResponse(history, signal) {
   const messages = history
     .filter((item) => item && (item.role === "user" || item.role === "atlas" || item.role === "assistant"))
     .slice(-24)
-    .map((item) => ({ role: item.role === "atlas" ? "assistant" : item.role, content: String(item.text || "").slice(0, 12000) }));
+    .map((item) => ({
+      role: item.role === "atlas" ? "assistant" : item.role,
+      content: String(item.text || "").trim().slice(0, 12000),
+    }))
+    .filter((item) => item.content.length > 0);
 
-  const response = await fetch(`${API_BASE}/api/chat`, {
+  if (!messages.length || messages[messages.length - 1].role !== "user") {
+    throw new Error("Send a message before requesting an ATLAS response.");
+  }
+
+  const payload = await requestJson("/api/chat", {
     method: "POST",
-    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ messages }),
     signal,
   });
-
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new Error(payload.detail || `ATLAS model service returned HTTP ${response.status}.`);
-  }
-  const answer = payload.answer;
-  if (typeof answer !== "string" || !answer.trim()) {
+  if (typeof payload.answer !== "string" || !payload.answer.trim()) {
     throw new Error("The configured model returned an empty response.");
   }
-  return answer.trim();
+  return payload.answer.trim();
 }
