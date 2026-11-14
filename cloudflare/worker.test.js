@@ -124,3 +124,13 @@ test("five consecutive chat requests each receive a fresh model response", async
   }
   assert.equal(callCount, 5);
 });
+
+
+test("chat accepts the native Workers AI response field", async () => {
+  const env = envWith(async () => ({ response: "Native Workers AI response" }));
+  const response = await worker.fetch(request("/api/chat", { method: "POST", body: validBody }), env);
+  const body = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(body.answer, "Native Workers AI response");
+  assert.equal(body.fallbackUsed, false);
+});
