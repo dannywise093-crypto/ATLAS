@@ -120,3 +120,113 @@ async def chat(request: ChatRequest):
         raise HTTPException(status_code=502, detail="The configured model returned an empty response.")
 
     return {"answer": answer.strip(), "model": data.get("model") or UPSTREAM_MODEL}
+
+
+# Python execution is deliberately a separate, authenticated capability.
+from fastapi.concurrency import run_in_threadpool
+from server.python_runner import CodeRejected, execute_python
+
+class ExecuteRequest(BaseModel):
+    code: str = Field(min_length=1, max_length=20000)
+    auto_repair: bool = True
+
+
+def _extract_python(text: str) -> str:
+    import re
+    match = re.search(r"```(?:python)?\s*([\s\S]*?)```", text, re.IGNORECASE)
+    return (match.group(1) if match else text).strip()
+
+
+async def _ask_model_to_repair(code: str, stderr: str) -> str:
+    if not UPSTREAM_BASE_URL or not UPSTREAM_MODEL:
+        raise HTTPException(status_code=503, detail="Automatic repair is unavailable because the model endpoint is not configured.")
+    prompt = (
+        "Repair this Python program using the execution error below. Return only the "
+        "complete corrected Python source code, preferably in a python code fence. "
+        "Do not add explanations. The code will be checked by a restricted runner.\n\n"
+        f"EXECUTION ERROR:\n{stderr[:6000]}\n\nSOURCE CODE:\n{code[:20000]}"
+    )
+    headers = {"Content-Type": "application/json"}
+    if UPSTREAM_API_KEY:
+        headers["Authorization"] = f"Bearer {UPSTREAM_API_KEY}"
+    try:
+        async with httpx.AsyncClient(timeout=UPSTREAM_TIMEOUT) as client:
+            response = await client.post(
+                f"{UPSTREAM_BASE_URL}/chat/completions",
+                json={
+                    "model": UPSTREAM_MODEL,
+                    "messages": [
+                        {"role": "system", "content": "You are a careful Python debugging assistant. Never claim code was run unless the execution service ran it."},
+                        {"role": "user", "content": prompt},
+                    ],
+                    "temperature": 0.1,
+                    "max_tokens": 3000,
+                    "stream": False,
+                },
+                headers=headers,
+            )
+    except httpx.HTTPError as exc:
+        raise HTTPException(status_code=502, detail="The model service could not repair the Python program.") from exc
+    if response.is_error:
+        raise HTTPException(status_code=502, detail="The model service rejected the repair request.")
+    try:
+        answer = response.json()["choices"][0]["message"]["content"]
+    except (ValueError, KeyError, IndexError, TypeError) as exc:
+        raise HTTPException(status_code=502, detail="The model returned an invalid repair response.") from exc
+    if not isinstance(answer, str) or not answer.strip():
+        raise HTTPException(status_code=502, detail="The model returned an empty repair.")
+    return _extract_python(answer)
+
+
+@app.post("/api/execute", dependencies=[Depends(require_gateway_access)])
+async def execute_code(request: ExecuteRequest):
+    """Run restricted Python, capture actual process output, and optionally repair once."""
+    try:
+        first = await run_in_threadpool(execute_python, request.code)
+    except CodeRejected as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    attempts = [{
+        "stdout": first.stdout,
+        "stderr": first.stderr,
+        "exit_code": first.exit_code,
+        "duration_ms": first.duration_ms,
+        "timed_out": first.timed_out,
+        "verified": first.passed,
+    }]
+    final_code = request.code
+    final = first
+    repaired = False
+
+    if not first.passed and request.auto_repair:
+        try:
+            candidate = await _ask_model_to_repair(request.code, first.stderr or "Process exited unsuccessfully.")
+            # Validate before executing model-produced source.
+            repaired_result = await run_in_threadpool(execute_python, candidate)
+            attempts.append({
+                "stdout": repaired_result.stdout,
+                "stderr": repaired_result.stderr,
+                "exit_code": repaired_result.exit_code,
+                "duration_ms": repaired_result.duration_ms,
+                "timed_out": repaired_result.timed_out,
+                "verified": repaired_result.passed,
+            })
+            final_code = candidate
+            final = repaired_result
+            repaired = True
+        except CodeRejected as exc:
+            attempts.append({"verified": False, "rejected": str(exc)})
+
+    return {
+        "status": "passed" if final.passed else "failed",
+        "execution_verified": final.passed,
+        "output": final.stdout,
+        "error": final.stderr,
+        "exit_code": final.exit_code,
+        "duration_ms": final.duration_ms,
+        "auto_repair_attempted": repaired,
+        "code": final_code,
+        "attempts": attempts,
+        "execution_mode": "restricted_subprocess",
+        "security_note": "Restricted execution with process limits; not a hardened hostile-code isolation boundary.",
+    }
