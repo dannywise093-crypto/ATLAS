@@ -21,8 +21,10 @@ export default function App() {
   const [image,setImage] = useState("");
   const [menu,setMenu] = useState(false);
   const [notice,setNotice] = useState("");
-  const [generating,setGenerating] = useState(false);\n  const [gatewayReady,setGatewayReady] = useState(false);\n  const [gatewayMessage,setGatewayMessage] = useState("Checking the hosted model gateway…");
-  useEffect(()=>{const controller=new AbortController();checkAtlasBackend(controller.signal).then(status=>{const ready=status.status==="configured";setGatewayReady(ready);setGatewayMessage(ready?"Cloudflare Workers AI · GLM-4.7-Flash is connected.":"The hosted model is not configured.");}).catch(error=>{setGatewayReady(false);setGatewayMessage(error.message);});return()=>controller.abort();},[]);\n  useEffect(()=>localStorage.setItem("atlas-messages",JSON.stringify(messages)),[messages]);
+  const [generating,setGenerating] = useState(false);
+  const [gatewayReady,setGatewayReady] = useState(false);\n  const [gatewayMessage,setGatewayMessage] = useState("Checking the hosted model gateway…");
+  useEffect(()=>{const controller=new AbortController();checkAtlasBackend(controller.signal).then(status=>{const ready=status.status==="configured";setGatewayReady(ready);setGatewayMessage(ready?"Cloudflare Workers AI · GLM-4.7-Flash is connected.":"The hosted model is not configured.");}).catch(error=>{setGatewayReady(false);setGatewayMessage(error.message);});return()=>controller.abort();},[]);
+  useEffect(()=>localStorage.setItem("atlas-messages",JSON.stringify(messages)),[messages]);
   useEffect(()=>localStorage.setItem("atlas-memory",JSON.stringify(memory)),[memory]);
   async function send(e){
     e.preventDefault();
