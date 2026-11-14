@@ -57,6 +57,7 @@ test("chat uses the primary model and enables capacity-aware rejection", async (
   assert.deepEqual(calledWith.input.chat_template_kwargs, { enable_thinking: false, clear_thinking: true });
   assert.match(calledWith.input.messages[0].content, /complete, runnable code/);
   assert.match(calledWith.input.messages[0].content, /keep code and data memory regions separate/);
+  assert.match(calledWith.input.messages[0].content, /instruction widths/);
 });
 
 test("chat falls back when the primary model is unavailable", async () => {
