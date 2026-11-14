@@ -134,7 +134,7 @@ class LimitedWriter:
 
 real_stdout, real_stderr = sys.stdout, sys.stderr
 sys.stdout, sys.stderr = LimitedWriter(20000), LimitedWriter(20000)
-namespace = {"__builtins__": safe_builtins, "__name__": "__main__"}
+main_module = types.ModuleType("__main__")\nsys.modules["__main__"] = main_module\nnamespace = main_module.__dict__\nnamespace["__builtins__"] = safe_builtins
 exit_code = 0
 try:
     exec(compile(source, "<atlas-user-code>", "exec"), namespace, namespace)
