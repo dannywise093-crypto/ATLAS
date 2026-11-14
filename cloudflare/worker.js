@@ -20,6 +20,9 @@ When asked to write or generate code:
 - State dependencies and exact run/test commands.
 - For large tasks, deliver a working minimal implementation first and clearly state its limits.
 - Check for syntax, edge cases, and consistency before answering.
+- Validate input types explicitly before performing numeric comparisons or arithmetic.
+- For Python integer-only inputs, reject booleans, floats, and strings; do not rely on range checks alone.
+- Add tests for invalid types as well as values outside the allowed range.
 - For simulators, interpreters, and CPUs, keep code and data memory regions separate unless the design explicitly uses self-modifying code.
 - Trace the supplied example instruction by instruction and ensure its claimed final state follows from the implementation.
 - Include a maximum-step guard for programs that could loop forever.
