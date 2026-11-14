@@ -97,7 +97,8 @@ allowed = {
     "type", "object", "super", "zip", "Exception", "TypeError", "ValueError", "RuntimeError",
     "AssertionError", "KeyError", "IndexError", "StopIteration",
 }
-safe_builtins = {name: getattr(builtins, name) for name in allowed}\nsafe_builtins["__build_class__"] = builtins.__build_class__
+safe_builtins = {name: getattr(builtins, name) for name in allowed}
+safe_builtins["__build_class__"] = builtins.__build_class__
 real_import = builtins.__import__
 allowed_modules = {
     "math", "statistics", "decimal", "fractions", "collections",
@@ -152,7 +153,7 @@ def _limits() -> None:
         return
     try:
         import resource
-        resource.setrlimit(resource.RLIMIT_CPU, (6, 6))
+        resource.setrlimit(resource.RLIMIT_CPU, (10, 10))
         resource.setrlimit(resource.RLIMIT_AS, (MEMORY_LIMIT_BYTES, MEMORY_LIMIT_BYTES))
         resource.setrlimit(resource.RLIMIT_FSIZE, (1_000_000, 1_000_000))
         resource.setrlimit(resource.RLIMIT_NOFILE, (32, 32))
