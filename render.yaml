@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: atlas-model-gateway
+    runtime: python
+    plan: starter
+    buildCommand: pip install -r server/requirements.txt
+    startCommand: uvicorn server.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: ATLAS_GATEWAY_TOKEN
+        generateValue: true
+      - key: ATLAS_UPSTREAM_BASE_URL
+        sync: false
+      - key: ATLAS_MODEL_ID
+        sync: false
+      - key: ATLAS_UPSTREAM_API_KEY
+        sync: false
+      - key: ATLAS_UPSTREAM_TIMEOUT_SECONDS
+        value: "45"
+      - key: ATLAS_ALLOWED_ORIGINS
+        value: "http://localhost:5173,http://127.0.0.1:5173"
