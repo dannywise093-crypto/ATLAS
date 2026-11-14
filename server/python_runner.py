@@ -118,7 +118,7 @@ def _limits() -> None:
         return
     try:
         import resource
-        resource.setrlimit(resource.RLIMIT_CPU, (4, 4))
+        resource.setrlimit(resource.RLIMIT_CPU, (6, 6))
         resource.setrlimit(resource.RLIMIT_AS, (MEMORY_LIMIT_BYTES, MEMORY_LIMIT_BYTES))
         resource.setrlimit(resource.RLIMIT_FSIZE, (1_000_000, 1_000_000))
         resource.setrlimit(resource.RLIMIT_NOFILE, (32, 32))
