@@ -94,10 +94,10 @@ allowed = {
     "int", "isinstance", "issubclass", "iter", "len", "list", "map",
     "max", "min", "next", "oct", "ord", "pow", "print", "range", "repr",
     "reversed", "round", "set", "slice", "sorted", "str", "sum", "tuple",
-    "type", "zip", "Exception", "TypeError", "ValueError", "RuntimeError",
+    "type", "object", "super", "zip", "Exception", "TypeError", "ValueError", "RuntimeError",
     "AssertionError", "KeyError", "IndexError", "StopIteration",
 }
-safe_builtins = {name: getattr(builtins, name) for name in allowed}
+safe_builtins = {name: getattr(builtins, name) for name in allowed}\nsafe_builtins["__build_class__"] = builtins.__build_class__
 real_import = builtins.__import__
 allowed_modules = {
     "math", "statistics", "decimal", "fractions", "collections",
