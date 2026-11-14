@@ -14,8 +14,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 APP_NAME = "ATLAS Model Gateway"
-UPSTREAM_BASE_URL = os.getenv("ATLAS_UPSTREAM_BASE_URL", "http://127.0.0.1:1234/v1").rstrip("/")
-UPSTREAM_MODEL = os.getenv("ATLAS_MODEL_ID", "local-model")
+UPSTREAM_BASE_URL = os.getenv("ATLAS_UPSTREAM_BASE_URL", "").rstrip("/")
+UPSTREAM_MODEL = os.getenv("ATLAS_MODEL_ID", "")
 UPSTREAM_API_KEY = os.getenv("ATLAS_UPSTREAM_API_KEY", "")
 UPSTREAM_TIMEOUT = float(os.getenv("ATLAS_UPSTREAM_TIMEOUT_SECONDS", "90"))
 MAX_MESSAGES = 24
@@ -55,10 +55,10 @@ class ChatRequest(BaseModel):
 async def health():
     return {
         "service": APP_NAME,
-        "status": "ready",
+        "status": "configured" if UPSTREAM_BASE_URL and UPSTREAM_MODEL else "not_configured",
         "provider_configured": bool(UPSTREAM_BASE_URL and UPSTREAM_MODEL),
         "model": UPSTREAM_MODEL,
-        "upstream": UPSTREAM_BASE_URL,
+        
     }
 
 
