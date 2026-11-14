@@ -69,7 +69,7 @@ export async function callGateway(path, body) {
         Authorization: `Bearer ${token}`,
       },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-      signal: AbortSignal.timeout(52_000),
+      signal: AbortSignal.timeout(112_000),
     });
   } catch {
     return { status: 502, body: { error: "ATLAS backend could not be reached before the request deadline. Please retry." , retryable: true } };
