@@ -1,4 +1,8 @@
-const MODEL = "@cf/zai-org/glm-4.7-flash";
+const MODELS = [
+  { id: "@cf/zai-org/glm-4.7-flash", timeoutMs: 18_000 },
+  { id: "@cf/google/gemma-4-26b-a4b-it", timeoutMs: 18_000 },
+  { id: "@cf/meta/llama-3.3-70b-instruct-fp8-fast", timeoutMs: 12_000 },
+];
 const SYSTEM_PROMPT = `You are ATLAS, a capable general-purpose AI assistant.
 Be accurate, clear, and honest about uncertainty. Explain concepts clearly, solve
 problems carefully, and ask for missing context when needed. Do not claim to have
@@ -47,6 +51,25 @@ function rateLimited(request) {
   return false;
 }
 
+async function runModelWithDeadline(env, model, messages, timeoutMs) {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error("Model response deadline exceeded.")), timeoutMs);
+  });
+  try {
+    return await Promise.race([
+      env.AI.run(model, {
+        messages: [{ role: "system", content: SYSTEM_PROMPT }, ...messages],
+        max_tokens: 900,
+        temperature: 0.55,
+      }, { rejectIfBusy: true }),
+      timeout,
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -57,7 +80,8 @@ export default {
         service: "ATLAS Cloudflare Workers AI Gateway",
         status: env.AI ? "configured" : "not_configured",
         provider: "Cloudflare Workers AI",
-        model: MODEL,
+        model: MODELS[0].id,
+        fallbackModels: MODELS.slice(1).map((model) => model.id),
       });
     }
 
@@ -85,20 +109,28 @@ export default {
       return json({ error: "The latest message must be from the user." }, 400);
     }
 
-    try {
-      const result = await env.AI.run(MODEL, {
-        messages: [{ role: "system", content: SYSTEM_PROMPT }, ...messages],
-        max_tokens: 1200,
-        temperature: 0.6,
-      });
-      const answer = result?.choices?.[0]?.message?.content;
-      if (typeof answer !== "string" || !answer.trim()) {
-        return json({ error: "The model returned an empty or unsupported response." }, 502);
+    const failures = [];
+    for (const model of MODELS) {
+      try {
+        const result = await runModelWithDeadline(env, model.id, messages, model.timeoutMs);
+        const answer = result?.choices?.[0]?.message?.content;
+        if (typeof answer === "string" && answer.trim()) {
+          return json({
+            answer: answer.trim(),
+            model: model.id,
+            fallbackUsed: model.id !== MODELS[0].id,
+          });
+        }
+        failures.push(`${model.id}: empty response`);
+      } catch (error) {
+        failures.push(`${model.id}: ${error?.message || "inference failed"}`);
+        console.warn("ATLAS model attempt failed", model.id, error?.message || "unknown error");
       }
-      return json({ answer: answer.trim(), model: MODEL });
-    } catch (error) {
-      console.error("ATLAS inference request failed", error?.message || "unknown error");
-      return json({ error: "ATLAS could not complete the model request. Please retry shortly." }, 502);
     }
+    console.error("All ATLAS model attempts failed", failures.join("; "));
+    return json({
+      error: "ATLAS is temporarily busy. The request was tried against the primary model and backup models. Please retry in a moment.",
+      retryable: true,
+    }, 503, { "retry-after": "3" });
   },
 };
