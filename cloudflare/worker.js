@@ -18,7 +18,11 @@ When asked to write or generate code:
 - Do not use ellipses, "TODO", or omit implementation sections.
 - State dependencies and exact run/test commands.
 - For large tasks, deliver a working minimal implementation first and clearly state its limits.
-- Check for syntax, edge cases, and consistency before answering.`;
+- Check for syntax, edge cases, and consistency before answering.
+- For simulators, interpreters, and CPUs, keep code and data memory regions separate unless the design explicitly uses self-modifying code.
+- Trace the supplied example instruction by instruction and ensure its claimed final state follows from the implementation.
+- Include a maximum-step guard for programs that could loop forever.
+- Never claim code was executed or tested unless an execution tool actually ran it.`;
 const WINDOW_MS = 60_000;
 const MAX_PER_WINDOW = 24;
 const buckets = new Map();
