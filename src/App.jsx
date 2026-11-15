@@ -3,6 +3,53 @@ import { runAtlasCore } from "./atlasCore.js";
 import { getNeuralRuntimeStatus, checkAtlasBackend, generateAtlasResponse } from "./modelRuntime.js";
 import { Activity, Bot, BrainCircuit, Camera, Database, Eye, GraduationCap, Home, Menu, MessageSquare, Mic, Radio, Send, Settings, ShieldCheck, Sparkles, Volume2, X, Terminal, Play } from "lucide-react";
 
+function CodeBlock({ language, code }) {
+  const [copied, setCopied] = useState(false);
+  async function copyCode() {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1600);
+    } catch {
+      const area = document.createElement("textarea");
+      area.value = code;
+      area.style.position = "fixed";
+      area.style.opacity = "0";
+      document.body.appendChild(area);
+      area.select();
+      const ok = document.execCommand("copy");
+      area.remove();
+      setCopied(ok);
+      window.setTimeout(() => setCopied(false), 1600);
+    }
+  }
+  return <section className="assistant-code">
+    <header className="assistant-code-head">
+      <span className="assistant-code-language"><Terminal size={15}/>{language || "Code"}</span>
+      <button type="button" className="assistant-code-copy" onClick={copyCode} aria-label="Copy code">
+        {copied ? "Copied" : "Copy"} <CopyIcon />
+      </button>
+    </header>
+    <pre><code>{code}</code></pre>
+  </section>;
+}
+function CopyIcon() {
+  return <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="13" rx="2"/><path d="M16 5V4a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h1"/></svg>;
+}
+function AssistantMessage({ text }) {
+  const parts = [];
+  const pattern = /```([\w+#.-]*)[^\S\r\n]*\r?\n([\s\S]*?)```/g;
+  let last = 0, match, index = 0;
+  while ((match = pattern.exec(text)) !== null) {
+    if (match.index > last) parts.push(<p key={"text-"+index}>{text.slice(last, match.index).trim()}</p>);
+    parts.push(<CodeBlock key={"code-"+index} language={match[1]} code={match[2].replace(/\n$/, "")}/>);
+    last = pattern.lastIndex;
+    index++;
+  }
+  if (last < text.length) parts.push(<p key={"text-"+index}>{text.slice(last).trim()}</p>);
+  return <>{parts.length ? parts : <p>{text}</p>}</>;
+}
+
 function AtlasLogo({ className = "" }) {
   return <img className={className} src="/atlas-logo.svg" alt="ATLAS logo" />;
 }
@@ -79,7 +126,7 @@ export default function App() {
     <h2>SYSTEM OVERVIEW</h2><div className="grid four">{card(<BrainCircuit/>,"AI Core","Local intent engine connected","Local v0.2")}{card(<Sparkles/>,"Neural Runtime",neuralStatus.reason,neuralStatus.available?"Ready":"Not installed")}{card(<Database/>,"Project Memory",memory.length+" notes on this device","Local")}{card(<Eye/>,"Vision","Image preview only","Standby")}{card(<Bot/>,"Robotics","No hardware connected","Offline")}</div>
     <h2>DEVELOPMENT MODULES</h2><div className="grid two">{card(<MessageSquare/>,"Conversational intelligence","Hosted GLM-4.7-Flash foundation model through Cloudflare Workers AI.","Interface ready")}{card(<Eye/>,"Perception & vision","Prepare image inputs for future computer vision.","Preview ready")}{card(<GraduationCap/>,"Learning system","Plan supervised demonstrations and evaluation.","Planned")}{card(<Bot/>,"Robotics integration","A safe bridge to controllers after simulation and testing.","Not connected")}</div>
     <div className="safety"><ShieldCheck/><div><b>Safety-first development</b><p>This is a software prototype. It does not control physical devices. Real robot movement must use independent safety limits and supervised testing.</p></div></div>
-  </section> : page==="AI Assistant" ? <section className="stack">{heading(page,"General-purpose conversation powered by the hosted GLM-4.7-Flash model.","MODEL GATEWAY")}<div className="chat"><div className="messages">{messages.map((m,i)=><div className={"msg "+m.role} key={i}><b>{m.role==="atlas"?"ATLAS":"YOU"}</b><p>{m.text}</p></div>)}</div><form className="composer" onSubmit={send}><input value={input} onChange={e=>setInput(e.target.value)} placeholder="Ask ATLAS anything..."/><button disabled={!input.trim()||generating}><Send/></button></form><small>{generating?"ATLAS is generating a response…":"General chat uses Cloudflare Workers AI · GLM-4.7-Flash. Memory commands remain on this device."}</small></div></section>
+  </section> : page==="AI Assistant" ? <section className="stack">{heading(page,"General-purpose conversation powered by the hosted GLM-4.7-Flash model.","MODEL GATEWAY")}<div className="chat"><div className="messages">{messages.map((m,i)=><div className={"msg "+m.role} key={i}><b>{m.role==="atlas"?"ATLAS":"YOU"}</b><AssistantMessage text={m.text}/></div>)}</div><form className="composer" onSubmit={send}><input value={input} onChange={e=>setInput(e.target.value)} placeholder="Ask ATLAS anything..."/><button disabled={!input.trim()||generating}><Send/></button></form><small>{generating?"ATLAS is generating a response…":"General chat uses Cloudflare Workers AI · GLM-4.7-Flash. Memory commands remain on this device."}</small></div></section>
   : page==="Code Lab" ? <section className="stack">{heading("Python Code Lab","Run Python in ATLAS, capture real output, and request one automatic repair.","RESTRICTED RUNNER")}<div className="code-panel"><div className="code-toolbar"><span><Terminal size={15}/> Python 3 · Restricted execution</span><button onClick={runPython} disabled={runningPython||!pythonCode.trim()}><Play size={15}/>{runningPython?"Running…":"Run & verify"}</button></div><textarea className="code-editor" spellCheck="false" value={pythonCode} onChange={e=>setPythonCode(e.target.value)} aria-label="Python source code"/><p className="code-hint">Maximum 20,000 characters · 5-second runtime limit · standard-library allowlist · one AI repair attempt after a failed run.</p></div>{pythonResult&&<div className="execution-card"><div className="execution-heading"><b>Execution result</b><span className={"execution-status "+(pythonResult.execution_verified?"passed":"failed")}>{pythonResult.execution_verified?"EXECUTED · VERIFIED":"NOT VERIFIED"}</span></div><p className="execution-note">{pythonResult.execution_verified?"The server ran this code and captured the process output.":"The code did not complete successfully. Output below is only what the runner actually captured."}</p>{pythonResult.output&&<><label>STDOUT</label><pre>{pythonResult.output}</pre></>}{pythonResult.error&&<><label>STDERR / ERROR</label><pre className="stderr">{pythonResult.error}</pre></>}{pythonResult.attempts?.length>1&&<p className="code-hint">Automatic repair was attempted. {pythonResult.execution_verified?"The repaired version passed execution.":"The repaired version did not pass."}</p>}{pythonResult.security_note&&<p className="notice">{pythonResult.security_note}</p>}</div>}<div className="safety"><ShieldCheck/><div><b>Execution safety</b><p>ATLAS uses a restricted subprocess with time and resource limits. This is not yet a hardened isolation boundary for hostile code; do not submit secrets or sensitive files.</p></div></div></section>
   : page==="Vision Center" ? <section className="stack">{heading(page,"Prepare image input for future computer-vision features.","NOT CONNECTED")}<div className="panel"><Camera size={30}/><h3>Image input</h3><p>Choose a picture from your phone to preview it here. This prototype does not send images to an AI model.</p><label className="button">Choose image<input hidden type="file" accept="image/*" onChange={e=>{const f=e.target.files?.[0];if(f){setImage(URL.createObjectURL(f));setNotice("Local preview only. AI analysis is not connected.")}}}/></label>{image&&<img className="preview" src={image} alt="Selected preview"/>}{notice&&<p className="notice">{notice}</p>}</div>{card(<ShieldCheck/>,"Planned vision capabilities","Object recognition, camera integration, visual Q&A and privacy controls.")}</section>
   : page==="Voice Center" ? <section className="stack">{heading(page,"Voice interaction will be added after the AI backend.","COMING NEXT")}<div className="panel"><Mic size={36}/><h3>Voice interface</h3><p>Microphone capture and spoken responses are not connected yet. Permissions will be requested only when implemented.</p><button onClick={()=>setNotice("Voice features are planned for a later milestone.")}><Volume2 size={16}/> Check status</button>{notice&&<p className="notice">{notice}</p>}</div></section>
