@@ -1,4 +1,5 @@
 import { formatResearchEvidence, needsLiveResearch, searchWeb } from "./knowledge.js";
+import { archiveResearchResults } from "./knowledgeArchive.js";
 const MODELS = [
   // Live Workers AI measurement: Llama returned a complete 920-token code answer
   // in ~29 seconds. The previous 9-second deadline guaranteed false timeouts.
@@ -155,16 +156,18 @@ export default {
 
     // ACKE: search on demand for current facts or explicit research requests.
     // Search is optional and fails closed; timeless prompts do not trigger it.
-    let research = { status: "skipped", sources: [], checkedAt: null };
+    let research = { status: "skipped", sources: [], checkedAt: null, archive: { status: env.KNOWLEDGE_DB ? "skipped" : "disabled", storedSources: 0, storedChunks: 0 } };
     let modelMessages = messages;
     const latestPrompt = messages[messages.length - 1].content;
     if (needsLiveResearch(latestPrompt)) {
       const searchResult = await searchWeb(latestPrompt);
       const evidence = formatResearchEvidence(searchResult);
+      const archive = await archiveResearchResults(env.KNOWLEDGE_DB, searchResult, evidence.checkedAt);
       research = {
         status: searchResult.status,
         sources: evidence.sources,
         checkedAt: evidence.checkedAt,
+        archive,
       };
       modelMessages = [
         ...messages.slice(0, -1),
