@@ -45,7 +45,7 @@ test("archives bounded source metadata and snippets without storing the search p
   assert.match(db.calls[0].sql, /INSERT INTO knowledge_sources/);
   assert.match(db.calls[1].sql, /INSERT OR IGNORE INTO knowledge_chunks/);
   assert.equal(db.calls[0].params[3], "example.com");
-  assert.equal(db.calls[1].params[3], "Public source snippet.");
+  assert.equal(db.calls[1].params[2], "Public source snippet.");
   assert.ok(!JSON.stringify(db.calls).includes("private user prompt"));
 });
 
