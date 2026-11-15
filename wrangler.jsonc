@@ -5,5 +5,6 @@
   "compatibility_date": "2026-11-14",
   "workers_dev": true,
   "ai": { "binding": "AI" },
+  "d1_databases": [{ "binding": "KNOWLEDGE_DB", "database_name": "atlas-knowledge-archive", "database_id": "27a086e4-c14b-4822-9d47-267f68163773", "migrations_dir": "migrations" }],
   "observability": { "enabled": true }
 }
