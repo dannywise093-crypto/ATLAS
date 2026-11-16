@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createSpeechRecognition, getVoiceCapabilities, speakText } from "./voiceInterface.js";
+import { cleanTextForSpeech, createSpeechRecognition, getVoiceCapabilities, speakText } from "./voiceInterface.js";
 
 class FakeRecognition {
   start() { this.started = true; }
@@ -45,4 +45,24 @@ test("speaks using a British English voice when one is available", async () => {
   assert.equal(spoken.lang, "en-GB");
   assert.equal(spoken.voice.lang, "en-GB");
   assert.equal(spoken.rate, 0.94);
+});
+
+test("removes markdown markers before speech", () => {
+  assert.equal(cleanTextForSpeech("## Status\\n**Ready**\\n- First item"), "Status Ready First item");
+});
+
+test("prefers a named British male voice when available", async () => {
+  let spoken;
+  class FakeUtterance { constructor(text) { this.text = text; } }
+  const environment = {
+    SpeechSynthesisUtterance: FakeUtterance,
+    speechSynthesis: {
+      cancel() {},
+      getVoices: () => [{ name: "Google UK English Female", lang: "en-GB" }, { name: "Microsoft Ryan", lang: "en-GB" }],
+      speak(utterance) { spoken = utterance; queueMicrotask(() => utterance.onend()); }
+    }
+  };
+  await speakText("Certainly, sir.", environment);
+  assert.equal(spoken.voice.name, "Microsoft Ryan");
+  assert.equal(spoken.pitch, 0.82);
 });
