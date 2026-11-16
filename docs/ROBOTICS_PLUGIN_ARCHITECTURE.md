@@ -1,119 +1,111 @@
-# ATLAS Integrated Universal Robotics Bridge
+# ATLAS Universal Robotics & Vehicle Connectivity
 
-## Status
+## Product direction
 
-This document defines the first, vendor-neutral integration contract for ATLAS. The Android ATLAS application is intended to host the phone-side connection layer directly; a separately installed Local Robotics Bridge application is not part of the product design. The current build still does **not** discover devices, connect to a controller, or read physical sensors. It includes simulation-ready adapter contracts and read-only telemetry validation only.
+ATLAS contains one integrated connection manager. The Android ATLAS app is the phone-side hub; robots, vehicles, controllers and industrial equipment do not need to run Android. Compatible peer devices may run Linux, embedded Linux, Windows, RTOS firmware or industrial operating systems.
 
-## Design goals
+The connection manager is transport-neutral: each transport is implemented by an independently versioned adapter behind one common discovery, identity, health and read-only telemetry contract. A catalog entry is a compatibility target, not proof that a driver exists or that every device is supported.
 
-- Support different manufacturers and controller boards through independently versioned adapters.
-- Keep the cloud AI separate from time-critical robot control.
-- Make adapter identity, device identity, supported telemetry and permissions explicit.
-- Start with simulated devices and read-only discovery/telemetry.
-- Keep motor and actuator control disabled unless a later, separately reviewed implementation adds the required independent safety system.
+## Current implementation status
+
+- Native Android Bluetooth LE scanning is integrated in the APK and starts only after the user taps the scan button.
+- Browser Web Bluetooth uses the browser's explicit device picker where supported.
+- The UI now catalogs Bluetooth Classic, Wi-Fi/LAN, Wi-Fi Direct, Ethernet, USB OTG, USB serial, CAN/CAN FD adapters, ROS 2/DDS, micro-ROS, MQTT, Modbus, OPC UA, HTTP/WebSocket, manufacturer SDKs, cameras and sensors.
+- All transports other than BLE remain planned adapter integrations. They must not be displayed as connected or operational until their native driver/gateway and tests exist.
+- The app currently does not connect to a robot controller or consume live physical sensor telemetry.
 
 ## Architecture
 
 ```text
-ATLAS Web / Android UI
-        |
-        | authenticated, scoped session (future)
-        v
-ATLAS Local Robotics Bridge (future; runs on a supported edge computer)
-        |
-        +-- Plugin Manager / Adapter Registry
-        |      +-- ROS 2 / DDS adapter
-        |      +-- micro-ROS adapter
-        |      +-- USB / serial adapter
-        |      +-- CAN telemetry adapter
-        |      +-- Ethernet / TCP adapter
-        |      +-- Manufacturer SDK adapter
-        |      +-- Camera and sensor adapters
-        |
-        +-- Read-only Device Discovery
-        +-- Normalized Telemetry Gateway
-        +-- Audit Log and Health Monitor
+ATLAS Android app
+  |
+  +-- Universal Connection Manager
+  |     +-- Transport catalog and capability detection
+  |     +-- User-approved discovery / pairing
+  |     +-- Adapter lifecycle and connection health
+  |     +-- Normalized device identity
+  |     +-- Read-only telemetry validation
+  |     +-- Audit trail and disconnect/revoke
+  |
+  +-- Phone-native adapters
+  |     +-- Bluetooth LE / Classic
+  |     +-- Wi-Fi Direct / local network discovery
+  |     +-- USB Host / OTG / serial
+  |     +-- USB-C Ethernet (where supported)
+  |
+  +-- Network and edge adapters
+        +-- HTTP / WebSocket / MQTT over TLS
+        +-- ROS 2 / DDS through a same-LAN edge gateway
+        +-- micro-ROS through a ROS 2 Agent
+        +-- CAN / CAN FD through compatible USB or Ethernet gateways
+        +-- Modbus TCP / RTU and OPC UA through authenticated gateways
+        +-- Vendor SDKs and camera/sensor bridges
 
-Separate, independent robot safety controller
-        +-- physical emergency stop
-        +-- watchdog and interlocks
-        +-- manufacturer safety functions
+Independent equipment safety controller
+  +-- physical emergency stop
+  +-- watchdog and hardware interlocks
+  +-- manufacturer safety functions
 ```
 
-The Cloudflare Worker cannot directly access a user's USB, UART, CAN, GPIO, camera, or local network hardware. The Android ATLAS app must use native Android/Capacitor interfaces for supported phone peripherals. Robots that do not run Android connect as peers over compatible network protocols or supported adapters; the robot operating system does not need to be Android. CAN and GPIO require compatible external hardware. The web build remains capability-limited.
+Cloudflare Workers cannot directly access a phone's USB, Bluetooth, CAN, GPIO, camera or private LAN. The phone app uses native APIs for local peripherals. Network-connected equipment can be reached through supported protocols and explicit endpoints. Protocols such as ROS 2/DDS, CAN and industrial serial buses may require an edge computer or hardware adapter; ATLAS must identify that dependency rather than pretending the phone can speak every bus directly.
 
-## Adapter families
+## Transport adapter matrix
 
-| Adapter family | Intended first-phase scope | Example ecosystem |
+| Transport | Expected integration path | Current status |
 |---|---|---|
-| ROS 2 / DDS | Node and topic discovery; read-only topic telemetry | ROS 2 distributions and DDS vendors |
-| micro-ROS | Agent/device identity and telemetry | Supported microcontroller clients |
-| USB / serial | Port identity and allowlisted telemetry frames | Generic serial controllers and dev boards |
-| CAN | Read-only bus/device health and approved telemetry | CAN-compatible controllers |
-| Ethernet / TCP | Authenticated device identity and telemetry | LAN robot controllers |
-| Vendor SDK | Vendor-specific discovery and telemetry wrapped in the common contract | NVIDIA/Jetson ecosystem and other manufacturers |
-| Sensors | Timestamped, unit-labelled sensor values | IMU, encoders, range, force, temperature |
-| Vision | Camera metadata and approved image streams | USB, CSI and Ethernet cameras |
+| Bluetooth LE | Native Android BLE | Implemented; physical device testing pending |
+| Bluetooth Classic | Native Android Bluetooth profiles | Planned |
+| Wi-Fi / LAN | mDNS/SSDP or known authenticated endpoint | Planned |
+| Wi-Fi Direct | Native Android Wi-Fi P2P | Planned |
+| Ethernet | USB-C Ethernet or edge gateway | Planned |
+| USB OTG / Host | Android USB Host API | Planned |
+| USB Serial | Compatible USB-UART driver and allowlisted parser | Planned |
+| CAN / CAN FD | Certified USB-CAN or Ethernet-CAN adapter | Planned |
+| ROS 2 / DDS | Same-LAN ROS 2 edge gateway | Planned |
+| micro-ROS | micro-ROS Agent via ROS 2 gateway | Planned |
+| MQTT | TLS broker and read-only topic subscriptions | Planned |
+| Modbus TCP / RTU | Authenticated gateway and read-only register allowlist | Planned |
+| OPC UA | Certificate-validated endpoint and read-only node allowlist | Planned |
+| HTTP / WebSocket | TLS device API and health/telemetry schema | Planned |
+| Manufacturer SDKs | Versioned vendor-specific adapter | Planned |
+| Cameras / sensors | USB, network or vendor bridge | Planned |
 
-This is a compatibility target, not a claim that every listed adapter is implemented or tested.
+## Common adapter contract
 
-## Plugin manifest contract
+Every adapter should expose:
 
-Each adapter should ship a signed or integrity-checked manifest with at least:
+- `describe()`: adapter ID, publisher, version, transport and capabilities.
+- `discover()`: discover only devices authorized by the operator.
+- `connectReadOnly(deviceId)`: open a read-only session.
+- `getHealth()`: connected state, errors and last-seen time.
+- `subscribeTelemetry(stream, options)`: validated normalized readings.
+- `disconnect()`: release resources and permissions.
 
-```json
-{
-  "schemaVersion": "1.0",
-  "pluginId": "vendor.transport.adapter",
-  "displayName": "Example telemetry adapter",
-  "version": "0.1.0",
-  "vendor": "Adapter publisher",
-  "transport": "serial",
-  "supportedDevices": [],
-  "capabilities": ["device.discovery", "telemetry.read"],
-  "permissions": ["device.identity", "telemetry.read"],
-  "safetyClass": "read-only",
-  "entrypoint": "adapter module entrypoint",
-  "signature": "publisher signature metadata"
-}
-```
+Manifests must use stable IDs and declare only `device.discovery` and `telemetry.read` in this phase. Reject unknown capabilities, elevated permissions, unsigned production plugins and actuation-enabled descriptors.
 
-The example is a schema illustration, not an executable plugin. Unknown permissions, unsigned production plugins, duplicate IDs, unsupported schema versions and capability escalation must be rejected.
+Normalized telemetry includes device ID, sensor ID, numeric value, unit, timestamp, quality, stale status and source adapter. Validate timestamps, units, payload size and finite values. Invalid or stale readings must be visibly marked.
 
-## Normalized read-only interface
+## Security and safety
 
-An adapter implementation should expose equivalent operations regardless of vendor:
+1. Request transport permissions only after the user initiates the relevant connection.
+2. Show the manufacturer, device identity, adapter publisher and protocol before pairing.
+3. Use TLS and authenticated sessions for network adapters; never store secrets in browser local storage.
+4. Apply endpoint, topic, node and register allowlists.
+5. Do not accept arbitrary shell commands, raw CAN frames, arbitrary DDS publishing or unrestricted protocol pass-through from the AI.
+6. Keep this initial adapter API read-only. No motor, steering, flight, servo, gripper or other actuator API is included.
+7. Any later physical-control subsystem requires separate threat modelling, independent safety controller, physical emergency stop, watchdog, interlocks, operator authorization and supervised hardware validation.
+8. Loss of communication, stale telemetry or invalid safety heartbeat must be handled by the independent equipment controller, not by the cloud model or phone.
 
-- `describe()`: return manifest identity, version, transport and declared capabilities.
-- `discover()`: enumerate only explicitly authorized devices; no automatic pairing.
-- `connectReadOnly(deviceId)`: establish a read-only session to an approved device.
-- `getHealth()`: report connection state, errors and last-seen timestamp.
-- `subscribeTelemetry(stream, options)`: return normalized, timestamped telemetry.
-- `disconnect()`: close the session and release resources.
+## Roadmap
 
-Normalized telemetry should include `deviceId`, `sensorId`, `value`, `unit`, `timestamp`, `quality`, and `sourcePlugin`. Validate payload size, schema, units, timestamps and finite numeric values. Mark stale or invalid readings rather than silently treating them as current.
+1. **Transport catalog and adapter contract:** implemented in the ATLAS UI and registry.
+2. **Native BLE discovery:** integrated; needs testing against real supported BLE devices.
+3. **Wi-Fi/LAN discovery and authenticated read-only endpoint:** next adapter.
+4. **USB OTG/serial:** native permission and device-driver integration.
+5. **Edge gateway:** ROS 2/DDS, micro-ROS, CAN and industrial protocols.
+6. **Telemetry normalization:** hardware-in-the-loop tests for each adapter.
+7. **Separate safety review:** any future physical actuation is a distinct project milestone.
 
-## Security and safety requirements
+## Honest compatibility statement
 
-1. Default-deny plugin permissions; request only the minimum required.
-2. Pair devices explicitly and show the device identity and adapter publisher to the operator.
-3. Keep credentials and signing keys outside browser storage and source control.
-4. Authenticate bridge sessions, use encryption in transit, rotate credentials and log pairing/revocation.
-5. Do not accept arbitrary shell commands, raw pass-through frames, or arbitrary topic publishing from the AI.
-6. The initial adapter API is read-only. No motor, servo, gripper, steering, flight, or other actuator command API is included.
-7. A future motion-control proposal requires separate threat modelling, code review, simulation, operator confirmation and independently enforced hardware safety limits.
-8. Emergency stop must be a physical, independent mechanism and must not depend on ATLAS, a network, cloud inference or a phone.
-9. A communication timeout, stale telemetry, invalid units, bridge crash or loss of safety heartbeat must fail safe at the independent controller.
-10. Test with mock devices and simulation before any supervised physical evaluation.
-
-## Implementation roadmap
-
-- **Phase 1 — Architecture and UI:** vendor-neutral adapter families, explicit offline state, safety messaging. Implemented in the Robotics Center UI.
-- **Phase 2 — Contract and mock adapters:** validate manifests and normalized read-only telemetry using simulated devices only.
-- **Phase 3 — Local bridge:** design a least-privilege bridge for a supported edge OS; no actuator permissions.
-- **Phase 4 — Read-only integrations:** add one adapter at a time with hardware-in-the-loop telemetry tests and documented device compatibility.
-- **Phase 5 — Separate safety review:** any future actuation work must be designed and reviewed as a distinct subsystem; it is not authorized by this plugin architecture.
-
-## Current limitations
-
-ATLAS currently has no installed robotics bridge, no connected robot, no live adapter registry and no hardware telemetry endpoint. The UI lists planned adapter families only. A displayed adapter is not evidence of device support or a working connection.
+ATLAS is being designed as a multi-transport platform, not a Bluetooth-only app. At this point, only BLE discovery has an implemented Android adapter. Listing a transport does not mean its driver, gateway, hardware compatibility or telemetry parser is already working.
