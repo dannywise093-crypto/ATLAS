@@ -153,13 +153,12 @@ export default function App() {
   }
   async function speakVoiceReply(text){
     if(!voiceModeRef.current)return;
-    // Speech recognition and speech synthesis compete for the Android microphone/audio
-    // route in many WebViews. Give playback exclusive ownership, then restart once.
+    // Keep recognition active during playback so the user can interrupt naturally.
+    // The browser speech service may still impose device-specific audio limitations.
     voicePendingRef.current=true;
     voiceSpeakingRef.current=true;
     clearTimeout(voiceRestartTimerRef.current);
-    try{voiceRecognitionRef.current?.stop();}catch{}
-    setVoiceStatus("Speaking, sir. Listening will resume when I finish.");
+    setVoiceStatus("Speaking, sir. You can interrupt whenever you need.");
     try{
       await speakText(text);
     }catch(error){
@@ -167,11 +166,10 @@ export default function App() {
     }finally{
       voiceSpeakingRef.current=false;
     }
-    if(voiceModeRef.current){
-      voicePendingRef.current=false;
+    if(voiceModeRef.current&&!voicePendingRef.current){
       voiceAwaitingCommandRef.current=false;
       setVoiceTranscript("");
-      setVoiceStatus("Listening for the ATLAS wake word.");
+      setVoiceStatus("Listening. Speak naturally; no wake word is required.");
       clearTimeout(voiceRestartTimerRef.current);
       voiceRestartTimerRef.current=setTimeout(()=>{
         if(voiceModeRef.current&&!voicePendingRef.current&&!voiceSpeakingRef.current)voiceStartRef.current?.();
@@ -240,7 +238,7 @@ export default function App() {
     setVoiceTranscript("");
     setVoiceStatus("Requesting microphone access…");
     const listen=()=>{
-      if(!voiceModeRef.current||voicePendingRef.current||voiceSpeakingRef.current||voiceRecognitionRef.current)return;
+      if(!voiceModeRef.current||voicePendingRef.current||voiceRecognitionRef.current)return;
       let recognition;
       try{
         recognition=createSpeechRecognition(window,{
@@ -260,23 +258,17 @@ export default function App() {
                 voiceSpeakingRef.current=false;
                 window.speechSynthesis?.cancel();
               }
-              const wakeMatch=phrase.match(/\batlas\b[\s,.:;!?-]*(.*)$/i);
-              if(!wasSpeaking&&!wakeMatch&&!voiceAwaitingCommandRef.current)return;
-              const command=(wakeMatch?.[1]||phrase).trim();
-              if(!command){
-                voiceAwaitingCommandRef.current=true;
-                setVoiceTranscript("ATLAS");
-                setVoiceStatus("Yes, sir? I'm listening.");
-                try{recognition.stop();}catch{}
-                return;
-              }
+              // Ordinary speech is accepted as an instruction; saying ATLAS is optional.
+              // If playback is active, cancel it and handle the new instruction immediately.
+              const command=phrase.trim();
+              if(!command)return;
               voiceAwaitingCommandRef.current=false;
               voicePendingRef.current=true;
               setVoiceTranscript(command);
-              setVoiceStatus(wasSpeaking?"Interrupted. Processing your new instruction…":"ATLAS heard you. Processing your instruction…");
+              setVoiceStatus(wasSpeaking?"Interrupted. I'll handle your new instruction…":"I heard you. Processing your instruction…");
               try{recognition.stop();}catch{}
               void sendMessage(command,{speak:true,voiceModeActive:true});
-            }else if(interim.trim()&&(voiceAwaitingCommandRef.current||/\batlas\b/i.test(interim))){
+            }else if(interim.trim()){
               setVoiceTranscript(interim.trim());
               setVoiceStatus("Listening for your instruction…");
             }
@@ -295,7 +287,7 @@ export default function App() {
             if(voiceRecognitionRef.current===recognition)voiceRecognitionRef.current=null;
             // A single restart owner prevents recognition from reopening during TTS
             // or racing the post-response restart timer.
-            if(voiceModeRef.current&&!voicePendingRef.current&&!voiceSpeakingRef.current){
+            if(voiceModeRef.current&&!voicePendingRef.current){
               clearTimeout(voiceRestartTimerRef.current);
               voiceRestartTimerRef.current=setTimeout(listen,500);
             }
@@ -303,7 +295,7 @@ export default function App() {
         });
         voiceRecognitionRef.current=recognition;
         recognition.start();
-        setVoiceStatus("Wake-word standby. Say ATLAS, then give your instruction.");
+        setVoiceStatus("Listening. Speak naturally; no wake word is required.");
       }catch(error){
         voiceModeRef.current=false;
         setVoiceMode(false);
