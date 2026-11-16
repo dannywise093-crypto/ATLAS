@@ -244,7 +244,7 @@ test("skill catalog endpoint is authenticated and reports the bundled catalog", 
   assert.equal(body.skills[0].id, "cuopt-numerical-optimization-api");
 });
 
-test("Copilot includes routed specialist context only when a skill matches", async () => {
+test("Copilot includes routed specialist context for a mechanical CAD request", async () => {
   let systemPrompt;
   const env = envWith(async (_model, input) => {
     systemPrompt = input.messages[0].content;
@@ -252,11 +252,11 @@ test("Copilot includes routed specialist context only when a skill matches", asy
   });
   const response = await worker.fetch(request("/api/copilot", {
     method: "POST",
-    body: { messages: [{ role: "user", content: "Explain NVIDIA CUDA GPU kernel optimization." }] },
+    body: { messages: [{ role: "user", content: "Help me design a mechanical CAD gearbox." }] },
   }), env);
   assert.equal(response.status, 200);
   assert.match(systemPrompt, /ATLAS SPECIALIST ROUTER/);
-  assert.match(systemPrompt, /CUDA & GPU Computing specialist/);
+  assert.match(systemPrompt, /Mechanical & CAD Engineering specialist/);
 });
 
 
