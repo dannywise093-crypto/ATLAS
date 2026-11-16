@@ -17,6 +17,7 @@ const nav = [["Overview",Home],["AI Assistant",MessageSquare],["Copilot",Code2],
 export default function App() {
   const [page,setPage] = useState("Overview");
   const [messages,setMessages] = useState(()=>{try{return JSON.parse(localStorage.getItem("atlas-messages"))||initial}catch{return initial}});
+  const [copilotMessages,setCopilotMessages] = useState(()=>{try{return JSON.parse(localStorage.getItem("atlas-copilot-messages"))||[{role:"atlas",text:"ATLAS Copilot is ready for coding questions, complete implementations, debugging, and code reviews."}]}catch{return [{role:"atlas",text:"ATLAS Copilot is ready for coding questions, complete implementations, debugging, and code reviews."}]}});
   const [memory,setMemory] = useState(()=>{try{return JSON.parse(localStorage.getItem("atlas-memory"))||["ATLAS is a general-purpose Physical AI project.","Architecture preference: hybrid cloud and local computing."]}catch{return []}});
   const [input,setInput] = useState("");
   const [image,setImage] = useState("");
@@ -27,16 +28,19 @@ export default function App() {
   const [gatewayMessage,setGatewayMessage] = useState("Checking the hosted model gateway…");
   useEffect(()=>{const controller=new AbortController();checkAtlasBackend(controller.signal).then(status=>{const ready=status.status==="configured";setGatewayReady(ready);setGatewayMessage(ready?"Cloudflare Workers AI · Llama 3.3 primary with model fallbacks is connected.":"The hosted model is not configured.");}).catch(error=>{setGatewayReady(false);setGatewayMessage(error.message);});return()=>controller.abort();},[]);
   useEffect(()=>localStorage.setItem("atlas-messages",JSON.stringify(messages)),[messages]);
+  useEffect(()=>localStorage.setItem("atlas-copilot-messages",JSON.stringify(copilotMessages)),[copilotMessages]);
   useEffect(()=>localStorage.setItem("atlas-memory",JSON.stringify(memory)),[memory]);
   async function send(e){
     e.preventDefault();
     const value=input.trim();
     if(!value||generating)return;
+    const isCopilot=page==="Copilot";
+    const activeMessages=isCopilot?copilotMessages:messages;
     const userMessage={role:"user",text:value};
-    const nextMessages=[...messages,userMessage];
-    setMessages(nextMessages);
+    const nextMessages=[...activeMessages,userMessage];
+    if(isCopilot)setCopilotMessages(nextMessages);else setMessages(nextMessages);
     setInput("");
-    const localCommand=/^(remember that|remember|save this|store this|what do you remember|show memory|list memories|my memories|find |search memory for |do you remember |help$|roadmap$|development plan$)/i.test(value);
+    const localCommand=!isCopilot && /^(remember that|remember|save this|store this|what do you remember|show memory|list memories|my memories|find |search memory for |do you remember |help$|roadmap$|development plan$)/i.test(value);
     if(localCommand){
       const result=runAtlasCore(value,memory,messages);
       if(result.action==="save_memory"&&result.memory){
@@ -47,10 +51,13 @@ export default function App() {
     }
     setGenerating(true);
     try{
-      const reply=page==="Copilot" ? await generateAtlasCopilotResponse(nextMessages) : await generateAtlasResponse(nextMessages);
-      setMessages(items=>[...items,{role:"atlas",text:reply}]);
+      const reply=isCopilot ? await generateAtlasCopilotResponse(nextMessages) : await generateAtlasResponse(nextMessages);
+      if(isCopilot)setCopilotMessages(items=>[...items,{role:"atlas",text:reply}]);
+      else setMessages(items=>[...items,{role:"atlas",text:reply}]);
     }catch(error){
-      setMessages(items=>[...items,{role:"atlas",text:`I couldn't reach the ATLAS language-model service. ${error.message} Your message remains in this chat. The local notes and memory commands still work, but I won't pretend the rule-based core generated a general AI answer.`}]);
+      const failure={role:"atlas",text:`I couldn't reach the ATLAS language-model service. ${error.message} Your message remains in this chat. Please retry when the gateway is available.`};
+      if(isCopilot)setCopilotMessages(items=>[...items,failure]);
+      else setMessages(items=>[...items,failure]);
     }finally{
       setGenerating(false);
     }
@@ -65,7 +72,7 @@ export default function App() {
     <h2>DEVELOPMENT MODULES</h2><div className="grid two">{card(<MessageSquare/>,"Conversational intelligence","Hosted Llama 3.3 primary model with Gemma 4 and GLM fallbacks through Cloudflare Workers AI.","Interface ready")}{card(<Eye/>,"Perception & vision","Prepare image inputs for future computer vision.","Preview ready")}{card(<GraduationCap/>,"Learning system","Plan supervised demonstrations and evaluation.","Planned")}{card(<Bot/>,"Robotics integration","A safe bridge to controllers after simulation and testing.","Not connected")}</div>
     <div className="safety"><ShieldCheck/><div><b>Safety-first development</b><p>This is a software prototype. It does not control physical devices. Real robot movement must use independent safety limits and supervised testing.</p></div></div>
   </section> : page==="AI Assistant" ? <section className="stack">{heading(page,"General-purpose conversation powered by the hosted ATLAS model gateway.","MODEL GATEWAY")}<div className="chat"><div className="messages">{messages.map((m,i)=><div className={"msg "+m.role} key={i}><b>{m.role==="atlas"?"ATLAS":"YOU"}</b><p>{m.text}</p></div>)}</div><form className="composer" onSubmit={send}><input value={input} onChange={e=>setInput(e.target.value)} placeholder="Ask ATLAS anything..."/><button disabled={!input.trim()||generating}><Send/></button></form><small>{generating?"ATLAS is generating a response…":"General chat uses Cloudflare Workers AI model routing. Memory commands remain on this device."}</small></div></section>
-  : page==="Copilot" ? <section className="stack">{heading("ATLAS Copilot","Coding assistance powered by the ATLAS model gateway. External GitHub and Microsoft Copilot services are separate integrations.","ATLAS CODING MODE")}<div className="chat"><div className="messages">{messages.map((m,i)=><div className={"msg "+m.role} key={i}><b>{m.role==="atlas"?"ATLAS COPILOT":"YOU"}</b><p>{m.text}</p></div>)}</div><form className="composer" onSubmit={send}><input value={input} onChange={e=>setInput(e.target.value)} placeholder="Describe a coding task, bug, or design..."/><button disabled={!input.trim()||generating}><Send/></button></form><small>{generating?"ATLAS Copilot is preparing a response…":"ATLAS coding mode · Cloudflare Workers AI model fallback · No repository edits or code execution from this chat."}</small></div></section>
+  : page==="Copilot" ? <section className="stack">{heading("ATLAS Copilot","Coding assistance powered by the ATLAS model gateway. External GitHub and Microsoft Copilot services are separate integrations.","ATLAS CODING MODE")}<div className="chat"><div className="messages">{copilotMessages.map((m,i)=><div className={"msg "+m.role} key={i}><b>{m.role==="atlas"?"ATLAS COPILOT":"YOU"}</b><p>{m.text}</p></div>)}</div><form className="composer" onSubmit={send}><input value={input} onChange={e=>setInput(e.target.value)} placeholder="Describe a coding task, bug, or design..."/><button disabled={!input.trim()||generating}><Send/></button></form><small>{generating?"ATLAS Copilot is preparing a response…":"ATLAS coding mode · Cloudflare Workers AI model fallback · No repository edits or code execution from this chat."}</small></div></section>
   : page==="Vision Center" ? <section className="stack">{heading(page,"Prepare image input for future computer-vision features.","NOT CONNECTED")}<div className="panel"><Camera size={30}/><h3>Image input</h3><p>Choose a picture from your phone to preview it here. This prototype does not send images to an AI model.</p><label className="button">Choose image<input hidden type="file" accept="image/*" onChange={e=>{const f=e.target.files?.[0];if(f){setImage(URL.createObjectURL(f));setNotice("Local preview only. AI analysis is not connected.")}}}/></label>{image&&<img className="preview" src={image} alt="Selected preview"/>}{notice&&<p className="notice">{notice}</p>}</div>{card(<ShieldCheck/>,"Planned vision capabilities","Object recognition, camera integration, visual Q&A and privacy controls.")}</section>
   : page==="Voice Center" ? <section className="stack">{heading(page,"Voice interaction will be added after the AI backend.","COMING NEXT")}<div className="panel"><Mic size={36}/><h3>Voice interface</h3><p>Microphone capture and spoken responses are not connected yet. Permissions will be requested only when implemented.</p><button onClick={()=>setNotice("Voice features are planned for a later milestone.")}><Volume2 size={16}/> Check status</button>{notice&&<p className="notice">{notice}</p>}</div></section>
   : page==="Memory" ? <section className="stack">{heading("Project Memory","Notes are stored in this browser on this device.")}<div className="toolbar"><span>{memory.length} saved notes</span><button onClick={addMemory}>+ Add memory</button></div>{memory.map((m,i)=><div className="memory" key={i}><Database/><p>{m}</p><button className="delete" onClick={()=>setMemory(a=>a.filter((_,n)=>n!==i))}>Delete</button></div>)}<p className="notice">Notes are stored locally. They are not synced to a server or shared across devices.</p></section>
