@@ -44,9 +44,9 @@ function appendSkillUsageNotice(answer, payload) {
   const selected = Array.isArray(payload.skills?.selected) ? payload.skills.selected : [];
   const inventory = Number.isInteger(payload.skills?.skillCount) ? payload.skills.skillCount : null;
   const limit = Number.isInteger(payload.skills?.maxSkillsPerRequest) ? payload.skills.maxSkillsPerRequest : 4;
-  if (/\d+ installed skill records/i.test(answer) || /ATLAS skills used:/i.test(answer)) return answer;
+  if (/\d+ installed skill records/i.test(answer) || /ATLAS skill references selected:/i.test(answer)) return answer;
   if (selected.length) {
-    return answer + `\n\n---\n**ATLAS skills used:** ${selected.map((skill) => skill.name).join(", ")} (${selected.length} selected; up to ${limit} per request${inventory ? ` from ${inventory} installed` : ""}).`;
+    return answer + `\n\n---\n**ATLAS skill references selected:** ${selected.map((skill) => skill.name).join(", ")} (${selected.length} selected; up to ${limit} per request${inventory ? ` from ${inventory} installed` : ""}).`;
   }
   if (inventory !== null) {
     return answer + `\n\n---\n**ATLAS skills:** No specialist skill was selected for this request. Catalogue: ${inventory} installed; up to ${limit} can be selected per request.`;
