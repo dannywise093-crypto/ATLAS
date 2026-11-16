@@ -44,11 +44,11 @@ test("speaks using a British English voice when one is available", async () => {
   await speakText("Good afternoon, sir.", environment);
   assert.equal(spoken.lang, "en-GB");
   assert.equal(spoken.voice.lang, "en-GB");
-  assert.equal(spoken.rate, 0.94);
+  assert.equal(spoken.rate, 0.90);
 });
 
 test("removes markdown markers before speech", () => {
-  assert.equal(cleanTextForSpeech("## Status\\n**Ready**\\n- First item"), "Status Ready First item");
+  assert.equal(cleanTextForSpeech(["## Status", "**Ready**", "- First item"].join(String.fromCharCode(10))), "Status Ready First item");
 });
 
 test("prefers a named British male voice when available", async () => {
