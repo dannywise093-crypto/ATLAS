@@ -4,6 +4,13 @@
   "main": "cloudflare/worker.js",
   "compatibility_date": "2026-11-14",
   "workers_dev": true,
-  "ai": { "binding": "AI" },
-  "observability": { "enabled": true }
+  "ai": {
+    "binding": "AI"
+  },
+  "observability": {
+    "enabled": true
+  },
+  "browser": {
+    "binding": "BROWSER"
+  }
 }
