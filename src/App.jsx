@@ -168,7 +168,8 @@ export default function App() {
     try{
       await speakText(text);
     }catch(error){
-      if(voiceModeRef.current)setVoiceStatus("Spoken response unavailable: "+error.message);
+      // Cancelling playback because the user started speaking is intentional.
+      if(voiceModeRef.current&&voiceSpeakingRef.current)setVoiceStatus("Spoken response unavailable: "+error.message);
     }finally{
       voiceSpeakingRef.current=false;
     }
@@ -279,8 +280,16 @@ export default function App() {
               try{recognition.stop();}catch{}
               void sendMessage(command,{speak:true,voiceModeActive:true});
             }else if(interim.trim()){
+              // Stop TTS on the first partial transcript, not after the user
+              // finishes speaking. Recognition stays open for the final command.
+              if(voiceSpeakingRef.current){
+                voiceSpeakingRef.current=false;
+                window.speechSynthesis?.cancel();
+                setVoiceStatus("I’m listening, sir. Finish your instruction.");
+              }else{
+                setVoiceStatus("Listening for your instruction…");
+              }
               setVoiceTranscript(interim.trim());
-              setVoiceStatus("Listening for your instruction…");
             }
           },
           onError:event=>{
