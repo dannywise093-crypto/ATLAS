@@ -33,6 +33,17 @@ When asked to write or generate code:
 - Keep instruction widths, opcode formats, operand counts, and program-counter increments consistent throughout CPU/ISA examples.
 - Make assertions and expected output agree exactly with the program's actual instruction count and state transitions.
 - Respect addressing semantics exactly: direct memory loads read memory[address], while immediate loads use the literal operand; never silently swap them.`;
+const COPILOT_SYSTEM_PROMPT = `You are ATLAS Copilot, the coding-agent mode of ATLAS.
+You help users understand, design, write, review, debug, and test software.
+Be precise and security-conscious. Never claim to have inspected a repository, run code,
+edited files, or deployed software unless the relevant tool actually did so.
+When the user provides code, distinguish confirmed defects from hypotheses.
+Prefer minimal, complete, maintainable changes. Explain assumptions and include tests
+or exact verification commands when useful. Never expose secrets; treat credentials,
+tokens, and private configuration as sensitive. Do not invent API behavior or SDKs.
+ATLAS Copilot uses the configured ATLAS model gateway; it is not GitHub Copilot or
+Microsoft Copilot unless those separately authorized services are explicitly connected.
+`;
 const WINDOW_MS = 60_000;
 const MAX_PER_WINDOW = 24;
 const buckets = new Map();
@@ -94,7 +105,7 @@ function extractAnswer(result) {
   return "";
 }
 
-async function runModelWithDeadline(env, model, messages, timeoutMs) {
+async function runModelWithDeadline(env, model, messages, timeoutMs, systemPrompt = SYSTEM_PROMPT) {
   let timer;
   const timeout = new Promise((_, reject) => {
     timer = setTimeout(() => reject(new Error("Model response deadline exceeded.")), timeoutMs);
@@ -102,7 +113,7 @@ async function runModelWithDeadline(env, model, messages, timeoutMs) {
   try {
     return await Promise.race([
       env.AI.run(model, {
-        messages: [{ role: "system", content: SYSTEM_PROMPT }, ...messages],
+        messages: [{ role: "system", content: systemPrompt }, ...messages],
         max_tokens: 3000,
         temperature: 0.55,
         // Keep the request to documented chat-completion parameters. Model-
@@ -130,7 +141,8 @@ export default {
       });
     }
 
-    if (url.pathname !== "/api/chat") return json({ error: "Not found." }, 404);
+    const isCopilot = url.pathname === "/api/copilot";
+    if (url.pathname !== "/api/chat" && !isCopilot) return json({ error: "Not found." }, 404);
     if (request.method !== "POST") return json({ error: "Method not allowed." }, 405, { allow: "POST" });
     if (!authorized(request, env)) return json({ error: "Unauthorized." }, 401);
     if (rateLimited(request)) return json({ error: "Too many requests. Please wait and try again." }, 429, { "retry-after": "60" });
@@ -179,7 +191,7 @@ export default {
     for (const model of MODELS) {
       const startedAt = Date.now();
       try {
-        const result = await runModelWithDeadline(env, model.id, modelMessages, model.timeoutMs);
+        const result = await runModelWithDeadline(env, model.id, modelMessages, model.timeoutMs, isCopilot ? COPILOT_SYSTEM_PROMPT : SYSTEM_PROMPT);
         const durationMs = Date.now() - startedAt;
         if (isTruncated(result)) {
           failures.push({ model: model.id, status: "truncated", durationMs });

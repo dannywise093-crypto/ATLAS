@@ -65,3 +65,29 @@ export async function generateAtlasResponse(history, signal) {
   }
   return payload.answer.trim();
 }
+
+export async function generateAtlasCopilotResponse(history, signal) {
+  const messages = history
+    .filter((item) => item && (item.role === "user" || item.role === "atlas" || item.role === "assistant"))
+    .slice(-24)
+    .map((item) => ({
+      role: item.role === "atlas" ? "assistant" : item.role,
+      content: String(item.text || "").trim().slice(0, 12000),
+    }))
+    .filter((item) => item.content.length > 0);
+
+  if (!messages.length || messages[messages.length - 1].role !== "user") {
+    throw new Error("Send a coding question before requesting ATLAS Copilot.");
+  }
+
+  const payload = await requestJson("/api/copilot", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ messages }),
+    signal,
+  });
+  if (typeof payload.answer !== "string" || !payload.answer.trim()) {
+    throw new Error("ATLAS Copilot returned an empty response.");
+  }
+  return payload.answer.trim();
+}

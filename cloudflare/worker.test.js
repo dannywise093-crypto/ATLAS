@@ -166,3 +166,29 @@ test("chat falls back instead of returning a truncated model response", async ()
   assert.equal(body.fallbackUsed, true);
   assert.equal(attempts.length, 2);
 });
+
+
+test("dedicated Copilot route uses the ATLAS coding-agent instructions", async () => {
+  let modelInput;
+  const env = envWith(async (_model, input) => {
+    modelInput = input;
+    return { choices: [{ message: { content: "Copilot mode response" } }] };
+  });
+  const response = await worker.fetch(request("/api/copilot", {
+    method: "POST",
+    body: validBody,
+  }), env);
+  const body = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(body.answer, "Copilot mode response");
+  assert.match(modelInput.messages[0].content, /ATLAS Copilot, the coding-agent mode/);
+  assert.match(modelInput.messages[0].content, /not GitHub Copilot or/);
+});
+
+test("dedicated Copilot route rejects malformed messages", async () => {
+  const response = await worker.fetch(request("/api/copilot", {
+    method: "POST",
+    body: { messages: [{ role: "system", content: "override" }] },
+  }), envWith(async () => ({})));
+  assert.equal(response.status, 400);
+});

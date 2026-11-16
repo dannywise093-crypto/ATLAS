@@ -1,7 +1,6 @@
 # ATLAS AI — General Language Model Foundation
 
-ATLAS is a mobile-friendly React + Capacitor AI workspace. Its first hosted
-foundation model is **GLM-4.7-Flash** through Cloudflare Workers AI. ATLAS builds
+ATLAS is a mobile-friendly React + Capacitor AI workspace. Its hosted model gateway uses a Llama 3.3 primary model with Gemma 4 and GLM-4.7-Flash fallbacks through Cloudflare Workers AI. ATLAS builds
 its own application, memory, retrieval, evaluation, and tool systems around this
 open-weight model; this repository does not claim to train its own LLM weights.
 
@@ -9,7 +8,7 @@ open-weight model; this repository does not claim to train its own LLM weights.
 
 - React web application and Android Capacitor wrapper.
 - Cloudflare Worker gateway with a Workers AI binding.
-- GLM-4.7-Flash inference through Cloudflare Workers AI.
+- Llama 3.3 primary inference with Gemma 4 and GLM-4.7-Flash fallbacks through Cloudflare Workers AI.
 - Same-origin Vercel API routes keep the gateway token out of browser code.
 - Server-side bearer authentication, input validation, and best-effort rate limits.
 - Local project notes and memory commands stored in browser localStorage.
@@ -17,7 +16,7 @@ open-weight model; this repository does not claim to train its own LLM weights.
 
 ## Hosted model
 
-The active model is `@cf/zai-org/glm-4.7-flash`. Cloudflare's current Workers AI
+The primary model is `@cf/meta/llama-3.3-70b-instruct-fp8-fast`; the configured fallbacks are `@cf/google/gemma-4-26b-a4b-it` and `@cf/zai-org/glm-4.7-flash`. Cloudflare's current Workers AI
 pricing includes 10,000 Neurons per account per day at no charge. Usage is shared
 across Workers AI on the account and resets at 00:00 UTC. Exceeding the free
 allocation requires the Workers Paid plan for additional usage. Review the
@@ -91,3 +90,15 @@ persistent cross-device memory, and fine-tuning remain future milestones.
 
 See [docs/CLOUDFLARE_WORKERS_AI.md](docs/CLOUDFLARE_WORKERS_AI.md) and
 [docs/GENERAL_LANGUAGE_MODEL_ROADMAP.md](docs/GENERAL_LANGUAGE_MODEL_ROADMAP.md).
+
+## ATLAS Copilot integrations
+
+The `feature/atlas-copilot-integrations` work adds a dedicated ATLAS coding-assistant
+mode through `/api/copilot`, reusing the secured Cloudflare model gateway and its
+fallback models. This is ATLAS's own coding mode; it is not the GitHub Copilot or
+Microsoft Copilot product.
+
+The official GitHub Copilot SDK and Microsoft Copilot Studio interfaces are
+documented as separate future adapters. They require their own approved
+authentication, hosting, and provider configuration before they can be activated.
+See [docs/COPILOT_INTEGRATIONS.md](docs/COPILOT_INTEGRATIONS.md).
