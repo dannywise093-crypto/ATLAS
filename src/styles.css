@@ -47,3 +47,17 @@ body{background:radial-gradient(ellipse at 82% 0%,rgba(38,103,207,.17),transpare
 .notice{border-color:#35577e;background:#12243a}
 @media(max-width:700px){.content{padding:16px 12px 26px}.chat{height:calc(100dvh - 112px);min-height:570px;border-radius:15px}.chat-topbar{height:66px;padding:0 13px}.chat-orb{width:36px;height:36px}.chat-orb img{width:27px;height:27px}.chat-identity b{font-size:12px}.chat-identity small{font-size:7px;letter-spacing:1px}.connection-pill{font-size:8px;padding:7px 8px}.messages{padding:20px 13px}.msg{max-width:91%;padding:13px 14px;font-size:12px}.providerbar{margin:0 12px 9px;padding:9px 11px}.providerbar select{font-size:10px}.composer{margin:0 12px 9px;padding:5px}.composer input{font-size:12px;padding:11px 9px}.composer button{width:40px;height:39px}.chat>small{font-size:8px;padding-bottom:12px}}
 @media(max-width:380px){.connection-pill{letter-spacing:.5px}.chat-identity{gap:8px}.chat-identity small{letter-spacing:.5px}.providerbar label{font-size:7px}}
+
+
+/* Conversation history and chat management */
+.conversation-tools{padding:12px 20px;display:grid;gap:10px;border-bottom:1px solid rgba(139,171,222,.12);background:#0b1523}
+.new-conversation{justify-self:start;display:inline-flex;align-items:center;gap:8px;padding:9px 13px;border:1px solid #477fc0;background:linear-gradient(120deg,#1e4d83,#17365d);color:#eaf3ff;border-radius:9px;font-size:11px;font-weight:700}
+.new-conversation:hover{filter:brightness(1.15)}
+.conversation-list{display:flex;gap:8px;overflow-x:auto;padding:1px 0 4px;scrollbar-width:thin}
+.conversation-item{display:flex;align-items:center;flex:none;max-width:240px;border:1px solid #2b405c;border-radius:9px;background:#101d2e}
+.conversation-item.active{border-color:#548bd0;background:#183253;box-shadow:inset 0 0 0 1px #548bd033}
+.conversation-select{min-width:0;max-width:195px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border:0;background:transparent;color:#aebed5;padding:9px 10px;font-size:10px;text-align:left}
+.conversation-item.active .conversation-select{color:#f0f6ff}
+.conversation-delete{display:grid;place-items:center;width:30px;height:30px;flex:none;margin-right:3px;border:0;border-radius:7px;background:transparent;color:#9babc2}
+.conversation-delete:hover{background:#5c2634;color:#ffb4bd}
+@media(max-width:700px){.conversation-tools{padding:10px 12px;gap:8px}.new-conversation{font-size:10px;padding:8px 11px}.conversation-item{max-width:205px}.conversation-select{max-width:160px;font-size:9px}.conversation-delete{width:28px;height:28px}}
