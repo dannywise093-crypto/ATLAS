@@ -57,7 +57,9 @@ export { json };
 
 export async function proxyTts(request, env) {
   if (request.method !== "POST") return json({ error: "Method not allowed." }, 405);
-  if (!env.ATLAS_GATEWAY_TOKEN) return json({ error: "ATLAS Cloudflare gateway token is not configured in Pages Functions." }, 503);
+  const gatewayToken = env.ATLAS_TTS_GATEWAY_TOKEN || env.ATLAS_GATEWAY_TOKEN;
+  const gatewayUrl = env.ATLAS_TTS_GATEWAY_URL || GATEWAY_URL;
+  if (!gatewayToken) return json({ error: "ATLAS speech gateway token is not configured in Pages Functions." }, 503);
   const raw = await request.text();
   if (raw.length > 20 * 1024) return json({ error: "Speech text is too large." }, 413);
   let body;
@@ -72,11 +74,11 @@ export async function proxyTts(request, env) {
   else if (bucket.count >= 8 || bucket.characters + body.text.length > 10_000) return json({ error: "Speech usage limit reached. Please wait before trying again." }, 429);
   else { bucket.count++; bucket.characters += body.text.length; }
   try {
-    const upstream = await fetch(GATEWAY_URL + "/api/tts", {
+    const upstream = await fetch(gatewayUrl + "/api/tts", {
       method: "POST",
       headers: {
         Accept: "audio/mpeg, application/json",
-        Authorization: "Bearer " + env.ATLAS_GATEWAY_TOKEN,
+        Authorization: "Bearer " + gatewayToken,
         "Content-Type": "application/json"
       },
       body: JSON.stringify({ text: body.text.trim() })
