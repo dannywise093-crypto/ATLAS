@@ -101,7 +101,34 @@ function extractAnswer(result) {
   return "";
 }
 
-async function runModelWithDeadline(env, model, messages, timeoutMs) {
+// Public-web search and narrowly allowlisted public API adapters.
+async function searchPublicWeb(query) {
+  const endpoint = new URL("https://html.duckduckgo.com/html/");
+  endpoint.searchParams.set("q", query.slice(0, 300));
+  const response = await fetch(endpoint, { headers: { "user-agent": "ATLAS-Research/1.0", accept: "text/html" }, signal: AbortSignal.timeout(9000) });
+  if (!response.ok) throw new Error("Search provider HTTP " + response.status);
+  const html = (await response.text()).slice(0, 1000000);
+  const decode = (s) => s.replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#x27;|&#39;/g, "'").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+  const found = [];
+  const re = /<a[^>]+class="result__a"[^>]+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>[\s\S]*?<a[^>]+class="result__snippet"[^>]*>([\s\S]*?)<\/a>/gi;
+  for (const m of html.matchAll(re)) {
+    let link = m[1].replace(/&amp;/g, "&");
+    try {
+      const u = new URL(link, "https://duckduckgo.com");
+      link = u.searchParams.get("uddg") ? decodeURIComponent(u.searchParams.get("uddg")) : u.toString();
+      const target = new URL(link);
+      if (!["http:", "https:"].includes(target.protocol) || target.username || target.password) continue;
+      if (/^(localhost|127\.|10\.|192\.168\.|169\.254\.)/.test(target.hostname)) continue;
+    } catch { continue; }
+    found.push({ title: decode(m[2]), url: link, snippet: decode(m[3]) });
+    if (found.length === 6) break;
+  }
+  return found;
+}
+function wantsWebResearch(text) {
+  return /\b(latest|today|current|right now|this week|recent|news|browse|search the web|internet|look up|research|sources|citations|price today|weather today)\b/i.test(text);
+}
+\nasync function runModelWithDeadline(env, model, messages, timeoutMs) {
   let timer;
   const timeout = new Promise((_, reject) => {
     timer = setTimeout(() => reject(new Error("Model response deadline exceeded.")), timeoutMs);
@@ -165,7 +192,7 @@ export default {
     for (const model of MODELS) {
       const startedAt = Date.now();
       try {
-        const result = await runModelWithDeadline(env, model.id, messages, model.timeoutMs);
+        const result = await runModelWithDeadline(env, model.id, modelMessages, model.timeoutMs);
         const durationMs = Date.now() - startedAt;
         if (isTruncated(result)) {
           failures.push({ model: model.id, status: "truncated", durationMs });
@@ -177,7 +204,7 @@ export default {
           return json({
             answer: answer.trim(),
             model: model.id,
-            fallbackUsed: model.id !== MODELS[0].id,
+            fallbackUsed: model.id !== MODELS[0].id,\n            sources,
           });
         }
         failures.push({ model: model.id, status: "empty_response", durationMs });
