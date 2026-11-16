@@ -51,18 +51,32 @@ export function selectBritishMaleVoice(voices = []) {
     candidates[0] || null;
 }
 
-export function speakText(text, environment = globalThis) {
+function getVoicesWhenReady(synthesis) {
+  const initial = synthesis.getVoices?.() || [];
+  if (initial.length) return Promise.resolve(initial);
+  return new Promise(resolve => {
+    let timer;
+    const finish = () => {
+      clearTimeout(timer);
+      synthesis.removeEventListener?.("voiceschanged", finish);
+      resolve(synthesis.getVoices?.() || []);
+    };
+    synthesis.addEventListener?.("voiceschanged", finish, { once: true });
+    timer = setTimeout(finish, 1200);
+  });
+}
+
+export async function speakText(text, environment = globalThis) {
   const capabilities = getVoiceCapabilities(environment);
-  if (!capabilities.speechSynthesis) return Promise.reject(new Error("Spoken responses are not supported by this browser."));
+  if (!capabilities.speechSynthesis) throw new Error("Spoken responses are not supported by this browser.");
   const phrase = cleanTextForSpeech(text);
-  if (!phrase) return Promise.resolve();
+  if (!phrase) return;
+  const voices = await getVoicesWhenReady(environment.speechSynthesis);
+  const maleVoice = selectBritishMaleVoice(voices);
+  if (!maleVoice) {
+    throw new Error("No British male voice is installed or exposed by this device. Enable a British English male voice in Android Text-to-Speech settings; ATLAS will not use a female fallback.");
+  }
   return new Promise((resolve, reject) => {
-    const voices = environment.speechSynthesis.getVoices?.() || [];
-    const maleVoice = selectBritishMaleVoice(voices);
-    if (!maleVoice) {
-      reject(new Error("No British male voice is installed or exposed by this device. Install or enable a British English male voice in Android Text-to-Speech settings; ATLAS will not use a female fallback."));
-      return;
-    }
     environment.speechSynthesis.cancel();
     const utterance = new environment.SpeechSynthesisUtterance(phrase);
     utterance.lang = "en-GB";
