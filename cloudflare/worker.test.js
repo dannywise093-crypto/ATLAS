@@ -238,7 +238,9 @@ test("skill catalog endpoint is authenticated and reports the bundled catalog", 
   const body = await response.json();
   assert.equal(response.status, 200);
   assert.equal(body.skillCount, 1);
-  assert.ok(body.specialistCount >= 5);
+  assert.equal(body.specialistCount, 12);
+  assert.equal(body.specialists.length, 12);
+  assert.ok(body.specialists.some((item) => item.id === "mechanical-cad"));
   assert.equal(body.skills[0].id, "cuopt-numerical-optimization-api");
 });
 
@@ -255,4 +257,17 @@ test("Copilot includes routed specialist context only when a skill matches", asy
   assert.equal(response.status, 200);
   assert.match(systemPrompt, /ATLAS SPECIALIST ROUTER/);
   assert.match(systemPrompt, /CUDA & GPU Computing specialist/);
+});
+
+
+test("Copilot returns explicit Mechanical & CAD routing diagnostics", async () => {
+  const env = envWith(async () => ({ choices: [{ message: { content: "Gearbox design guidance" } }] }));
+  const response = await worker.fetch(request("/api/copilot", {
+    method: "POST",
+    body: { messages: [{ role: "user", content: "Help me design a mechanical gearbox" }] },
+  }), env);
+  const body = await response.json();
+  assert.equal(response.status, 200);
+  assert.ok(body.routing.specialists.some((item) => item.id === "mechanical-cad"));
+  assert.equal(body.routing.specialists.length, 1);
 });
