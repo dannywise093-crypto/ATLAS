@@ -292,7 +292,7 @@ export default {
               : research.status === "unavailable" || research.status === "no_results"
                 ? "\n\nLive web research could not provide usable sources for this request. Current facts have not been independently verified."
                 : "";
-            return json({ answer: answer.trim() + sourceFooter, provider: "NVIDIA API Catalog", model: "meta/llama-3.3-70b-instruct", fallbackUsed: false, research, skills: { selected: routedSkills.skills.map(({ id, name }) => ({ id, name })), specialists: routedSkills.specialists } });
+            return json({ answer: answer.trim() + sourceFooter, provider: "NVIDIA API Catalog", model: "meta/llama-3.3-70b-instruct", fallbackUsed: false, research, skills: { selected: routedSkills.skills.map(({ id, name }) => ({ id, name })), specialists: routedSkills.specialists, ...skillInventory } });
           }
           failures.push({ provider: "nvidia", status: "empty_response", durationMs: Date.now() - startedAt });
         } else {

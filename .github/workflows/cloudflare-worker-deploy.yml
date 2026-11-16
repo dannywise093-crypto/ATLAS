@@ -1,0 +1,44 @@
+name: Deploy ATLAS Cloudflare Worker
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out project
+        uses: actions/checkout@v5
+
+      - name: Set up Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Rebuild all installed skill instructions
+        run: npm run skills:build
+
+      - name: Run ATLAS tests
+        run: npm test
+
+      - name: Skip deployment when Cloudflare token is not configured
+        if: ${{ secrets.CLOUDFLARE_API_TOKEN == '' }}
+        run: echo '::notice::Worker deployment skipped. Add CLOUDFLARE_API_TOKEN in GitHub Actions secrets to enable Cloudflare deployment.'
+
+      - name: Deploy ATLAS Worker to Cloudflare
+        if: ${{ secrets.CLOUDFLARE_API_TOKEN != '' }}
+        uses: cloudflare/wrangler-action@v4
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: a5c4e4218e2cfa4196341ae2edcb194f
+          command: deploy
