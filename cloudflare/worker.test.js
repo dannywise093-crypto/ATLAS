@@ -197,3 +197,34 @@ test("dedicated Copilot route rejects malformed messages", async () => {
   }), envWith(async () => ({})));
   assert.equal(response.status, 400);
 });
+
+
+test("Copilot loads NVIDIA cuOpt skill guidance for numerical optimization tasks", async () => {
+  let systemPrompt;
+  const env = envWith(async (_model, input) => {
+    systemPrompt = input.messages[0].content;
+    return { choices: [{ message: { content: "LP guidance response" } }] };
+  });
+  const response = await worker.fetch(request("/api/copilot", {
+    method: "POST",
+    body: { messages: [{ role: "user", content: "Help me formulate a linear programming model with cuOpt." }] },
+  }), env);
+  assert.equal(response.status, 200);
+  assert.match(systemPrompt, /NVIDIA cuOpt Numerical Optimization skill/);
+  assert.match(systemPrompt, /QP is beta, MINIMIZE-only/);
+  assert.match(systemPrompt, /never call a merely feasible result optimal/);
+});
+
+test("Copilot does not load cuOpt guidance for unrelated coding tasks", async () => {
+  let systemPrompt;
+  const env = envWith(async (_model, input) => {
+    systemPrompt = input.messages[0].content;
+    return { choices: [{ message: { content: "React component response" } }] };
+  });
+  const response = await worker.fetch(request("/api/copilot", {
+    method: "POST",
+    body: { messages: [{ role: "user", content: "Create a React button component." }] },
+  }), env);
+  assert.equal(response.status, 200);
+  assert.doesNotMatch(systemPrompt, /NVIDIA cuOpt Numerical Optimization skill/);
+});
