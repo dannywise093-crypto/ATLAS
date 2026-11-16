@@ -46,11 +46,24 @@ export function speakText(text, environment = globalThis) {
     environment.speechSynthesis.cancel();
     const utterance = new environment.SpeechSynthesisUtterance(phrase);
     utterance.lang = "en-GB";
-    utterance.rate = 0.90;
-    utterance.pitch = 0.82;
+    utterance.rate = 0.88;
+    utterance.pitch = 0.78;
     const voices = environment.speechSynthesis.getVoices?.() || [];
     const britishVoices = voices.filter(voice => /^en-GB(?:-|$)/i.test(voice.lang));
-    const preferredVoice = britishVoices.find(voice => /(?:^|[\s_-])(male|daniel|george|oliver|arthur|ryan|brian|guy|andrew|james|thomas)(?:$|[\s_-])/i.test(voice.name || ""));
+    // Prefer clearly identified British male voices, with a measured,
+    // JARVIS-inspired delivery. Actual availability depends on the device.
+    const preferredNames = [
+      /google uk english male/i,
+      /(?:^|[\\s_-])daniel(?:$|[\\s_-])/i,
+      /(?:^|[\\s_-])george(?:$|[\\s_-])/i,
+      /(?:^|[\\s_-])arthur(?:$|[\\s_-])/i,
+      /(?:^|[\\s_-])oliver(?:$|[\\s_-])/i,
+      /microsoft ryan/i,
+      /(?:^|[\\s_-])male(?:$|[\\s_-])/i
+    ];
+    const preferredVoice = preferredNames
+      .map(pattern => britishVoices.find(voice => pattern.test(voice.name || "")))
+      .find(Boolean);
     utterance.voice = preferredVoice || britishVoices[0] || voices.find(voice => /^en-/i.test(voice.lang)) || null;
     utterance.onend = () => resolve();
     utterance.onerror = event => reject(new Error(event.error || "Speech playback failed."));
