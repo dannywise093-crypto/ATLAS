@@ -331,3 +331,54 @@ test("Copilot includes routed specialist context only when a skill matches", asy
   assert.match(systemPrompt, /ATLAS SPECIALIST ROUTER/);
   assert.match(systemPrompt, /CUDA & GPU Computing specialist/);
 });
+
+
+test("cloud TTS endpoint generates Draco MP3 audio through Workers AI", async () => {
+  let call;
+  const audioBytes = new Uint8Array([73, 68, 51, 1, 2, 3]);
+  const env = envWith(async (model, input) => {
+    call = { model, input };
+    return new ReadableStream({
+      start(controller) {
+        controller.enqueue(audioBytes);
+        controller.close();
+      }
+    });
+  });
+  const response = await worker.fetch(request("/api/tts", {
+    method: "POST",
+    body: { text: "Good afternoon, sir." }
+  }), env);
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("content-type"), "audio/mpeg");
+  assert.equal(response.headers.get("x-atlas-voice"), "draco");
+  assert.equal(call.model, "@cf/deepgram/aura-2-en");
+  assert.deepEqual(call.input, {
+    text: "Good afternoon, sir.",
+    speaker: "draco",
+    encoding: "mp3"
+  });
+  assert.deepEqual(new Uint8Array(await response.arrayBuffer()), audioBytes);
+});
+
+test("cloud TTS endpoint requires authorization and valid bounded text", async () => {
+  const env = envWith(async () => new ReadableStream());
+  const denied = await worker.fetch(request("/api/tts", {
+    method: "POST",
+    body: { text: "Hello" },
+    auth: false
+  }), env);
+  assert.equal(denied.status, 401);
+
+  const invalid = await worker.fetch(request("/api/tts", {
+    method: "POST",
+    body: { text: "   " }
+  }), env);
+  assert.equal(invalid.status, 400);
+
+  const tooLong = await worker.fetch(request("/api/tts", {
+    method: "POST",
+    body: { text: "x".repeat(4001) }
+  }), env);
+  assert.equal(tooLong.status, 400);
+});

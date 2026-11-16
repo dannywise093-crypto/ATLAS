@@ -54,3 +54,51 @@ export async function proxy(request, env, path, method) {
 }
 
 export { json };
+
+export async function proxyTts(request, env) {
+  if (request.method !== "POST") return json({ error: "Method not allowed." }, 405);
+  const gatewayToken = env.ATLAS_TTS_GATEWAY_TOKEN || env.ATLAS_GATEWAY_TOKEN;
+  const gatewayUrl = env.ATLAS_TTS_GATEWAY_URL || GATEWAY_URL;
+  if (!gatewayToken) return json({ error: "ATLAS speech gateway token is not configured in Pages Functions." }, 503);
+  const raw = await request.text();
+  if (raw.length > 20 * 1024) return json({ error: "Speech text is too large." }, 413);
+  let body;
+  try { body = JSON.parse(raw); } catch { return json({ error: "A valid JSON request body is required." }, 400); }
+  if (!body || typeof body.text !== "string" || !body.text.trim() || body.text.length > 4000) {
+    return json({ error: "Provide speech text between 1 and 4,000 characters." }, 400);
+  }
+  const ip = request.headers.get("CF-Connecting-IP") || "unknown";
+  const now = Date.now();
+  const bucket = buckets.get("tts:" + ip);
+  if (!bucket || now - bucket.start >= WINDOW_MS) buckets.set("tts:" + ip, { start: now, count: 1, characters: body.text.length });
+  else if (bucket.count >= 8 || bucket.characters + body.text.length > 10_000) return json({ error: "Speech usage limit reached. Please wait before trying again." }, 429);
+  else { bucket.count++; bucket.characters += body.text.length; }
+  try {
+    const upstream = await fetch(gatewayUrl + "/api/tts", {
+      method: "POST",
+      headers: {
+        Accept: "audio/mpeg, application/json",
+        Authorization: "Bearer " + gatewayToken,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ text: body.text.trim() })
+    });
+    if (!upstream.ok) {
+      const errorText = await upstream.text();
+      return new Response(errorText, {
+        status: upstream.status,
+        headers: { "Content-Type": upstream.headers.get("Content-Type") || "application/json", "Cache-Control": "no-store" }
+      });
+    }
+    return new Response(upstream.body, {
+      status: 200,
+      headers: {
+        "Content-Type": upstream.headers.get("Content-Type") || "audio/mpeg",
+        "Cache-Control": "no-store",
+        "X-Content-Type-Options": "nosniff"
+      }
+    });
+  } catch {
+    return json({ error: "ATLAS speech gateway could not be reached. Please retry." }, 502);
+  }
+}
