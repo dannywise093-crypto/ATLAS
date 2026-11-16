@@ -37,7 +37,10 @@ function matchesTerm(promptTokens, term) {
   return includesPhrase(promptTokens, meaningfulTokens(term));
 }
 
-export function routeSkills(prompt, catalog = SKILL_CATALOG, limit = 4) {
+export const MAX_SKILLS_PER_REQUEST = 4;
+const MAX_SKILL_CONTEXT_CHARS = 12000;
+
+export function routeSkills(prompt, catalog = SKILL_CATALOG, limit = MAX_SKILLS_PER_REQUEST) {
   const queryTokens = meaningfulTokens(prompt);
   const query = new Set(queryTokens);
 
@@ -111,5 +114,5 @@ export function buildSkillContext(prompt, catalog = SKILL_CATALOG) {
 }
 
 export function getSkillCatalogStats(catalog = SKILL_CATALOG) {
-  return { skillCount: catalog.length, specialistCount: SPECIALISTS.length };
+  return { skillCount: catalog.length, specialistCount: SPECIALISTS.length, maxSkillsPerRequest: MAX_SKILLS_PER_REQUEST };
 }

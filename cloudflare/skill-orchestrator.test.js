@@ -53,4 +53,6 @@ test("does not inject unrelated skill content", () => {
 
 test("catalog statistics report the installed catalog size", () => {
   assert.equal(getSkillCatalogStats(sample).skillCount, 5);
+  assert.equal(getSkillCatalogStats(sample).maxSkillsPerRequest, 4);
+  assert.equal(getSkillCatalogStats(sample).specialistCount, 6);
 });
