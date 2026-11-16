@@ -1,3 +1,4 @@
+import { handleBrowserRequest } from "./browser.js";
 const MODELS = [
   // Live Workers AI measurement: Llama returned a complete 920-token code answer
   // in ~29 seconds. The previous 9-second deadline guaranteed false timeouts.
@@ -128,7 +129,7 @@ async function searchPublicWeb(query) {
 function wantsWebResearch(text) {
   return /\b(latest|today|current|right now|this week|recent|news|browse|search the web|internet|look up|research|sources|citations|price today|weather today)\b/i.test(text);
 }
-\nasync function runModelWithDeadline(env, model, messages, timeoutMs) {
+async function runModelWithDeadline(env, model, messages, timeoutMs) {
   let timer;
   const timeout = new Promise((_, reject) => {
     timer = setTimeout(() => reject(new Error("Model response deadline exceeded.")), timeoutMs);
@@ -164,6 +165,12 @@ export default {
       });
     }
 
+    if (url.pathname === "/api/browser") {
+      if (!authorized(request, env)) return json({ error: "Unauthorized." }, 401);
+      if (rateLimited(request)) return json({ error: "Too many requests. Please wait and try again." }, 429, { "retry-after": "60" });
+      return handleBrowserRequest(request, env);
+    }
+
     if (url.pathname !== "/api/chat") return json({ error: "Not found." }, 404);
     if (request.method !== "POST") return json({ error: "Method not allowed." }, 405, { allow: "POST" });
     if (!authorized(request, env)) return json({ error: "Unauthorized." }, 401);
@@ -188,6 +195,27 @@ export default {
       return json({ error: "The latest message must be from the user." }, 400);
     }
 
+    let sources = [];
+    let modelMessages = messages;
+    const latestQuestion = messages[messages.length - 1].content;
+    if (wantsWebResearch(latestQuestion)) {
+      try {
+        sources = await searchPublicWeb(latestQuestion);
+        if (sources.length) {
+          const last = messages[messages.length - 1];
+          const researchContext = sources.map((item, index) =>
+            `[${index + 1}] ${item.title}\nURL: ${item.url}\nSnippet: ${item.snippet}`
+          ).join("\n\n");
+          modelMessages = [
+            ...messages.slice(0, -1),
+            { ...last, content: last.content + "\n\nUntrusted public-web search snippets (verify before relying on them):\n" + researchContext },
+          ];
+        }
+      } catch (error) {
+        console.warn("ATLAS public-web search unavailable", error?.message || "unknown error");
+      }
+    }
+
     const failures = [];
     for (const model of MODELS) {
       const startedAt = Date.now();
@@ -204,7 +232,8 @@ export default {
           return json({
             answer: answer.trim(),
             model: model.id,
-            fallbackUsed: model.id !== MODELS[0].id,\n            sources,
+            fallbackUsed: model.id !== MODELS[0].id,
+            sources,
           });
         }
         failures.push({ model: model.id, status: "empty_response", durationMs });

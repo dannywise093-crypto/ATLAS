@@ -166,3 +166,22 @@
  .assistant-mode .atlas-speak{font-size:13px;padding:10px 9px}
  .assistant-mode .atlas-conversation{padding-left:12px;padding-right:12px}
 }
+
+
+/* ATLAS Browser Center */
+.browser-panel{display:flex;flex-direction:column;gap:14px;padding:20px;border:1px solid var(--line,#273244);border-radius:18px;background:var(--panel,#111827);min-width:0}
+.browser-address{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--line,#273244);border-radius:12px;background:var(--surface,#0b1220)}
+.browser-address input{flex:1;min-width:0;border:0;outline:0;background:transparent;color:inherit;font:inherit}
+.browser-address button,.browser-actions button{border:1px solid var(--line,#344256);border-radius:9px;padding:9px 14px;background:var(--accent,#3159a8);color:#fff;font:inherit;cursor:pointer}
+.browser-actions{display:flex;gap:8px;flex-wrap:wrap}
+.browser-actions button{background:transparent;color:inherit}
+.browser-address button:disabled,.browser-actions button:disabled,.browser-link-list button:disabled{opacity:.55;cursor:wait}
+.browser-result{display:flex;flex-direction:column;gap:12px;min-width:0}
+.browser-result-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.browser-result-head a{display:inline-flex;align-items:center;gap:6px;color:var(--accent-strong,#83aaff);text-decoration:none}
+.browser-text{max-height:560px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;padding:16px;border-radius:12px;background:#080d16;color:#dce6f4;font:13px/1.6 ui-monospace,SFMono-Regular,monospace}
+.browser-link-list{display:grid;gap:8px;max-height:560px;overflow:auto}
+.browser-link-list button{display:flex;align-items:flex-start;gap:10px;text-align:left;padding:10px;border:1px solid var(--line,#273244);border-radius:10px;background:transparent;color:inherit;cursor:pointer;overflow-wrap:anywhere}
+.browser-link-list button span{min-width:0;overflow-wrap:anywhere}
+.browser-shot{display:block;max-width:100%;height:auto;border:1px solid var(--line,#273244);border-radius:12px}
+@media(max-width:600px){.browser-panel{padding:13px}.browser-address{flex-wrap:wrap}.browser-address input{flex-basis:calc(100% - 40px)}.browser-address button{margin-left:auto}}
