@@ -18,7 +18,7 @@ test("creates an English UK recognition session with final-result handling", () 
   let received;
   const recognition = createSpeechRecognition({ SpeechRecognition: FakeRecognition }, { onResult: event => { received = event; } });
   assert.equal(recognition.lang, "en-GB");
-  assert.equal(recognition.continuous, false);
+  assert.equal(recognition.continuous, true);
   assert.equal(recognition.interimResults, true);
   const event = { resultIndex: 0, results: [] };
   recognition.onresult(event);
@@ -44,7 +44,7 @@ test("speaks using a British English voice when one is available", async () => {
   await speakText("Good afternoon, sir.", environment);
   assert.equal(spoken.lang, "en-GB");
   assert.equal(spoken.voice.lang, "en-GB");
-  assert.equal(spoken.rate, 0.90);
+  assert.equal(spoken.rate, 0.88);
 });
 
 test("removes markdown markers before speech", () => {
@@ -64,7 +64,7 @@ test("prefers a named British male voice when available", async () => {
   };
   await speakText("Certainly, sir.", environment);
   assert.equal(spoken.voice.name, "Microsoft Ryan");
-  assert.equal(spoken.pitch, 0.82);
+  assert.equal(spoken.pitch, 0.78);
 });
 test("prefers the explicit Google UK English Male voice over other British voices", async () => {
   let spoken;
