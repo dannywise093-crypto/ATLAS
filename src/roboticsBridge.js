@@ -1,6 +1,6 @@
 const ALLOWED_CAPABILITIES = new Set(["device.discovery", "telemetry.read"]);
 const ALLOWED_PERMISSIONS = new Set(["device.identity", "telemetry.read"]);
-const VALID_TRANSPORTS = new Set(["bluetooth", "usb", "serial", "wifi", "ethernet", "ros2", "can", "vendor-sdk", "simulation"]);
+const VALID_TRANSPORTS = new Set(["bluetooth", "bluetooth-le", "bluetooth-classic", "usb", "usb-otg", "usb-serial", "serial", "wifi", "wifi-lan", "wifi-direct", "ethernet", "ros2", "ros2-dds", "micro-ros", "can", "can-bus", "mqtt", "modbus", "opcua", "http-ws", "vendor-sdk", "camera-sensors", "simulation"]);
 
 export function validateRoboticsManifest(manifest) {
   const errors = [];
