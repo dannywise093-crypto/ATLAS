@@ -1,6 +1,6 @@
 import { formatResearchEvidence, needsLiveResearch, searchWeb } from "./knowledge.js";
 import { archiveResearchResults } from "./knowledgeArchive.js";
-import { buildSkillContext, getSkillCatalogStats } from "./skill-orchestrator.js";
+import { buildSkillContext, getSkillCatalogStats, getSpecialists } from "./skill-orchestrator.js";
 const MODELS = [
   // Live Workers AI measurement: Llama returned a complete 920-token code answer
   // in ~29 seconds. The previous 9-second deadline guaranteed false timeouts.
@@ -186,7 +186,7 @@ export default {
       if (!authorized(request, env)) return json({ error: "Unauthorized." }, 401);
       const { skillCount, specialistCount } = getSkillCatalogStats();
       const { SKILL_CATALOG } = await import("./generated-skill-catalog.js");
-      return json({ skillCount, specialistCount, skills: SKILL_CATALOG.map(({ id, name, description, tags, source }) => ({ id, name, description, tags, source })) });
+      return json({ skillCount, specialistCount, specialists: getSpecialists(), skills: SKILL_CATALOG.map(({ id, name, description, tags, source }) => ({ id, name, description, tags, source })) });
     }
 
     const isCopilot = url.pathname === "/api/copilot";
@@ -266,6 +266,7 @@ export default {
             model: model.id,
             fallbackUsed: model.id !== MODELS[0].id,
             research,
+            ...(isCopilot ? { routing: { specialists: routedSkills.specialists, skills: routedSkills.skills.map(({ id, name, score }) => ({ id, name, score })) } } : {}),
           });
         }
         failures.push({ model: model.id, status: "empty_response", durationMs });
