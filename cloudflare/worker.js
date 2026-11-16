@@ -275,9 +275,9 @@ export default {
           const answer = extractAnswer(result);
           if (answer) {
             const sourceFooter = research.sources.length
-              ? "\\n\\nSources checked (" + research.checkedAt + "):\\n" + research.sources.map((source, index) => (index + 1) + ". " + source.title + " — " + source.url).join("\\n") + "\\nThese are search-result snippets; full source pages were not independently verified."
+              ? "\n\nSources checked (" + research.checkedAt + "):\n" + research.sources.map((source, index) => (index + 1) + ". " + source.title + " — " + source.url).join("\n") + "\nThese are search-result snippets; full source pages were not independently verified."
               : research.status === "unavailable" || research.status === "no_results"
-                ? "\\n\\nLive web research could not provide usable sources for this request. Current facts have not been independently verified."
+                ? "\n\nLive web research could not provide usable sources for this request. Current facts have not been independently verified."
                 : "";
             return json({ answer: answer.trim() + sourceFooter, provider: "NVIDIA API Catalog", model: "meta/llama-3.3-70b-instruct", fallbackUsed: false, research, skills: { selected: routedSkills.skills.map(({ id, name }) => ({ id, name })), specialists: routedSkills.specialists } });
           }
