@@ -37,34 +37,38 @@ export function cleanTextForSpeech(value) {
     .trim();
 }
 
+const britishMaleVoiceName = /google uk english male|microsoft ryan|\b(?:daniel|george|arthur|oliver|ryan)\b|\bmale\b/i;
+const femaleVoiceName = /\bfemale\b|\b(?:susan|kate|hazel|samantha|victoria|serena|moira|tessa)\b/i;
+
+export function selectBritishMaleVoice(voices = []) {
+  const candidates = voices.filter(voice =>
+    /^en-GB(?:-|$)/i.test(voice.lang || "") &&
+    !femaleVoiceName.test(voice.name || "") &&
+    (voice.gender === "male" || britishMaleVoiceName.test(voice.name || ""))
+  );
+  return candidates.find(voice => /google uk english male/i.test(voice.name || "")) ||
+    candidates.find(voice => /microsoft ryan/i.test(voice.name || "")) ||
+    candidates[0] || null;
+}
+
 export function speakText(text, environment = globalThis) {
   const capabilities = getVoiceCapabilities(environment);
   if (!capabilities.speechSynthesis) return Promise.reject(new Error("Spoken responses are not supported by this browser."));
   const phrase = cleanTextForSpeech(text);
   if (!phrase) return Promise.resolve();
   return new Promise((resolve, reject) => {
+    const voices = environment.speechSynthesis.getVoices?.() || [];
+    const maleVoice = selectBritishMaleVoice(voices);
+    if (!maleVoice) {
+      reject(new Error("No British male voice is installed or exposed by this device. Install or enable a British English male voice in Android Text-to-Speech settings; ATLAS will not use a female fallback."));
+      return;
+    }
     environment.speechSynthesis.cancel();
     const utterance = new environment.SpeechSynthesisUtterance(phrase);
     utterance.lang = "en-GB";
     utterance.rate = 0.88;
     utterance.pitch = 0.78;
-    const voices = environment.speechSynthesis.getVoices?.() || [];
-    const britishVoices = voices.filter(voice => /^en-GB(?:-|$)/i.test(voice.lang));
-    // Prefer clearly identified British male voices, with a measured,
-    // JARVIS-inspired delivery. Actual availability depends on the device.
-    const preferredNames = [
-      /google uk english male/i,
-      /(?:^|[\\s_-])daniel(?:$|[\\s_-])/i,
-      /(?:^|[\\s_-])george(?:$|[\\s_-])/i,
-      /(?:^|[\\s_-])arthur(?:$|[\\s_-])/i,
-      /(?:^|[\\s_-])oliver(?:$|[\\s_-])/i,
-      /microsoft ryan/i,
-      /(?:^|[\\s_-])male(?:$|[\\s_-])/i
-    ];
-    const preferredVoice = preferredNames
-      .map(pattern => britishVoices.find(voice => pattern.test(voice.name || "")))
-      .find(Boolean);
-    utterance.voice = preferredVoice || britishVoices[0] || voices.find(voice => /^en-/i.test(voice.lang)) || null;
+    utterance.voice = maleVoice;
     utterance.onend = () => resolve();
     utterance.onerror = event => reject(new Error(event.error || "Speech playback failed."));
     environment.speechSynthesis.speak(utterance);
