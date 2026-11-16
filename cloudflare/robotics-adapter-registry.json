@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "1.0",
+  "project": "ATLAS",
+  "architecture": "vendor-neutral-adapter-registry",
+  "status": "specification-only",
+  "defaultPermissions": [],
+  "defaultSafetyClass": "read-only",
+  "actuationEnabled": false,
+  "adapterFamilies": [
+    {"id":"ros2-dds","name":"ROS 2 / DDS","status":"planned","capabilities":["device.discovery","telemetry.read"]},
+    {"id":"micro-ros","name":"micro-ROS","status":"planned","capabilities":["device.discovery","telemetry.read"]},
+    {"id":"usb-serial","name":"USB / Serial","status":"planned","capabilities":["device.discovery","telemetry.read"]},
+    {"id":"can-telemetry","name":"CAN telemetry","status":"planned","capabilities":["device.discovery","telemetry.read"]},
+    {"id":"ethernet-tcp","name":"Ethernet / TCP","status":"planned","capabilities":["device.discovery","telemetry.read"]},
+    {"id":"vendor-sdk","name":"Manufacturer SDK","status":"planned","capabilities":["device.discovery","telemetry.read"]},
+    {"id":"camera-sensors","name":"Camera and sensor adapters","status":"planned","capabilities":["device.discovery","telemetry.read"]}
+  ]
+}
