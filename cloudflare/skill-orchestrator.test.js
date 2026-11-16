@@ -14,7 +14,7 @@ test("routes numerical optimization prompts to cuOpt and optimization specialist
   const routed = routeSkills("Use NVIDIA cuOpt for mixed integer optimization", sample);
   assert.equal(routed.skills[0].id, "cuopt");
   assert.ok(routed.specialists.some((agent) => agent.id === "optimization"));
-  assert.ok(routed.specialists.some((agent) => agent.id === "cuda-gpu"));
+  assert.equal(routed.specialists.some((agent) => agent.id === "cuda-gpu"), false);
 });
 
 test("routes vision prompts to the relevant skill", () => {
