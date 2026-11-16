@@ -180,7 +180,7 @@ export default function App() {
       const result=runAtlasCore(messageText,memory,messages);
       if(result.action==="save_memory"&&result.memory)setMemory(items=>items.includes(result.memory)?items:[...items,result.memory]);
       updateConversationMessages(conversationId,items=>[...items,{role:"atlas",text:result.text}]);
-      if(speak)await speakVoiceReply(result.text);
+      if(speak)await speakVoiceReply("Certainly, sir. "+result.text);
       return;
     }
     setGenerating(true);
@@ -272,6 +272,8 @@ export default function App() {
         recognition.start();
         setVoiceStatus("Listening. Speak naturally; ATLAS will respond when you finish.");
       }catch(error){
+        voiceModeRef.current=false;
+        setVoiceMode(false);
         setVoiceStatus("Could not start microphone recognition: "+error.message);
       }
     };
