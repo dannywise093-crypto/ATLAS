@@ -5,7 +5,7 @@ import { getBluetoothDiscoveryStatus, discoverBluetoothDevice, scanNativeBluetoo
 test("reports Web Bluetooth unavailable in embedded environments without the API", () => {
   const status = getBluetoothDiscoveryStatus({ isSecureContext: true, navigator: {} });
   assert.equal(status.supported, false);
-  assert.match(status.reason, /Native Android integration is not installed/);
+  assert.match(status.reason, /native ATLAS app/);
 });
 
 test("requires a secure context for Bluetooth discovery", () => {
