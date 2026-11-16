@@ -221,7 +221,7 @@ export default function App() {
     if(!isCopilot)setInput("");
     const localCommand=!isCopilot && /^(remember that|remember|save this|store this|what do you remember|show memory|list memories|my memories|find |search memory for |do you remember |help$|roadmap$|development plan$)/i.test(messageText);
     if(localCommand){
-      const result=runAtlasCore(messageText,memory,messages);
+      const result=runAtlasCore(messageText,memory,activeMessages);
       if(result.action==="save_memory"&&result.memory)setMemory(items=>items.includes(result.memory)?items:[...items,result.memory]);
       updateConversationMessages(targetId,items=>[...items,{role:"atlas",text:result.text}]);
       sendInProgressRef.current=false;
