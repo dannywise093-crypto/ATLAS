@@ -102,3 +102,19 @@ The official GitHub Copilot SDK and Microsoft Copilot Studio interfaces are
 documented as separate future adapters. They require their own approved
 authentication, hosting, and provider configuration before they can be activated.
 See [docs/COPILOT_INTEGRATIONS.md](docs/COPILOT_INTEGRATIONS.md).
+
+
+## NVIDIA cuOpt numerical optimization skill
+
+ATLAS Copilot conditionally loads NVIDIA's `cuopt-numerical-optimization-api`
+guidance for relevant numerical optimization prompts. The versioned agent skill is
+stored under `.agents/skills/cuopt-numerical-optimization-api/` and covers Python,
+C/C++, and CLI workflows for LP, MILP, and QP (beta).
+
+This is an **instruction/authoring integration**, not a deployed GPU solver. The
+Cloudflare Worker cannot run the cuOpt native/Python solver itself. To execute
+optimization jobs from the ATLAS application, provision a supported NVIDIA cuOpt
+runtime on GPU infrastructure and add a separately secured server-side adapter;
+never expose solver credentials or an unauthenticated solver service to browsers.
+See NVIDIA's [cuOpt documentation](https://docs.nvidia.com/cuopt/user-guide/latest/)
+and [cuOpt OpenAPI reference](https://docs.nvidia.com/cuopt/user-guide/latest/open-api.html).
