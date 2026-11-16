@@ -237,7 +237,8 @@ test("skill catalog endpoint is authenticated and reports the bundled catalog", 
   const response = await worker.fetch(request("/api/skills"), envWith(async () => ({})));
   const body = await response.json();
   assert.equal(response.status, 200);
-  assert.equal(body.skillCount, 1);
+  assert.ok(body.skillCount >= 451);
+  assert.equal(body.skills.length, body.skillCount);
   assert.ok(body.specialistCount >= 5);
   assert.equal(body.skills[0].id, "cuopt-numerical-optimization-api");
 });
