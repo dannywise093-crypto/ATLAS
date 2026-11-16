@@ -22,18 +22,18 @@ export function createSpeechRecognition(environment = globalThis, handlers = {})
 
 export function cleanTextForSpeech(value) {
   return String(value || "")
-    .replace(/\x60\x60\x60[\\s\\S]*?\x60\x60\x60/g, " ")
+    .replace(/\x60\x60\x60[\s\S]*?\x60\x60\x60/g, " ")
     .replace(/\x60([^\x60]+)\x60/g, "$1")
-    .replace(/^\\s{0,3}#{1,6}\\s*/gm, "")
-    .replace(/^\\s*[-*+]\\s+/gm, "")
-    .replace(/^\\s*>\\s?/gm, "")
-    .replace(/\\*\\*(.*?)\\*\\*/g, "$1")
+    .replace(/^\s{0,3}#{1,6}\s*/gm, "")
+    .replace(/^\s*[-*+]\s+/gm, "")
+    .replace(/^\s*>\s?/gm, "")
+    .replace(/\*\*(.*?)\*\*/g, "$1")
     .replace(/__(.*?)__/g, "$1")
-    .replace(/\\*(.*?)\\*/g, "$1")
+    .replace(/\*(.*?)\*/g, "$1")
     .replace(/_(.*?)_/g, "$1")
     .replace(/~~(.*?)~~/g, "$1")
-    .replace(/[\\*#_~]/g, "")
-    .replace(/\\s+/g, " ")
+    .replace(/[\*#_~]/g, "")
+    .replace(/\s+/g, " ")
     .trim();
 }
 
