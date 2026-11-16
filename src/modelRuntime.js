@@ -1,6 +1,6 @@
 // ATLAS model gateway client.
-// Production requests use same-origin Vercel serverless routes. The gateway
-// token and model-provider credentials remain server-side and never enter VITE_*.
+// Production requests use same-origin Cloudflare Pages Functions.
+// Gateway and NVIDIA credentials remain server-side and never enter VITE_*.
 const API_BASE = String(import.meta.env.VITE_ATLAS_API_URL || "").replace(/\/$/, "");
 
 export function getNeuralRuntimeStatus() {
