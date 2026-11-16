@@ -28,6 +28,8 @@ export default function App() {
       return [{id:crypto.randomUUID(),title:"Welcome to ATLAS",messages:Array.isArray(legacy)&&legacy.length?legacy:initial,updatedAt:Date.now()}];
     } catch { return [{id:crypto.randomUUID(),title:"Welcome to ATLAS",messages:initial,updatedAt:Date.now()}]; }
   });
+  const conversationsRef = useRef(conversations);
+  const sendInProgressRef = useRef(false);
   const [activeConversationId,setActiveConversationId] = useState(()=>{
     try{return localStorage.getItem("atlas-active-conversation")||"";}catch{return "";}
   });
@@ -42,6 +44,7 @@ export default function App() {
       return [{id:crypto.randomUUID(),title:"Welcome to Copilot",messages:Array.isArray(legacy)&&legacy.length?legacy:copilotWelcome,updatedAt:Date.now()}];
     } catch { return [{id:crypto.randomUUID(),title:"Welcome to Copilot",messages:copilotWelcome,updatedAt:Date.now()}]; }
   });
+  const copilotConversationsRef = useRef(copilotConversations);
   const [activeCopilotConversationId,setActiveCopilotConversationId] = useState(()=>{
     try{return localStorage.getItem("atlas-active-copilot-conversation")||"";}catch{return "";}
   });
@@ -89,13 +92,29 @@ export default function App() {
   const [gatewayReady,setGatewayReady] = useState(false);
   const [gatewayMessage,setGatewayMessage] = useState("Checking the hosted model gateway…");
   useEffect(()=>{const controller=new AbortController();checkAtlasBackend(controller.signal).then(status=>{const ready=status.status==="configured";setGatewayReady(ready);setGatewayMessage(ready?"Cloudflare Workers AI · Llama 3.3 primary with model fallbacks is connected.":"The hosted model is not configured.");}).catch(error=>{setGatewayReady(false);setGatewayMessage(error.message);});return()=>controller.abort();},[]);
-  useEffect(()=>localStorage.setItem("atlas-conversations",JSON.stringify(conversations)),[conversations]);
+  function commitConversations(updater){
+    const current=conversationsRef.current;
+    const next=typeof updater==="function"?updater(current):updater;
+    conversationsRef.current=next;
+    setConversations(next);
+    try{localStorage.setItem("atlas-conversations",JSON.stringify(next));}
+    catch(error){console.warn("ATLAS could not persist chat history locally.",error);}
+  }
+  function commitCopilotConversations(updater){
+    const current=copilotConversationsRef.current;
+    const next=typeof updater==="function"?updater(current):updater;
+    copilotConversationsRef.current=next;
+    setCopilotConversations(next);
+    try{localStorage.setItem("atlas-copilot-conversations",JSON.stringify(next));}
+    catch(error){console.warn("ATLAS could not persist Copilot history locally.",error);}
+  }
+  useEffect(()=>{try{localStorage.setItem("atlas-conversations",JSON.stringify(conversations));}catch(error){console.warn("ATLAS chat history persistence failed.",error);}},[conversations]);
   useEffect(()=>{if(activeConversation?.id){setActiveConversationId(activeConversation.id);localStorage.setItem("atlas-active-conversation",activeConversation.id);}},[activeConversation?.id]);
-  useEffect(()=>localStorage.setItem("atlas-copilot-conversations",JSON.stringify(copilotConversations)),[copilotConversations]);
+  useEffect(()=>{try{localStorage.setItem("atlas-copilot-conversations",JSON.stringify(copilotConversations));}catch(error){console.warn("ATLAS Copilot history persistence failed.",error);}},[copilotConversations]);
   useEffect(()=>{if(activeCopilotConversation?.id){setActiveCopilotConversationId(activeCopilotConversation.id);localStorage.setItem("atlas-active-copilot-conversation",activeCopilotConversation.id);}},[activeCopilotConversation?.id]);
   useEffect(()=>localStorage.setItem("atlas-memory",JSON.stringify(memory)),[memory]);
   function updateConversationMessages(id,updater){
-    setConversations(items=>items.map(item=>{
+    commitConversations(items=>items.map(item=>{
       if(item.id!==id)return item;
       const next=typeof updater==="function"?updater(item.messages):updater;
       const firstUser=next.find(message=>message.role==="user");
@@ -104,7 +123,7 @@ export default function App() {
   }
   function newConversation(){
     const id=crypto.randomUUID();
-    setConversations(items=>[{id,title:"New conversation",messages:initial,updatedAt:Date.now()},...items]);
+    commitConversations(items=>[{id,title:"New conversation",messages:initial,updatedAt:Date.now()},...items]);
     setActiveConversationId(id);
     localStorage.setItem("atlas-active-conversation",id);
     setInput("");
@@ -116,15 +135,15 @@ export default function App() {
     if(!window.confirm("Delete this conversation permanently from this device?"))return;
     const remaining=conversations.filter(item=>item.id!==id);
     if(remaining.length){
-      setConversations(remaining);
+      commitConversations(remaining);
       if(activeConversationId===id){setActiveConversationId(remaining[0].id);localStorage.setItem("atlas-active-conversation",remaining[0].id);}
     }else{
       const fresh={id:crypto.randomUUID(),title:"New conversation",messages:initial,updatedAt:Date.now()};
-      setConversations([fresh]);setActiveConversationId(fresh.id);localStorage.setItem("atlas-active-conversation",fresh.id);
+      commitConversations([fresh]);setActiveConversationId(fresh.id);localStorage.setItem("atlas-active-conversation",fresh.id);
     }
   }
   function updateCopilotConversationMessages(id,updater){
-    setCopilotConversations(items=>items.map(item=>{
+    commitCopilotConversations(items=>items.map(item=>{
       if(item.id!==id)return item;
       const next=typeof updater==="function"?updater(item.messages):updater;
       const firstUser=next.find(message=>message.role==="user");
@@ -133,7 +152,7 @@ export default function App() {
   }
   function newCopilotConversation(){
     const id=crypto.randomUUID();
-    setCopilotConversations(items=>[{id,title:"New Copilot chat",messages:copilotWelcome,updatedAt:Date.now()},...items]);
+    commitCopilotConversations(items=>[{id,title:"New Copilot chat",messages:copilotWelcome,updatedAt:Date.now()},...items]);
     setActiveCopilotConversationId(id);
     localStorage.setItem("atlas-active-copilot-conversation",id);
     setInput("");
@@ -144,11 +163,11 @@ export default function App() {
     if(!window.confirm("Delete this Copilot conversation permanently from this device?"))return;
     const remaining=copilotConversations.filter(item=>item.id!==id);
     if(remaining.length){
-      setCopilotConversations(remaining);
+      commitCopilotConversations(remaining);
       if(activeCopilotConversationId===id){setActiveCopilotConversationId(remaining[0].id);localStorage.setItem("atlas-active-copilot-conversation",remaining[0].id);}
     }else{
       const fresh={id:crypto.randomUUID(),title:"New Copilot chat",messages:copilotWelcome,updatedAt:Date.now()};
-      setCopilotConversations([fresh]);setActiveCopilotConversationId(fresh.id);localStorage.setItem("atlas-active-copilot-conversation",fresh.id);
+      commitCopilotConversations([fresh]);setActiveCopilotConversationId(fresh.id);localStorage.setItem("atlas-active-copilot-conversation",fresh.id);
     }
   }
   async function speakVoiceReply(text){
@@ -185,39 +204,50 @@ export default function App() {
   }
   async function sendMessage(value,{isCopilot=false,speak=false,voiceModeActive=false}={}){
     const messageText=String(value||"").trim();
-    if(!messageText||generating)return;
+    // React state updates are asynchronous; use a synchronous lock to prevent
+    // rapid taps/duplicate form submissions from racing and replacing a chat.
+    if(!messageText||sendInProgressRef.current)return;
+    sendInProgressRef.current=true;
     const conversationId=activeConversation?.id;
     const copilotConversationId=activeCopilotConversation?.id;
-    const activeMessages=isCopilot?copilotMessages:messages;
+    const currentItems=isCopilot?copilotConversationsRef.current:conversationsRef.current;
+    const activeId=isCopilot?copilotConversationId:conversationId;
+    const activeEntry=currentItems.find(item=>item.id===activeId)||currentItems[0];
+    const activeMessages=activeEntry?.messages||(isCopilot?copilotWelcome:initial);
+    const targetId=activeEntry?.id;
     const userMessage={role:"user",text:messageText};
     const nextMessages=[...activeMessages,userMessage];
-    if(isCopilot)updateCopilotConversationMessages(copilotConversationId,nextMessages);else updateConversationMessages(conversationId,nextMessages);
+    if(isCopilot)updateCopilotConversationMessages(targetId,items=>[...items,userMessage]);else updateConversationMessages(targetId,items=>[...items,userMessage]);
     if(!isCopilot)setInput("");
     const localCommand=!isCopilot && /^(remember that|remember|save this|store this|what do you remember|show memory|list memories|my memories|find |search memory for |do you remember |help$|roadmap$|development plan$)/i.test(messageText);
     if(localCommand){
-      const result=runAtlasCore(messageText,memory,messages);
+      const result=runAtlasCore(messageText,memory,activeMessages);
       if(result.action==="save_memory"&&result.memory)setMemory(items=>items.includes(result.memory)?items:[...items,result.memory]);
-      updateConversationMessages(conversationId,items=>[...items,{role:"atlas",text:result.text}]);
+      updateConversationMessages(targetId,items=>[...items,{role:"atlas",text:result.text}]);
+      sendInProgressRef.current=false;
       if(speak)await speakVoiceReply("Certainly, sir. "+result.text);
       return;
     }
     setGenerating(true);
     try{
       const reply=isCopilot ? await generateAtlasCopilotResponse(nextMessages) : await generateProviderResponse(provider,nextMessages,undefined,{voiceMode:voiceModeActive});
-      if(isCopilot)updateCopilotConversationMessages(copilotConversationId,items=>[...items,{role:"atlas",text:reply}]);
-      else updateConversationMessages(conversationId,items=>[...items,{role:"atlas",text:reply}]);
+      if(isCopilot)updateCopilotConversationMessages(targetId,items=>[...items,{role:"atlas",text:reply}]);
+      else updateConversationMessages(targetId,items=>[...items,{role:"atlas",text:reply}]);
       // Release the generation guard before speaking, allowing a recognised
       // interruption to submit a fresh instruction while playback is active.
       setGenerating(false);
+      sendInProgressRef.current=false;
       if(speak)await speakVoiceReply(reply);
     }catch(error){
       const failure={role:"atlas",text:`I couldn't reach the ATLAS language-model service. ${error.message} Your message remains in this chat. Please retry when the gateway is available.`};
-      if(isCopilot)updateCopilotConversationMessages(copilotConversationId,items=>[...items,failure]);
-      else updateConversationMessages(conversationId,items=>[...items,failure]);
+      if(isCopilot)updateCopilotConversationMessages(targetId,items=>[...items,failure]);
+      else updateConversationMessages(targetId,items=>[...items,failure]);
       setGenerating(false);
+      sendInProgressRef.current=false;
       if(speak)await speakVoiceReply(failure.text);
     }finally{
       setGenerating(false);
+      sendInProgressRef.current=false;
     }
   }
   async function send(e){
