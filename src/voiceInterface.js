@@ -50,7 +50,7 @@ export function speakText(text, environment = globalThis) {
     utterance.pitch = 0.82;
     const voices = environment.speechSynthesis.getVoices?.() || [];
     const britishVoices = voices.filter(voice => /^en-GB(?:-|$)/i.test(voice.lang));
-    const preferredVoice = britishVoices.find(voice => /male|daniel|george|oliver|arthur|ryan|brian|guy|andrew|james|thomas/i.test(voice.name || ""));
+    const preferredVoice = britishVoices.find(voice => /(?:^|[\s_-])(male|daniel|george|oliver|arthur|ryan|brian|guy|andrew|james|thomas)(?:$|[\s_-])/i.test(voice.name || ""));
     utterance.voice = preferredVoice || britishVoices[0] || voices.find(voice => /^en-/i.test(voice.lang)) || null;
     utterance.onend = () => resolve();
     utterance.onerror = event => reject(new Error(event.error || "Speech playback failed."));
