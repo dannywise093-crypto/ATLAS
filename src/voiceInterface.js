@@ -2,6 +2,7 @@ let activeAudio = null;
 let activeController = null;
 let activeObjectUrl = null;
 let activeReject = null;
+let activeUrlApi = URL;
 
 export function getVoiceCapabilities(environment = globalThis) {
   const Recognition = environment.SpeechRecognition || environment.webkitSpeechRecognition;
@@ -51,7 +52,7 @@ export function stopSpeechPlayback() {
     activeAudio.load?.();
   }
   activeAudio = null;
-  if (activeObjectUrl) URL.revokeObjectURL(activeObjectUrl);
+  if (activeObjectUrl) activeUrlApi.revokeObjectURL(activeObjectUrl);
   activeObjectUrl = null;
   const reject = activeReject;
   activeReject = null;
@@ -81,7 +82,9 @@ export async function speakText(text, environment = globalThis) {
     const blob = await response.blob();
     if (controller.signal.aborted) throw new Error("Speech playback interrupted.");
     if (!blob.size) throw new Error("The speech service returned empty audio.");
-    const objectUrl = (environment.URL || URL).createObjectURL(blob);
+    const urlApi = environment.URL || URL;
+    const objectUrl = urlApi.createObjectURL(blob);
+    activeUrlApi = urlApi;
     activeObjectUrl = objectUrl;
     const audio = new environment.Audio(objectUrl);
     activeAudio = audio;
@@ -91,7 +94,7 @@ export async function speakText(text, environment = globalThis) {
         if (activeAudio === audio) activeAudio = null;
         if (activeController === controller) activeController = null;
         if (activeObjectUrl === objectUrl) {
-          (environment.URL || URL).revokeObjectURL(objectUrl);
+          urlApi.revokeObjectURL(objectUrl);
           activeObjectUrl = null;
         }
         if (activeReject === reject) activeReject = null;
@@ -105,10 +108,6 @@ export async function speakText(text, environment = globalThis) {
     });
   } catch (error) {
     if (activeController === controller) activeController = null;
-    if (activeObjectUrl) {
-      (environment.URL || URL).revokeObjectURL(activeObjectUrl);
-      activeObjectUrl = null;
-    }
     if (controller.signal.aborted) throw new Error("Speech playback interrupted.");
     throw error;
   }
