@@ -58,12 +58,6 @@ export { json };
 export async function proxyTts(request, env) {
   if (request.method !== "POST") return json({ error: "Method not allowed." }, 405);
   if (!env.ATLAS_GATEWAY_TOKEN) return json({ error: "ATLAS Cloudflare gateway token is not configured in Pages Functions." }, 503);
-  const ip = request.headers.get("CF-Connecting-IP") || "unknown";
-  const now = Date.now();
-  const bucket = buckets.get("tts:" + ip);
-  if (!bucket || now - bucket.start >= WINDOW_MS) buckets.set("tts:" + ip, { start: now, count: 1 });
-  else if (bucket.count >= 20) return json({ error: "Too many speech requests. Please wait before trying again." }, 429);
-  else bucket.count++;
   const raw = await request.text();
   if (raw.length > 20 * 1024) return json({ error: "Speech text is too large." }, 413);
   let body;
@@ -71,6 +65,12 @@ export async function proxyTts(request, env) {
   if (!body || typeof body.text !== "string" || !body.text.trim() || body.text.length > 4000) {
     return json({ error: "Provide speech text between 1 and 4,000 characters." }, 400);
   }
+  const ip = request.headers.get("CF-Connecting-IP") || "unknown";
+  const now = Date.now();
+  const bucket = buckets.get("tts:" + ip);
+  if (!bucket || now - bucket.start >= WINDOW_MS) buckets.set("tts:" + ip, { start: now, count: 1, characters: body.text.length });
+  else if (bucket.count >= 8 || bucket.characters + body.text.length > 10_000) return json({ error: "Speech usage limit reached. Please wait before trying again." }, 429);
+  else { bucket.count++; bucket.characters += body.text.length; }
   try {
     const upstream = await fetch(GATEWAY_URL + "/api/tts", {
       method: "POST",
