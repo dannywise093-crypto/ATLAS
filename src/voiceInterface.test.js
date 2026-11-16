@@ -66,3 +66,23 @@ test("prefers a named British male voice when available", async () => {
   assert.equal(spoken.voice.name, "Microsoft Ryan");
   assert.equal(spoken.pitch, 0.82);
 });
+test("prefers the explicit Google UK English Male voice over other British voices", async () => {
+  let spoken;
+  class FakeUtterance { constructor(text) { this.text = text; } }
+  const environment = {
+    SpeechSynthesisUtterance: FakeUtterance,
+    speechSynthesis: {
+      cancel() {},
+      getVoices: () => [
+        { name: "Microsoft Ryan", lang: "en-GB" },
+        { name: "Google UK English Male", lang: "en-GB" },
+        { name: "Google UK English Female", lang: "en-GB" }
+      ],
+      speak(utterance) { spoken = utterance; queueMicrotask(() => utterance.onend()); }
+    }
+  };
+  await speakText("At your service, sir.", environment);
+  assert.equal(spoken.voice.name, "Google UK English Male");
+  assert.equal(spoken.rate, 0.88);
+  assert.equal(spoken.pitch, 0.78);
+});
