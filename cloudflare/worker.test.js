@@ -53,6 +53,8 @@ test("chat uses the primary model and enables capacity-aware rejection", async (
   assert.equal(body.skills.skillCount, 451);
   assert.equal(body.skills.maxSkillsPerRequest, 4);
   assert.match(calledWith.input.messages[0].content, /451 installed skill records/);
+  assert.match(calledWith.input.messages[0].content, /keep all routing and catalogue metadata internal/);
+  assert.match(calledWith.input.messages[0].content, /Use relevant skill guidance silently/);
   assert.equal(calledWith.input.messages.at(-1).role, "user");
   assert.deepEqual(calledWith.options, { rejectIfBusy: true });
   assert.equal(calledWith.input.max_tokens, 3000);
