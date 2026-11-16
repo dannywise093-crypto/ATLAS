@@ -159,6 +159,12 @@ export default function App() {
     voiceSpeakingRef.current=true;
     clearTimeout(voiceRestartTimerRef.current);
     setVoiceStatus("Speaking, sir. You can interrupt whenever you need.");
+    // The previous recognition session is stopped when its final command arrives.
+    // Re-open listening during TTS so a new spoken instruction can interrupt it.
+    clearTimeout(voiceRestartTimerRef.current);
+    voiceRestartTimerRef.current=setTimeout(()=>{
+      if(voiceModeRef.current&&!voicePendingRef.current&&!voiceRecognitionRef.current)voiceStartRef.current?.();
+    },350);
     try{
       await speakText(text);
     }catch(error){
