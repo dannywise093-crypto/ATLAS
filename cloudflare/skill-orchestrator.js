@@ -1,7 +1,7 @@
 import { SKILL_CATALOG } from "./generated-skill-catalog.js";
 
 const SPECIALISTS = [
-  { id: "ai-ml", name: "AI & Machine Learning", terms: ["machine learning", "deep learning", "llm", "neural network", "inference", "model training"] },
+  { id: "ai-ml", name: "AI & Machine Learning", terms: ["ai", "machine learning", "deep learning", "llm", "neural network", "inference", "model", "training", "train"] },
   { id: "cuda-gpu", name: "CUDA & GPU Computing", terms: ["cuda", "gpu", "kernel", "parallel computing", "tensorrt", "cutlass", "triton"] },
   { id: "optimization", name: "Numerical Optimization & Operations Research", terms: ["optimization", "linear programming", "milp", "cuopt", "solver", "routing", "integer programming", "operations research"] },
   { id: "robotics-simulation", name: "Robotics & Simulation", terms: ["robot", "robotics", "simulation", "physics", "control system", "autonomous", "isaac sim", "digital twin"] },
