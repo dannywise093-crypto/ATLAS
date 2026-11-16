@@ -89,6 +89,34 @@ test("main ATLAS chat routes NVIDIA skills and specialist context", async () => 
   assert.match(systemPrompt, /Do not invent a generic encoder\/decoder architecture/);
 });
 
+test("voice sessions receive the requested JARVIS-inspired British spoken style", async () => {
+  let systemPrompt;
+  const env = envWith(async (_model, input) => {
+    systemPrompt = input.messages[0].content;
+    return { choices: [{ message: { content: "Certainly, sir." } }] };
+  });
+  const response = await worker.fetch(request("/api/chat", {
+    method: "POST",
+    body: { messages: [{ role: "user", content: "What is the status?" }], voiceMode: true },
+  }), env);
+  assert.equal(response.status, 200);
+  assert.match(systemPrompt, /J\.A\.R\.V\.I\.S\.-inspired butler manner/);
+  assert.match(systemPrompt, /Address the user as “sir” in every reply/);
+  assert.match(systemPrompt, /polished British English/);
+  assert.match(systemPrompt, /Avoid markdown, headings, bullet lists and tables/);
+});
+
+test("ordinary text chat does not activate the voice persona", async () => {
+  let systemPrompt;
+  const env = envWith(async (_model, input) => {
+    systemPrompt = input.messages[0].content;
+    return { choices: [{ message: { content: "Hello." } }] };
+  });
+  const response = await worker.fetch(request("/api/chat", { method: "POST", body: validBody }), env);
+  assert.equal(response.status, 200);
+  assert.doesNotMatch(systemPrompt, /J\.A\.R\.V\.I\.S\.-inspired butler manner/);
+});
+
 test("chat falls back when the primary model is unavailable", async () => {
   const attempts = [];
   const env = envWith(async (model) => {
