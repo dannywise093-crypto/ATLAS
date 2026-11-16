@@ -32,6 +32,7 @@ test("does not confuse substrings with specialist terms", () => {
 test("CUDA memory questions rank the CUDA memory skill above generic CUDA diagnostics", () => {
   const routed = routeSkills("Explain CUDA kernel memory coalescing and shared memory", sample);
   assert.equal(routed.skills[0].id, "cuda-memory");
+  assert.equal(routed.skills.some((skill) => skill.id === "cuopt"), false);
   assert.ok(routed.specialists.some((agent) => agent.id === "cuda-gpu"));
   assert.equal(routed.specialists.some((agent) => agent.id === "ai-ml"), false);
 });
@@ -39,6 +40,7 @@ test("CUDA memory questions rank the CUDA memory skill above generic CUDA diagno
 test("Isaac Sim robotics selects robotics without incorrectly selecting CUDA", () => {
   const routed = routeSkills("Build a robot simulation with NVIDIA Isaac Sim and a digital twin", sample);
   assert.equal(routed.skills[0].id, "isaac-robotics");
+  assert.equal(routed.skills.some((skill) => skill.id === "cuopt"), false);
   assert.ok(routed.specialists.some((agent) => agent.id === "robotics-simulation"));
   assert.equal(routed.specialists.some((agent) => agent.id === "cuda-gpu"), false);
 });
