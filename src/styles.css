@@ -160,3 +160,13 @@ body{background:radial-gradient(ellipse at 82% 0%,rgba(38,103,207,.17),transpare
 .robotics-page .notice{font-size:10px;color:#8998ae;overflow-wrap:anywhere}
 .robotics-page .notice code{color:#a9c9ff}
 @media(max-width:700px){.robotics-status{align-items:flex-start;flex-wrap:wrap;padding:13px}.robotics-status>.badge{margin-left:61px}.robotics-section-head{align-items:flex-start}.robotics-adapter{padding:13px}}
+
+.robot-motion-lab{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(220px,1fr);gap:18px;padding:20px;border:1px solid var(--line);border-radius:18px;background:linear-gradient(135deg,rgba(24,35,58,.9),rgba(10,15,27,.96));}
+.robot-motion-stage{min-width:0;display:flex;flex-direction:column;justify-content:center;gap:16px}
+.robot-motion-track{height:90px;position:relative;border:1px solid var(--line);border-radius:14px;background:repeating-linear-gradient(90deg,transparent 0,transparent calc(10% - 1px),rgba(148,163,184,.14) 10%);overflow:hidden}
+.robot-motion-unit{position:absolute;top:50%;transform:translateY(-50%);width:48px;height:48px;border-radius:13px;display:grid;place-items:center;background:rgba(56,189,248,.16);border:1px solid rgba(56,189,248,.6);color:#7dd3fc;transition:left .09s linear}
+.robot-motion-scale,.robot-motion-readout{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;color:var(--muted);font-size:11px}
+.robot-motion-readout span{display:flex;flex-direction:column;gap:5px}.robot-motion-readout b{font-size:13px;color:var(--text)}
+.robot-motion-controls{display:flex;flex-direction:column;justify-content:center;gap:12px}.robot-motion-controls label{font-size:13px;font-weight:600}.robot-motion-controls input{width:100%;accent-color:#38bdf8}
+.robot-motion-buttons{display:flex;gap:9px;flex-wrap:wrap}.robot-motion-buttons button{border:1px solid rgba(56,189,248,.5);border-radius:10px;padding:10px 14px;background:rgba(14,165,233,.16);color:var(--text);font-weight:600}.robot-motion-buttons button.secondary{background:transparent;border-color:var(--line)}
+@media(max-width:700px){.robot-motion-lab{grid-template-columns:1fr;padding:14px}.robot-motion-buttons button{flex:1}}
