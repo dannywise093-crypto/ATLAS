@@ -211,6 +211,41 @@ export default {
       return json({ skillCount, specialistCount, maxSkillsPerRequest, skills: SKILL_CATALOG.map(({ id, name, description, tags, source }) => ({ id, name, description, tags, source })) });
     }
 
+    if (url.pathname === "/api/tts") {
+      if (request.method !== "POST") return json({ error: "Method not allowed." }, 405, { allow: "POST" });
+      if (!authorized(request, env)) return json({ error: "Unauthorized." }, 401);
+      if (rateLimited(request)) return json({ error: "Too many speech requests. Please wait and try again." }, 429, { "retry-after": "60" });
+      const length = Number(request.headers.get("content-length") || 0);
+      if (length > 20 * 1024) return json({ error: "Speech text is too large." }, 413);
+      let body;
+      try { body = await request.json(); } catch { return json({ error: "A valid JSON body is required." }, 400); }
+      const speechText = typeof body?.text === "string" ? body.text.trim() : "";
+      if (!speechText || speechText.length > 4000) return json({ error: "Provide speech text between 1 and 4,000 characters." }, 400);
+      if (!env.AI) return json({ error: "Cloudflare Workers AI is not configured for speech." }, 503);
+      try {
+        const audio = await env.AI.run("@cf/deepgram/aura-2-en", {
+          text: speechText,
+          speaker: "draco",
+          encoding: "mp3"
+        });
+        if (!audio || typeof audio.getReader !== "function") {
+          console.error("ATLAS TTS returned an unexpected audio payload.");
+          return json({ error: "The speech service returned an invalid audio response." }, 502);
+        }
+        return new Response(audio, {
+          headers: {
+            "Content-Type": "audio/mpeg",
+            "Cache-Control": "no-store",
+            "X-Content-Type-Options": "nosniff",
+            "X-ATLAS-Voice": "draco"
+          }
+        });
+      } catch (error) {
+        console.error("ATLAS TTS inference failed:", error?.message || "unknown error");
+        return json({ error: "ATLAS could not generate speech just now. Please try again." }, 503, { "retry-after": "3" });
+      }
+    }
+
     const isCopilot = url.pathname === "/api/copilot";
     if (url.pathname !== "/api/chat" && !isCopilot) return json({ error: "Not found." }, 404);
     if (request.method !== "POST") return json({ error: "Method not allowed." }, 405, { allow: "POST" });
