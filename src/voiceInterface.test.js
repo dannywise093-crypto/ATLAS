@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { cleanTextForSpeech, createSpeechRecognition, getVoiceCapabilities, speakText } from "./voiceInterface.js";
+import { cleanTextForSpeech, createSpeechRecognition, getVoiceCapabilities, selectBritishMaleVoice, speakText } from "./voiceInterface.js";
 
 class FakeRecognition {
   start() { this.started = true; }
@@ -37,7 +37,7 @@ test("speaks using a British English voice when one is available", async () => {
     SpeechSynthesisUtterance: FakeUtterance,
     speechSynthesis: {
       cancel() {},
-      getVoices: () => [{ lang: "en-US" }, { lang: "en-GB" }],
+      getVoices: () => [{ lang: "en-US" }, { name: "Microsoft Ryan", lang: "en-GB" }],
       speak(utterance) { spoken = utterance; queueMicrotask(() => utterance.onend()); }
     }
   };
@@ -85,4 +85,32 @@ test("prefers the explicit Google UK English Male voice over other British voice
   assert.equal(spoken.voice.name, "Google UK English Male");
   assert.equal(spoken.rate, 0.88);
   assert.equal(spoken.pitch, 0.78);
+});
+
+
+test("never selects a female British voice when no male voice is available", async () => {
+  class FakeUtterance { constructor(text) { this.text = text; } }
+  const environment = {
+    SpeechSynthesisUtterance: FakeUtterance,
+    speechSynthesis: {
+      cancel() {},
+      getVoices: () => [
+        { name: "Google UK English Female", lang: "en-GB" },
+        { name: "English (United Kingdom)", lang: "en-GB" }
+      ],
+      speak() { throw new Error("A female or unverified voice must never be spoken."); }
+    }
+  };
+  await assert.rejects(speakText("Good evening, sir.", environment), /No British male voice is installed/);
+});
+
+test("selects only a positively identified British male voice", () => {
+  assert.equal(selectBritishMaleVoice([
+    { name: "Google UK English Female", lang: "en-GB" },
+    { name: "English (United Kingdom)", lang: "en-GB" },
+    { name: "Microsoft Ryan", lang: "en-GB" }
+  ]).name, "Microsoft Ryan");
+  assert.equal(selectBritishMaleVoice([
+    { name: "Google UK English Female", lang: "en-GB" }
+  ]), null);
 });
