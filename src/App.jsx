@@ -66,6 +66,7 @@ export default function App() {
   const voiceModeRef = useRef(false);
   const voicePendingRef = useRef(false);
   const voiceSpeakingRef = useRef(false);
+  const voiceReplyTextRef = useRef("");
   const voiceAwaitingCommandRef = useRef(false);
   const voiceRecognitionRef = useRef(null);
   const voiceStartRef = useRef(null);
@@ -176,6 +177,7 @@ export default function App() {
     // Keep it false during playback so Android recognition can restart segments.
     voicePendingRef.current=false;
     voiceSpeakingRef.current=true;
+    voiceReplyTextRef.current=String(text||"").toLowerCase().replace(/[^a-z0-9\s]/g," ").replace(/\s+/g," ").trim();
     clearTimeout(voiceRestartTimerRef.current);
     setVoiceStatus("Speaking, sir. You can interrupt whenever you need.");
     // The previous recognition session is stopped when its final command arrives.
@@ -191,6 +193,7 @@ export default function App() {
       if(voiceModeRef.current&&voiceSpeakingRef.current)setVoiceStatus("Spoken response unavailable: "+error.message);
     }finally{
       voiceSpeakingRef.current=false;
+      voiceReplyTextRef.current="";
     }
     if(voiceModeRef.current&&!voicePendingRef.current){
       voiceAwaitingCommandRef.current=false;
@@ -289,6 +292,15 @@ export default function App() {
             for(let index=event.resultIndex;index<event.results.length;index++){
               const result=event.results[index];
               const transcript=result?.[0]?.transcript||"";
+              const normalizedTranscript=transcript.toLowerCase().replace(/[^a-z0-9\s]/g," ").replace(/\s+/g," ").trim();
+              const spokenReply=voiceReplyTextRef.current;
+              // Mobile recognition may hear ATLAS through the device speaker.
+              // Ignore replayed TTS text; a distinct user utterance can still interrupt.
+              const isTtsEcho=Boolean(voiceSpeakingRef.current&&normalizedTranscript&&spokenReply&&(
+                normalizedTranscript===spokenReply ||
+                (normalizedTranscript.split(" ").length>=3&&spokenReply.includes(normalizedTranscript))
+              ));
+              if(isTtsEcho)continue;
               if(result?.isFinal)finalParts.push(transcript);else interim+=transcript;
             }
             if(finalParts.length){
