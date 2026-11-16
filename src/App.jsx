@@ -223,7 +223,7 @@ export default function App() {
     if(localCommand){
       const result=runAtlasCore(messageText,memory,messages);
       if(result.action==="save_memory"&&result.memory)setMemory(items=>items.includes(result.memory)?items:[...items,result.memory]);
-      updateConversationMessages(conversationId,items=>[...items,{role:"atlas",text:result.text}]);
+      updateConversationMessages(targetId,items=>[...items,{role:"atlas",text:result.text}]);
       sendInProgressRef.current=false;
       if(speak)await speakVoiceReply("Certainly, sir. "+result.text);
       return;
@@ -231,8 +231,8 @@ export default function App() {
     setGenerating(true);
     try{
       const reply=isCopilot ? await generateAtlasCopilotResponse(nextMessages) : await generateProviderResponse(provider,nextMessages,undefined,{voiceMode:voiceModeActive});
-      if(isCopilot)updateCopilotConversationMessages(copilotConversationId,items=>[...items,{role:"atlas",text:reply}]);
-      else updateConversationMessages(conversationId,items=>[...items,{role:"atlas",text:reply}]);
+      if(isCopilot)updateCopilotConversationMessages(targetId,items=>[...items,{role:"atlas",text:reply}]);
+      else updateConversationMessages(targetId,items=>[...items,{role:"atlas",text:reply}]);
       // Release the generation guard before speaking, allowing a recognised
       // interruption to submit a fresh instruction while playback is active.
       setGenerating(false);
@@ -240,8 +240,8 @@ export default function App() {
       if(speak)await speakVoiceReply(reply);
     }catch(error){
       const failure={role:"atlas",text:`I couldn't reach the ATLAS language-model service. ${error.message} Your message remains in this chat. Please retry when the gateway is available.`};
-      if(isCopilot)updateCopilotConversationMessages(copilotConversationId,items=>[...items,failure]);
-      else updateConversationMessages(conversationId,items=>[...items,failure]);
+      if(isCopilot)updateCopilotConversationMessages(targetId,items=>[...items,failure]);
+      else updateConversationMessages(targetId,items=>[...items,failure]);
       setGenerating(false);
       sendInProgressRef.current=false;
       if(speak)await speakVoiceReply(failure.text);
