@@ -228,3 +228,31 @@ test("Copilot does not load cuOpt guidance for unrelated coding tasks", async ()
   assert.equal(response.status, 200);
   assert.doesNotMatch(systemPrompt, /NVIDIA cuOpt Numerical Optimization skill/);
 });
+
+
+test("skill catalog endpoint is authenticated and reports the bundled catalog", async () => {
+  const denied = await worker.fetch(request("/api/skills", { auth: false }), envWith(async () => ({})));
+  assert.equal(denied.status, 401);
+
+  const response = await worker.fetch(request("/api/skills"), envWith(async () => ({})));
+  const body = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(body.skillCount, 1);
+  assert.ok(body.specialistCount >= 5);
+  assert.equal(body.skills[0].id, "cuopt-numerical-optimization-api");
+});
+
+test("Copilot includes routed specialist context only when a skill matches", async () => {
+  let systemPrompt;
+  const env = envWith(async (_model, input) => {
+    systemPrompt = input.messages[0].content;
+    return { choices: [{ message: { content: "CUDA guidance response" } }] };
+  });
+  const response = await worker.fetch(request("/api/copilot", {
+    method: "POST",
+    body: { messages: [{ role: "user", content: "Explain NVIDIA CUDA GPU kernel optimization." }] },
+  }), env);
+  assert.equal(response.status, 200);
+  assert.match(systemPrompt, /ATLAS SPECIALIST ROUTER/);
+  assert.match(systemPrompt, /CUDA & GPU Computing specialist/);
+});
