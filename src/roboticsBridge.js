@@ -8,7 +8,7 @@ export function validateRoboticsManifest(manifest) {
   if (manifest.schemaVersion !== "1.0") errors.push("Unsupported schemaVersion.");
   if (!/^[a-z0-9][a-z0-9.-]{2,95}$/.test(manifest.pluginId || "")) errors.push("pluginId must be a stable lowercase identifier.");
   if (typeof manifest.displayName !== "string" || !manifest.displayName.trim()) errors.push("displayName is required.");
-  if (typeof manifest.version !== "string" || !/^\\d+\\.\\d+\\.\\d+/.test(manifest.version)) errors.push("version must be semantic version text.");
+  if (typeof manifest.version !== "string" || !/^\d+\.\d+\.\d+/.test(manifest.version)) errors.push("version must be semantic version text.");
   if (!VALID_TRANSPORTS.has(manifest.transport)) errors.push("Unsupported transport.");
   if (!Array.isArray(manifest.capabilities) || !manifest.capabilities.length) errors.push("At least one capability is required.");
   else if (manifest.capabilities.some(value => !ALLOWED_CAPABILITIES.has(value))) errors.push("Only discovery and read-only telemetry capabilities are permitted.");
