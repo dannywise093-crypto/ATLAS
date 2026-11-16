@@ -1,3 +1,5 @@
+import { ROBOTICS_TRANSPORTS } from "./roboticsTransports.js";
+
 const DEVICE_CLASSES = Object.freeze(["motor", "actuator", "servo", "gripper"]);
 const REQUIRED_SAFETY_SIGNALS = Object.freeze(["emergencyStopReleased", "interlocksHealthy", "watchdogHealthy", "limitsVerified", "controllerOnline"]);
 
@@ -9,7 +11,7 @@ export function validateMotionAdapterProfile(profile) {
   if (!isPlainObject(profile)) return { valid: false, reason: "An approved device profile is required." };
   if (typeof profile.id !== "string" || !/^[a-z0-9][a-z0-9.-]{2,95}$/.test(profile.id)) return { valid: false, reason: "The adapter profile ID is invalid." };
   if (!DEVICE_CLASSES.includes(profile.deviceClass)) return { valid: false, reason: "The device class must be motor, actuator, servo or gripper." };
-  if (typeof profile.transport !== "string" || !profile.transport.trim()) return { valid: false, reason: "A supported transport is required." };
+  if (typeof profile.transport !== "string" || !ROBOTICS_TRANSPORTS.some(item => item.id === profile.transport)) return { valid: false, reason: "A catalogued transport is required." };
   if (profile.safetyClass !== "supervised-control") return { valid: false, reason: "The profile must declare supervised-control safety." };
   if (profile.vendorApproved !== true || profile.independentlySafetyReviewed !== true) return { valid: false, reason: "Vendor approval and independent safety review are required." };
   if (!Array.isArray(profile.approvedCommands) || profile.approvedCommands.length === 0) return { valid: false, reason: "At least one vendor-approved command identifier is required." };
