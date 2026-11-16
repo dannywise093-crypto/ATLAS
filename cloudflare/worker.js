@@ -175,11 +175,21 @@ export default {
       return json({
         service: "ATLAS Cloudflare Workers AI Gateway",
         status: env.AI ? "configured" : "not_configured",
-        provider: "Cloudflare Workers AI",
-        model: MODELS[0].id,
+        provider: env.NVIDIA_API_KEY ? "NVIDIA API Catalog (primary), Cloudflare Workers AI (fallback)" : "Cloudflare Workers AI",
+        nvidiaConfigured: Boolean(env.NVIDIA_API_KEY),
+        nvidiaModel: "meta/llama-3.3-70b-instruct",
+        model: env.NVIDIA_API_KEY ? "meta/llama-3.3-70b-instruct" : MODELS[0].id,
         fallbackModels: MODELS.slice(1).map((model) => model.id),
         skills: getSkillCatalogStats(),
       });
+    }
+    if (url.pathname === "/api/providers") {
+      if (request.method !== "GET") return json({ error: "Method not allowed." }, 405, { allow: "GET" });
+      if (!authorized(request, env)) return json({ error: "Unauthorized." }, 401);
+      return json({ defaultProvider: env.NVIDIA_API_KEY ? "nvidia" : "atlas", providers: {
+        atlas: { configured: Boolean(env.AI), label: "Cloudflare Workers AI", role: env.NVIDIA_API_KEY ? "fallback" : "primary" },
+        nvidia: { configured: Boolean(env.NVIDIA_API_KEY), label: "NVIDIA API Catalog", model: "meta/llama-3.3-70b-instruct", role: env.NVIDIA_API_KEY ? "primary" : "not_configured" }
+      }, skills: getSkillCatalogStats() });
     }
     if (url.pathname === "/api/skills") {
       if (request.method !== "GET") return json({ error: "Method not allowed." }, 405, { allow: "GET" });
@@ -243,6 +253,44 @@ export default {
       + (routedSkills.context ? "\n\n" + routedSkills.context : "")
       + (isCuOptTask(latestPrompt) ? "\n\n" + CUOPT_SKILL_PROMPT : "");
     const failures = [];
+    // NVIDIA is the primary model when configured. It receives the same system
+    // prompt and routed skill context as the native Workers AI fallback.
+    if (env.NVIDIA_API_KEY) {
+      const startedAt = Date.now();
+      try {
+        const upstream = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
+          method: "POST",
+          headers: { Authorization: "Bearer " + env.NVIDIA_API_KEY, "Content-Type": "application/json", Accept: "application/json" },
+          body: JSON.stringify({
+            model: "meta/llama-3.3-70b-instruct",
+            messages: [{ role: "system", content: systemPrompt }, ...modelMessages],
+            temperature: isCopilot ? 0.2 : 0.4,
+            max_tokens: isCopilot ? 6000 : 4096,
+            stream: false
+          }),
+          signal: AbortSignal.timeout(100_000)
+        });
+        const result = await upstream.json().catch(() => ({}));
+        if (upstream.ok) {
+          const answer = extractAnswer(result);
+          if (answer) {
+            const sourceFooter = research.sources.length
+              ? "\\n\\nSources checked (" + research.checkedAt + "):\\n" + research.sources.map((source, index) => (index + 1) + ". " + source.title + " — " + source.url).join("\\n") + "\\nThese are search-result snippets; full source pages were not independently verified."
+              : research.status === "unavailable" || research.status === "no_results"
+                ? "\\n\\nLive web research could not provide usable sources for this request. Current facts have not been independently verified."
+                : "";
+            return json({ answer: answer.trim() + sourceFooter, provider: "NVIDIA API Catalog", model: "meta/llama-3.3-70b-instruct", fallbackUsed: false, research, skills: { selected: routedSkills.skills.map(({ id, name }) => ({ id, name })), specialists: routedSkills.specialists } });
+          }
+          failures.push({ provider: "nvidia", status: "empty_response", durationMs: Date.now() - startedAt });
+        } else {
+          failures.push({ provider: "nvidia", status: "upstream_error", httpStatus: upstream.status, durationMs: Date.now() - startedAt });
+          console.warn("ATLAS NVIDIA inference failed", upstream.status);
+        }
+      } catch {
+        failures.push({ provider: "nvidia", status: "connection_error", durationMs: Date.now() - startedAt });
+        console.warn("ATLAS NVIDIA inference connection failed");
+      }
+    }
     for (const model of MODELS) {
       const startedAt = Date.now();
       try {
