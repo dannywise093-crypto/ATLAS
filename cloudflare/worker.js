@@ -99,6 +99,7 @@ function isCuOptTask(prompt) {
 const WINDOW_MS = 60_000;
 const MAX_PER_WINDOW = 24;
 const buckets = new Map();
+const speechBuckets = new Map();
 
 function json(body, status = 200, extraHeaders = {}) {
   return new Response(JSON.stringify(body), {
@@ -133,6 +134,25 @@ function rateLimited(request) {
   if (buckets.size > 4000) {
     for (const [key, value] of buckets) {
       if (now - value.start >= WINDOW_MS) buckets.delete(key);
+    }
+  }
+  return false;
+}
+
+function speechRateLimited(request, characterCount) {
+  const ip = request.headers.get("cf-connecting-ip") || "unknown";
+  const now = Date.now();
+  const bucket = speechBuckets.get(ip);
+  if (!bucket || now - bucket.start >= WINDOW_MS) {
+    speechBuckets.set(ip, { start: now, count: 1, characters: characterCount });
+    return false;
+  }
+  if (bucket.count >= 8 || bucket.characters + characterCount > 10_000) return true;
+  bucket.count += 1;
+  bucket.characters += characterCount;
+  if (speechBuckets.size > 4000) {
+    for (const [key, value] of speechBuckets) {
+      if (now - value.start >= WINDOW_MS) speechBuckets.delete(key);
     }
   }
   return false;
@@ -214,13 +234,13 @@ export default {
     if (url.pathname === "/api/tts") {
       if (request.method !== "POST") return json({ error: "Method not allowed." }, 405, { allow: "POST" });
       if (!authorized(request, env)) return json({ error: "Unauthorized." }, 401);
-      if (rateLimited(request)) return json({ error: "Too many speech requests. Please wait and try again." }, 429, { "retry-after": "60" });
       const length = Number(request.headers.get("content-length") || 0);
       if (length > 20 * 1024) return json({ error: "Speech text is too large." }, 413);
       let body;
       try { body = await request.json(); } catch { return json({ error: "A valid JSON body is required." }, 400); }
       const speechText = typeof body?.text === "string" ? body.text.trim() : "";
       if (!speechText || speechText.length > 4000) return json({ error: "Provide speech text between 1 and 4,000 characters." }, 400);
+      if (speechRateLimited(request, speechText.length)) return json({ error: "Speech usage limit reached. Please wait before trying again." }, 429, { "retry-after": "60" });
       if (!env.AI) return json({ error: "Cloudflare Workers AI is not configured for speech." }, 503);
       try {
         const audio = await env.AI.run("@cf/deepgram/aura-2-en", {
