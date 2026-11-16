@@ -61,3 +61,85 @@ body{background:radial-gradient(ellipse at 82% 0%,rgba(38,103,207,.17),transpare
 .conversation-delete{display:grid;place-items:center;width:30px;height:30px;flex:none;margin-right:3px;border:0;border-radius:7px;background:transparent;color:#9babc2}
 .conversation-delete:hover{background:#5c2634;color:#ffb4bd}
 @media(max-width:700px){.conversation-tools{padding:10px 12px;gap:8px}.new-conversation{font-size:10px;padding:8px 11px}.conversation-item{max-width:205px}.conversation-select{max-width:160px;font-size:9px}.conversation-delete{width:28px;height:28px}}
+
+
+/* Grok-inspired chat workspace for ATLAS and Copilot */
+.grok-page{display:block!important;gap:0!important;width:100%;max-width:none!important;padding:0!important;margin:0!important}
+.grok-workspace{height:calc(100dvh - 142px);min-height:560px;display:grid;grid-template-columns:248px minmax(0,1fr);overflow:hidden;border:1px solid #292b30;border-radius:17px;background:#111214;box-shadow:0 22px 70px #0006;color:#e9e9ea}
+.grok-history{min-width:0;display:flex;flex-direction:column;padding:17px 12px 12px;background:#17181b;border-right:1px solid #292b30}
+.grok-new-chat{height:42px;display:flex;align-items:center;justify-content:flex-start;gap:11px;padding:0 13px;border:1px solid #383a40;border-radius:10px;background:#222429;color:#f1f1f2;font-size:12px;font-weight:600;text-align:left}
+.grok-new-chat:hover{background:#2b2d33;border-color:#555861}
+.grok-history-label{padding:25px 10px 9px;color:#777b84;font-size:9px;font-weight:700;letter-spacing:1.4px}
+.grok-history-list{display:grid;gap:3px;overflow-y:auto;min-height:0;scrollbar-width:thin}
+.grok-history-item{display:flex;align-items:center;gap:2px;min-width:0;border-radius:8px;color:#b9bbc1}
+.grok-history-item:hover,.grok-history-item.active{background:#292b30;color:#fff}
+.grok-history-open{min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:10px 9px;border:0;background:transparent;color:inherit;text-align:left;font-size:11px}
+.grok-history-delete{width:29px;height:29px;flex:none;display:grid;place-items:center;border:0;border-radius:7px;background:transparent;color:#777d88;opacity:.0}
+.grok-history-item:hover .grok-history-delete,.grok-history-item.active .grok-history-delete{opacity:1}
+.grok-history-delete:hover{background:#463036;color:#ffb8bf}
+.grok-history-foot{margin-top:auto;padding:13px 8px 4px;border-top:1px solid #2a2c31;color:#858991;font-size:9px;letter-spacing:.7px;display:flex;align-items:center;gap:8px}
+.grok-status-dot,.grok-online i{width:7px;height:7px;border-radius:50%;background:#62c99a;box-shadow:0 0 9px #62c99a66;display:inline-block}
+.grok-chat-main{min-width:0;min-height:0;display:flex;flex-direction:column;position:relative;background:#111214}
+.grok-topbar{height:66px;flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 25px;border-bottom:1px solid #292b30;background:#141518}
+.grok-title{display:flex;align-items:center;gap:11px;min-width:0}
+.grok-title>div{display:grid;gap:3px}
+.grok-title b{font:600 14px 'Space Grotesk',sans-serif;color:#f4f4f5;letter-spacing:.1px}
+.grok-title small{font-size:8px;letter-spacing:1.4px;color:#81858e}
+.grok-mark{width:34px;height:34px;display:grid;place-items:center;border:1px solid #3b3d43;border-radius:10px;background:#222429}
+.grok-mark img{width:26px;height:26px;object-fit:contain}
+.grok-top-actions{display:flex;align-items:center;gap:10px}
+.grok-model-tag{padding:6px 9px;border:1px solid #393b42;border-radius:20px;color:#b5b8c0;font-size:8px;font-weight:700;letter-spacing:1px}
+.grok-online{display:flex;align-items:center;gap:7px;color:#a3a6ae;font-size:9px;letter-spacing:.8px}
+.grok-online i{width:6px;height:6px}
+.grok-messages{width:100%;max-width:920px;margin:0 auto;padding:34px clamp(17px,5vw,60px) 24px;flex:1;min-height:0;overflow-y:auto;scroll-behavior:smooth;display:flex;flex-direction:column;gap:25px}
+.grok-message{display:flex;align-items:flex-start;gap:13px;width:100%;color:#e6e6e8;font-size:14px;line-height:1.8;overflow-wrap:anywhere}
+.grok-message-avatar{width:29px;height:29px;flex:none;display:grid;place-items:center;border:1px solid #3b3d43;border-radius:50%;background:#202227;margin-top:1px}
+.grok-message-avatar img{width:22px;height:22px;object-fit:contain}
+.grok-message-body{min-width:0;max-width:100%}
+.grok-message-body> b{display:block;margin:0 0 5px;color:#9da1aa;font-size:8px;letter-spacing:1.3px}
+.grok-message-body p{margin:0;white-space:pre-wrap;color:#e0e0e2;font-size:13px;line-height:1.85}
+.grok-message.user{justify-content:flex-end}
+.grok-message.user .grok-message-body{max-width:min(78%,680px);padding:11px 16px;border:1px solid #34363d;border-radius:18px;background:#25272d}
+.grok-message.user .grok-message-body p{color:#f0f0f1}
+.grok-compose-area{width:100%;max-width:880px;margin:0 auto;padding:0 clamp(14px,4vw,38px) 17px;flex:none}
+.grok-model-row{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin:0 2px 8px}
+.grok-model-row label{font-size:8px;letter-spacing:1.2px;color:#777c85}
+.grok-model-row select{max-width:230px;padding:6px 9px;border:1px solid #393b42;border-radius:8px;background:#1b1d21;color:#cfd1d5;font-size:10px;outline:none}
+.grok-composer{display:grid;gap:7px;padding:13px 14px 10px;border:1px solid #41434a;border-radius:19px;background:#202226;box-shadow:0 8px 28px #0004}
+.grok-composer:focus-within{border-color:#666a74;box-shadow:0 0 0 3px #ffffff08,0 8px 28px #0004}
+.grok-composer textarea{width:100%;min-height:30px;max-height:180px;resize:vertical;border:0;outline:0;background:transparent;color:#f0f0f1;font:400 13px/1.6 Inter,sans-serif}
+.grok-composer textarea::placeholder{color:#858991}
+.grok-composer-bottom{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.grok-composer-bottom span{color:#777c85;font-size:9px}
+.grok-composer-bottom button{width:34px;height:34px;display:grid;place-items:center;border:0;border-radius:50%;background:#f0f0f1;color:#17181b;transition:transform .15s,opacity .15s}
+.grok-composer-bottom button:hover:not(:disabled){transform:scale(1.05)}
+.grok-composer-bottom button:disabled{opacity:.35;cursor:not-allowed}
+.grok-compose-area>small{display:block;padding:8px 4px 0;text-align:center;color:#747982;font-size:9px}
+.grok-composer-hint{padding:0 3px 8px;color:#8b8f98;font-size:10px}
+@media(max-width:850px){.grok-workspace{grid-template-columns:205px minmax(0,1fr)}.grok-history{padding:13px 9px}.grok-topbar{padding:0 16px}.grok-messages{padding-top:25px}}
+@media(max-width:700px){
+ .content:has(.grok-page){padding:9px 8px 12px!important}
+ .grok-workspace{height:calc(100dvh - 82px);min-height:540px;grid-template-columns:minmax(0,1fr);grid-template-rows:116px minmax(0,1fr);border-radius:13px}
+ .grok-history{padding:8px 10px 6px;border-right:0;border-bottom:1px solid #292b30;overflow:hidden}
+ .grok-new-chat{height:34px;width:max-content;padding:0 11px;font-size:10px}
+ .grok-history-label{padding:9px 3px 4px;font-size:8px}
+ .grok-history-list{display:flex;gap:6px;overflow-x:auto;overflow-y:hidden}
+ .grok-history-item{flex:none;max-width:190px;background:#222429;border:1px solid #303238}
+ .grok-history-open{max-width:150px;padding:7px 8px;font-size:9px}
+ .grok-history-delete{opacity:1;width:25px;height:25px}
+ .grok-history-foot{display:none}
+ .grok-topbar{height:55px;padding:0 12px}
+ .grok-title b{font-size:12px}.grok-title small{font-size:7px}
+ .grok-mark{width:30px;height:30px}.grok-mark img{width:23px;height:23px}
+ .grok-model-tag{font-size:7px;padding:5px 7px}.grok-online{font-size:8px}
+ .grok-messages{padding:20px 13px 15px;gap:19px}
+ .grok-message{gap:9px}.grok-message-body p{font-size:12px;line-height:1.75}
+ .grok-message-avatar{width:26px;height:26px}
+ .grok-message.user .grok-message-body{max-width:88%;padding:9px 12px}
+ .grok-compose-area{padding:0 9px 10px}
+ .grok-composer{padding:11px 11px 8px;border-radius:16px}
+ .grok-composer textarea{font-size:12px}
+ .grok-composer-bottom span{font-size:8px}
+ .grok-composer-bottom button{width:32px;height:32px}
+ .grok-model-row{margin-bottom:6px}
+}
