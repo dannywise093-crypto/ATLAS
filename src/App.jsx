@@ -4,13 +4,14 @@ import { getNeuralRuntimeStatus, checkAtlasBackend, generateAtlasResponse } from
 import { Activity, Bot, BrainCircuit, Camera, Database, Eye, GraduationCap, Home, Menu, MessageSquare, Mic, Radio, Send, Settings, ShieldCheck, Sparkles, Volume2, X, Terminal, Play, Plus, ChevronDown, AudioLines, PencilLine, Zap } from "lucide-react";
 
 function SyntaxCode({ language, code }) {
-  const keywords = new Set(({
+  const keywordSource = ({
     python:"False None True and as assert async await break class continue def del elif else except finally for from global if import in is lambda nonlocal not or pass raise return try while with yield self",
     cpp:"alignas auto bool break case catch char class const constexpr continue default delete do double else enum explicit extern false float for friend if inline int long namespace new nullptr private protected public return short signed sizeof static struct switch template this throw true try typedef typename union unsigned using virtual void volatile while",
-    javascript:"async await break case catch class const continue debugger default delete do else export extends false finally for from function if import in instanceof let new null return static super switch this throw true try typeof undefined var void while with yield",
+    javascript:"async await break case catch class const continue debugger default delete do else export extends false finally for function if import in instanceof let new null return static super switch this throw true try typeof undefined var void while with yield",
     typescript:"abstract any as async await boolean break case catch class const constructor continue declare default delete do else enum export extends false finally for from function if implements import in infer instanceof interface keyof let module namespace never new null number object private protected public readonly return static string super switch this throw true try type typeof undefined unknown var void while with",
     java:"abstract assert boolean break byte case catch char class const continue default do double else enum extends final finally float for if implements import instanceof int interface long native new package private protected public return short static strictfp super switch synchronized this throw throws transient try void volatile while"
-  })[String(language).toLowerCase()] || "").split(/\s+/));
+  })[String(language).toLowerCase()] || "";
+  const keywords = new Set(keywordSource.split(/\\s+/));
   const pattern = /(\/\/[^\n]*|#[^\n]*|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|\b\d+(?:\.\d+)?\b|\b[A-Za-z_$][\w$]*\b)/g;
   const chunks=[]; let last=0, match, index=0;
   while((match=pattern.exec(code))!==null){
