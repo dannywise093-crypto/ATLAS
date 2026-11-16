@@ -181,8 +181,13 @@ test("dedicated Copilot route uses the ATLAS coding-agent instructions", async (
   const body = await response.json();
   assert.equal(response.status, 200);
   assert.equal(body.answer, "Copilot mode response");
-  assert.match(modelInput.messages[0].content, /ATLAS Copilot, the coding-agent mode/);
+  assert.match(modelInput.messages[0].content, /ATLAS Copilot, the software engineering assistant/);
+  assert.match(modelInput.messages[0].content, /complete, runnable source code/);
+  assert.match(modelInput.messages[0].content, /If the user asks you to fix code, fix the code they supplied/);
+  assert.match(modelInput.messages[0].content, /Never invent test output/);
   assert.match(modelInput.messages[0].content, /not GitHub Copilot or/);
+  assert.equal(modelInput.max_tokens, 6000);
+  assert.equal(modelInput.temperature, 0.2);
 });
 
 test("dedicated Copilot route rejects malformed messages", async () => {
