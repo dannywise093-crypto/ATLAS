@@ -71,14 +71,18 @@ export function routeSkills(prompt, catalog = SKILL_CATALOG, limit = 4) {
     if (score < 4 || searchableTokens.size === 0) score = 0;
     return { skill, score };
   }).filter((item) => item.score > 0)
-    .sort((a, b) => b.score - a.score || a.skill.name.localeCompare(b.skill.name))
+    .sort((a, b) => b.score - a.score || a.skill.name.localeCompare(b.skill.name));
+
+  const strongestScore = scored[0]?.score || 0;
+  const relevantSkills = scored
+    .filter((item) => item.score >= Math.max(6, strongestScore * 0.25))
     .slice(0, Math.max(0, limit));
 
   const specialists = SPECIALISTS.filter((agent) =>
     agent.terms.some((term) => matchesTerm(queryTokens, term))
   ).map(({ id, name }) => ({ id, name }));
 
-  return { skills: scored.map(({ skill, score }) => ({ ...skill, score })), specialists };
+  return { skills: relevantSkills.map(({ skill, score }) => ({ ...skill, score })), specialists };
 }
 
 export function buildSkillContext(prompt, catalog = SKILL_CATALOG) {
