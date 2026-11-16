@@ -180,3 +180,7 @@ body{background:radial-gradient(ellipse at 82% 0%,rgba(38,103,207,.17),transpare
 
 .robot-discovered-list{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:7px;max-height:180px;overflow:auto}.robot-discovered-list li{display:flex;justify-content:space-between;gap:12px;padding:9px 11px;border:1px solid #29415d;border-radius:9px;background:#0c1929}.robot-discovered-list li b{font-size:11px;color:#d7e8ff;overflow-wrap:anywhere}.robot-discovered-list li span{font-size:10px;color:#8da6c3;text-align:right;flex:none}
 @media(max-width:700px){.robot-discovered-list li{flex-direction:column;gap:4px}.robot-discovered-list li span{text-align:left}}
+
+
+.robotics-transport-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.robotics-transport-grid .robotics-adapter{min-width:0}.transport-group{display:inline-block;margin-top:-4px;color:#8ba6c6;font-size:10px;letter-spacing:.08em;text-transform:uppercase}.transport-route{margin-top:10px;padding-top:9px;border-top:1px solid rgba(135,166,204,.15);font-size:10px;line-height:1.5;color:#9ab1cc}.transport-state.available{border-color:#287b60;color:#7ee0b4;background:rgba(35,132,94,.12)}.transport-state.implemented{border-color:#526d9d;color:#a9c6ff;background:rgba(67,104,163,.12)}.transport-state.planned{color:#aebbd0}
+@media(max-width:700px){.robotics-transport-grid{grid-template-columns:1fr}}
