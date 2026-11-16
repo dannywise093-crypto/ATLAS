@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import worker from "./worker.js";
+import { handleBrowserRequest, validateBrowserUrl } from "./browser.js";
 
 const token = "test-only-atlas-token";
 function request(path, { method = "GET", body, auth = true } = {}) {
@@ -169,4 +170,67 @@ test("chat falls back instead of returning a truncated model response", async ()
   assert.equal(body.model, "@cf/google/gemma-4-26b-a4b-it");
   assert.equal(body.fallbackUsed, true);
   assert.equal(attempts.length, 2);
+});
+
+
+test("Browser Run rejects private and local network destinations", () => {
+  for (const url of ["http://localhost", "http://127.0.0.1", "http://192.168.1.1", "http://169.254.169.254", "http://service.local"]) {
+    assert.throws(() => validateBrowserUrl(url), /blocked/);
+  }
+});
+
+test("Browser Run validates public URLs and strips fragments", () => {
+  assert.equal(validateBrowserUrl("https://example.com/path#section").toString(), "https://example.com/path");
+  assert.throws(() => validateBrowserUrl("file:///etc/passwd"), /HTTP and HTTPS/);
+  assert.throws(() => validateBrowserUrl("https://user:pass@example.com"), /HTTP and HTTPS/);
+});
+
+test("Browser Run reads a rendered page through the browser binding", async () => {
+  let call;
+  const request = new Request("https://atlas.test/api/browser", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ action: "read", url: "https://example.com" }),
+  });
+  const response = await handleBrowserRequest(request, {
+    BROWSER: { quickAction: async (action, input) => {
+      call = { action, input };
+      return new Response("# Example page", { headers: { "content-type": "text/markdown" } });
+    } },
+  });
+  const body = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(call.action, "markdown");
+  assert.equal(call.input.url, "https://example.com/");
+  assert.equal(body.result, "# Example page");
+});
+
+test("Browser Run follows a discovered link by navigating to its URL", async () => {
+  let call;
+  const request = new Request("https://atlas.test/api/browser", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ action: "click", href: "https://example.org/next" }),
+  });
+  const response = await handleBrowserRequest(request, {
+    BROWSER: { quickAction: async (action, input) => {
+      call = { action, input };
+      return new Response("Destination page");
+    } },
+  });
+  assert.equal(response.status, 200);
+  assert.equal(call.action, "markdown");
+  assert.equal(call.input.url, "https://example.org/next");
+});
+
+test("Browser Run rejects unsupported actions and private destinations", async () => {
+  const env = { BROWSER: { quickAction: async () => { throw new Error("must not run"); } } };
+  const unsupported = await handleBrowserRequest(new Request("https://atlas.test/api/browser", {
+    method: "POST", body: JSON.stringify({ action: "submit", url: "https://example.com" }),
+  }), env);
+  assert.equal(unsupported.status, 400);
+  const privateTarget = await handleBrowserRequest(new Request("https://atlas.test/api/browser", {
+    method: "POST", body: JSON.stringify({ action: "read", url: "http://10.0.0.5" }),
+  }), env);
+  assert.equal(privateTarget.status, 400);
 });
