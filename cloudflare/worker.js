@@ -80,7 +80,7 @@ ATLAS Copilot uses the configured ATLAS model gateway. It is not GitHub Copilot 
 const CUOPT_SKILL_PROMPT = `You have the NVIDIA cuOpt Numerical Optimization skill. Select LP for linear objectives with continuous variables, MILP for linear objectives with integer/binary decisions, and QP only for genuinely quadratic objectives with continuous variables. Prefer LP where possible. QP is beta, MINIMIZE-only, continuous-only, and should be convex (positive-semidefinite quadratic matrix). Select Python, C/C++, CLI, or an existing modeling-language integration based on the user's environment. Confirm units, objective direction, bounds, integrality, and constraints. Report solver status accurately; never call a merely feasible result optimal. Do not fabricate execution or results. If cuOpt is not installed or no solver runtime is configured, provide a complete implementation and explicitly say it has not been executed by cuOpt.`;
 
 function isCuOptTask(prompt) {
-  return /\\b(cuopt|linear programming|mixed[- ]integer|quadratic programming|optimization solver|operations research|vehicle routing|facility location|integer programming)\\b/i.test(prompt);
+  return /\b(cuopt|linear programming|mixed[- ]integer|quadratic programming|optimization solver|operations research|vehicle routing|facility location|integer programming)\\b/i.test(prompt);
 }
 
 const WINDOW_MS = 60_000;
@@ -227,7 +227,7 @@ export default {
     }
 
     const systemPrompt = isCopilot
-      ? (isCuOptTask(latestPrompt) ? COPILOT_SYSTEM_PROMPT + "\\n\\n" + CUOPT_SKILL_PROMPT : COPILOT_SYSTEM_PROMPT)
+      ? (isCuOptTask(latestPrompt) ? COPILOT_SYSTEM_PROMPT + "\n\n" + CUOPT_SKILL_PROMPT : COPILOT_SYSTEM_PROMPT)
       : SYSTEM_PROMPT;
     const failures = [];
     for (const model of MODELS) {
