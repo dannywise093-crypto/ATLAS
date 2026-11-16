@@ -11,7 +11,7 @@ export function createSpeechRecognition(environment = globalThis, handlers = {})
   if (typeof Recognition !== "function") throw new Error("Speech recognition is not supported by this browser.");
   const recognition = new Recognition();
   recognition.lang = "en-GB";
-  recognition.continuous = false;
+  recognition.continuous = true;
   recognition.interimResults = true;
   recognition.maxAlternatives = 1;
   recognition.onresult = event => handlers.onResult?.(event);
