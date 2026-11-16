@@ -221,6 +221,7 @@ export default {
     if (length > 64 * 1024) return json({ error: "Request body is too large." }, 413);
     let body;
     try { body = await request.json(); } catch { return json({ error: "A valid JSON body is required." }, 400); }
+    const voiceMode = body?.voiceMode === true && !isCopilot;
     if (!body || !Array.isArray(body.messages) || body.messages.length < 1 || body.messages.length > 24) {
       return json({ error: "Provide between 1 and 24 messages." }, 400);
     }
@@ -273,7 +274,9 @@ export default {
     const routedSkills = buildSkillContext(latestPrompt);
     const baseSystemPrompt = isCopilot ? COPILOT_SYSTEM_PROMPT : SYSTEM_PROMPT;
     const skillInventoryPrompt = `INTERNAL ATLAS SKILL ROUTING METADATA (authoritative runtime facts): ${skillInventory.skillCount} installed skill records; ${skillInventory.maxSkillsPerRequest} maximum selected for a single request; ${skillInventory.specialistCount} built-in specialist categories. These are distinct counts. Never confuse the per-request selection limit with the installed catalogue total. If the user explicitly asks about ATLAS skills, specialist routing, or catalogue counts, use these exact values. Otherwise keep all routing and catalogue metadata internal: do not mention skills, selected references, specialist labels, installed counts, selection limits, or append a skills footer to ordinary answers. Use relevant skill guidance silently to improve the answer. The catalogue contains instructions; it does not automatically install external runtimes, GPUs, credentials, or services.`;
+    const voiceStylePrompt = voiceMode ? `VOICE SESSION STYLE\nYou are speaking aloud in a composed, J.A.R.V.I.S.-inspired butler manner. Do not claim to be the fictional character or a product from Iron Man. Address the user as “sir” in every reply. Use polished British English, calm formal precision, concise natural spoken sentences, and occasional understated dry wit. Avoid markdown, headings, bullet lists and tables unless the user asks for them or they are essential. Keep answers easy to hear and follow. Do not claim microphone access or continuous listening; the application controls those functions.` : "";
     const systemPrompt = baseSystemPrompt
+      + (voiceStylePrompt ? "\n\n" + voiceStylePrompt : "")
       + "\n\n" + skillInventoryPrompt
       + (routedSkills.context ? "\n\n" + routedSkills.context : "")
       + (isCuOptTask(latestPrompt) ? "\n\n" + CUOPT_SKILL_PROMPT : "");
