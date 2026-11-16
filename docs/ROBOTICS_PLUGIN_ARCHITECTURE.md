@@ -1,8 +1,8 @@
-# ATLAS Universal Robotics Plugin Architecture
+# ATLAS Integrated Universal Robotics Bridge
 
 ## Status
 
-This document defines the first, vendor-neutral integration contract for ATLAS. The current Robotics Center is a status/planning interface only. It does **not** discover devices, connect to a controller, read physical sensors, or issue actuator commands. No local bridge or hardware adapter is currently shipped.
+This document defines the first, vendor-neutral integration contract for ATLAS. The Android ATLAS application is intended to host the phone-side connection layer directly; a separately installed Local Robotics Bridge application is not part of the product design. The current build still does **not** discover devices, connect to a controller, or read physical sensors. It includes simulation-ready adapter contracts and read-only telemetry validation only.
 
 ## Design goals
 
@@ -40,7 +40,7 @@ Separate, independent robot safety controller
         +-- manufacturer safety functions
 ```
 
-The Cloudflare Worker cannot directly access a user's USB, UART, CAN, GPIO, camera, or local network hardware. A future local bridge is required. The bridge must initiate an authenticated outbound connection or use an explicitly paired local session; it must not expose an unauthenticated public control port.
+The Cloudflare Worker cannot directly access a user's USB, UART, CAN, GPIO, camera, or local network hardware. The Android ATLAS app must use native Android/Capacitor interfaces for supported phone peripherals. Robots that do not run Android connect as peers over compatible network protocols or supported adapters; the robot operating system does not need to be Android. CAN and GPIO require compatible external hardware. The web build remains capability-limited.
 
 ## Adapter families
 
