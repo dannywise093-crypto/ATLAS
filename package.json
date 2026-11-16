@@ -9,7 +9,7 @@
     "preview": "vite preview --host 0.0.0.0",
     "test": "node --test src/atlasCore.test.js cloudflare/worker.test.js cloudflare/skill-orchestrator.test.js cloudflare/knowledge.test.js cloudflare/knowledgeArchive.test.js",
     "skills:build": "node scripts/build-skill-catalog.js",
-    "deploy:worker": "npm run skills:build && wrangler deploy"
+    "deploy:worker": "npm run skills:build && npx wrangler deploy"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",

@@ -62,6 +62,21 @@ test("chat uses the primary model and enables capacity-aware rejection", async (
   assert.match(calledWith.input.messages[0].content, /direct memory loads read memory/);
 });
 
+test("main ATLAS chat routes NVIDIA skills and specialist context", async () => {
+  let systemPrompt;
+  const env = envWith(async (_model, input) => {
+    systemPrompt = input.messages[0].content;
+    return { choices: [{ message: { content: "NVIDIA skill-routed response" } }] };
+  });
+  const response = await worker.fetch(request("/api/chat", {
+    method: "POST",
+    body: { messages: [{ role: "user", content: "Use NVIDIA CUDA GPU kernel optimization." }] },
+  }), env);
+  assert.equal(response.status, 200);
+  assert.match(systemPrompt, /ATLAS SPECIALIST ROUTER/);
+  assert.match(systemPrompt, /CUDA & GPU Computing specialist/);
+});
+
 test("chat falls back when the primary model is unavailable", async () => {
   const attempts = [];
   const env = envWith(async (model) => {

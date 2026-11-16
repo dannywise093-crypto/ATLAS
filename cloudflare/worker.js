@@ -235,12 +235,13 @@ export default {
       ];
     }
 
-    const routedSkills = isCopilot ? buildSkillContext(latestPrompt) : { context: "", skills: [], specialists: [] };
-    const systemPrompt = isCopilot
-      ? COPILOT_SYSTEM_PROMPT
-        + (routedSkills.context ? "\n\n" + routedSkills.context : "")
-        + (isCuOptTask(latestPrompt) ? "\n\n" + CUOPT_SKILL_PROMPT : "")
-      : SYSTEM_PROMPT;
+    // Route installed skills for the main ATLAS chat as well as Copilot.
+    // The catalog is generated from the workspace's installed skill files at deploy time.
+    const routedSkills = buildSkillContext(latestPrompt);
+    const baseSystemPrompt = isCopilot ? COPILOT_SYSTEM_PROMPT : SYSTEM_PROMPT;
+    const systemPrompt = baseSystemPrompt
+      + (routedSkills.context ? "\n\n" + routedSkills.context : "")
+      + (isCuOptTask(latestPrompt) ? "\n\n" + CUOPT_SKILL_PROMPT : "");
     const failures = [];
     for (const model of MODELS) {
       const startedAt = Date.now();
