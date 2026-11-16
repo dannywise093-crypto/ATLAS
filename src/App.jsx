@@ -256,7 +256,7 @@ export default function App() {
                 voiceSpeakingRef.current=false;
                 window.speechSynthesis?.cancel();
               }
-              const wakeMatch=phrase.match(/\\batlas\\b[\\s,.:;!?-]*(.*)$/i);
+              const wakeMatch=phrase.match(/\batlas\b[\s,.:;!?-]*(.*)$/i);
               if(!wasSpeaking&&!wakeMatch&&!voiceAwaitingCommandRef.current)return;
               const command=(wakeMatch?.[1]||phrase).trim();
               if(!command){
@@ -275,7 +275,7 @@ export default function App() {
             }else if(interim.trim()){
               if(voiceSpeakingRef.current){
                 setVoiceTranscript("Listening for an interruption…");
-              }else if(voiceAwaitingCommandRef.current||/\\batlas\\b/i.test(interim)){
+              }else if(voiceAwaitingCommandRef.current||/\batlas\b/i.test(interim)){
                 setVoiceTranscript(interim.trim());
                 setVoiceStatus("Listening for your instruction…");
               }
@@ -311,9 +311,7 @@ export default function App() {
     voiceStartRef.current=listen;
     listen();
   }
-  useEffect(()=>{
-    if(page!=="Voice Center"&&voiceModeRef.current)stopVoiceMode();
-  },[page]);
+
   useEffect(()=>()=>{voiceModeRef.current=false;clearTimeout(voiceRestartTimerRef.current);try{voiceRecognitionRef.current?.stop();}catch{};window.speechSynthesis?.cancel();},[]);
   async function startRobotDiscovery(){
     if(robotDiscoveryBusy)return;
