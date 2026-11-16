@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { runAtlasCore } from "./atlasCore.js";
 import { getNeuralRuntimeStatus, checkAtlasBackend, generateAtlasResponse } from "./modelRuntime.js";
-import { Activity, Bot, BrainCircuit, Camera, Database, Eye, GraduationCap, Home, Menu, MessageSquare, Mic, Radio, Send, Settings, ShieldCheck, Sparkles, Volume2, X, Terminal, Play, Plus, ChevronDown, AudioLines, PencilLine, Zap } from "lucide-react";
+import { Activity, Bot, BrainCircuit, Camera, Database, Eye, GraduationCap, Home, Menu, MessageSquare, Mic, Radio, Send, Settings, ShieldCheck, Sparkles, Volume2, X, Terminal, Play, Plus, ChevronDown, AudioLines, PencilLine, Zap, Copy, Share2, ThumbsUp, ThumbsDown, RefreshCw } from "lucide-react";
 
 function SyntaxCode({ language, code }) {
   const keywordSource = ({
@@ -159,6 +159,14 @@ export default function App() {
       {messages.map((m,i)=><article className={"atlas-message "+(m.role==="user"?"from-user":"from-atlas")} key={i}>
         {m.role==="atlas"&&i===0&&<span className="atlas-message-label">ATLAS</span>}
         <AssistantMessage text={m.text}/>
+        {m.role==="atlas"&&i===messages.length-1&&!generating&&<div className="atlas-message-actions">
+          <button aria-label="Copy response" title="Copy response" onClick={()=>navigator.clipboard?.writeText(m.text)}><Copy/></button>
+          <button aria-label="Share response" title="Share response" onClick={()=>{if(navigator.share)navigator.share({text:m.text}).catch(()=>{});else setNotice("Sharing is not available in this browser.");}}><Share2/></button>
+          <button aria-label="Helpful" title="Helpful" onClick={()=>setNotice("Thanks for your feedback.")}><ThumbsUp/></button>
+          <button aria-label="Not helpful" title="Not helpful" onClick={()=>setNotice("Feedback noted.")}><ThumbsDown/></button>
+          <button aria-label="Speak response" title="Speak response" onClick={()=>{if("speechSynthesis"in window){window.speechSynthesis.cancel();window.speechSynthesis.speak(new SpeechSynthesisUtterance(m.text));}}}><Volume2/></button>
+          <button aria-label="Regenerate response" title="Regenerate response" onClick={()=>{const prior=messages.slice(0,i);const lastUser=[...prior].reverse().find(x=>x.role==="user");if(lastUser){setMessages(prior);setInput(lastUser.text);setNotice("Tap Send to regenerate this response.");}}}><RefreshCw/></button>
+        </div>}
       </article>)}
       {generating&&<article className="atlas-message from-atlas"><span className="atlas-message-label">ATLAS</span><p className="typing">ATLAS is thinking…</p></article>}
     </div>
