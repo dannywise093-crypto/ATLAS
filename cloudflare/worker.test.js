@@ -365,7 +365,8 @@ test("cloud TTS endpoint requires authorization and valid bounded text", async (
   const env = envWith(async () => new ReadableStream());
   const denied = await worker.fetch(request("/api/tts", {
     method: "POST",
-    body: { text: "Hello", auth: false }
+    body: { text: "Hello" },
+    auth: false
   }), env);
   assert.equal(denied.status, 401);
 
