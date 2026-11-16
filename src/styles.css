@@ -143,3 +143,20 @@ body{background:radial-gradient(ellipse at 82% 0%,rgba(38,103,207,.17),transpare
  .grok-composer-bottom button{width:32px;height:32px}
  .grok-model-row{margin-bottom:6px}
 }
+
+/* Vendor-neutral robotics integration workspace */
+.robotics-page{gap:16px}
+.robotics-status{display:flex;align-items:center;gap:14px;padding:18px;border:1px solid #654c32;background:linear-gradient(110deg,#30241666,#171b24);border-radius:14px}
+.robotics-status-icon{width:48px;height:48px;flex:none;display:grid;place-items:center;border:1px solid #735a37;border-radius:13px;background:#3b2b18;color:#f2bd71}
+.robotics-status>div:nth-child(2){min-width:0;flex:1}
+.robotics-status b{font:600 14px 'Space Grotesk';color:#f4d6a8}
+.robotics-status p,.robotics-section-head p{font-size:11px;line-height:1.65;color:#a99b87;margin:5px 0 0;max-width:720px}
+.robotics-section-head{display:flex;align-items:end;justify-content:space-between;margin-top:8px}
+.robotics-section-head h2{margin:0;color:#9bb6dd;font-size:10px;letter-spacing:1.5px}
+.robotics-section-head p{color:#8493aa}
+.robotics-adapters{gap:11px}
+.robotics-adapter{padding:15px;background:linear-gradient(145deg,#111d2f,#0b1422)}
+.robotics-adapter h3{margin:10px 0 5px}
+.robotics-page .notice{font-size:10px;color:#8998ae;overflow-wrap:anywhere}
+.robotics-page .notice code{color:#a9c9ff}
+@media(max-width:700px){.robotics-status{align-items:flex-start;flex-wrap:wrap;padding:13px}.robotics-status>.badge{margin-left:61px}.robotics-section-head{align-items:flex-start}.robotics-adapter{padding:13px}}
