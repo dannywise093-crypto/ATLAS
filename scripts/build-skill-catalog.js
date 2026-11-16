@@ -4,7 +4,6 @@ import path from "node:path";
 const ROOT = process.cwd();
 const SEARCH_ROOTS = [".agents/skills", ".claude/skills", "agent/skills", "agents/skills"];
 const OUTPUT = path.join(ROOT, "cloudflare", "generated-skill-catalog.js");
-const MAX_SKILL_CHARS = 3600;
 
 function walk(dir, found = []) {
   if (!fs.existsSync(dir)) return found;
@@ -35,7 +34,7 @@ function parseSkill(file) {
     description: description.slice(0, 500),
     tags: tags.slice(0, 20),
     source: path.relative(ROOT, file).split(path.sep).join("/"),
-    instructions: body.trim().slice(0, MAX_SKILL_CHARS),
+    instructions: body.trim(),
   };
 }
 

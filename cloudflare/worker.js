@@ -175,18 +175,28 @@ export default {
       return json({
         service: "ATLAS Cloudflare Workers AI Gateway",
         status: env.AI ? "configured" : "not_configured",
-        provider: "Cloudflare Workers AI",
-        model: MODELS[0].id,
+        provider: env.NVIDIA_API_KEY ? "NVIDIA API Catalog (primary), Cloudflare Workers AI (fallback)" : "Cloudflare Workers AI",
+        nvidiaConfigured: Boolean(env.NVIDIA_API_KEY),
+        nvidiaModel: "meta/llama-3.3-70b-instruct",
+        model: env.NVIDIA_API_KEY ? "meta/llama-3.3-70b-instruct" : MODELS[0].id,
         fallbackModels: MODELS.slice(1).map((model) => model.id),
         skills: getSkillCatalogStats(),
       });
     }
+    if (url.pathname === "/api/providers") {
+      if (request.method !== "GET") return json({ error: "Method not allowed." }, 405, { allow: "GET" });
+      if (!authorized(request, env)) return json({ error: "Unauthorized." }, 401);
+      return json({ defaultProvider: env.NVIDIA_API_KEY ? "nvidia" : "atlas", providers: {
+        atlas: { configured: Boolean(env.AI), label: "Cloudflare Workers AI", role: env.NVIDIA_API_KEY ? "fallback" : "primary" },
+        nvidia: { configured: Boolean(env.NVIDIA_API_KEY), label: "NVIDIA API Catalog", model: "meta/llama-3.3-70b-instruct", role: env.NVIDIA_API_KEY ? "primary" : "not_configured" }
+      }, skills: getSkillCatalogStats() });
+    }
     if (url.pathname === "/api/skills") {
       if (request.method !== "GET") return json({ error: "Method not allowed." }, 405, { allow: "GET" });
       if (!authorized(request, env)) return json({ error: "Unauthorized." }, 401);
-      const { skillCount, specialistCount } = getSkillCatalogStats();
+      const { skillCount, specialistCount, maxSkillsPerRequest } = getSkillCatalogStats();
       const { SKILL_CATALOG } = await import("./generated-skill-catalog.js");
-      return json({ skillCount, specialistCount, skills: SKILL_CATALOG.map(({ id, name, description, tags, source }) => ({ id, name, description, tags, source })) });
+      return json({ skillCount, specialistCount, maxSkillsPerRequest, skills: SKILL_CATALOG.map(({ id, name, description, tags, source }) => ({ id, name, description, tags, source })) });
     }
 
     const isCopilot = url.pathname === "/api/copilot";
@@ -219,6 +229,17 @@ export default {
     let research = { status: "skipped", sources: [], checkedAt: null, archive: { status: env.KNOWLEDGE_DB ? "skipped" : "disabled", storedSources: 0, storedChunks: 0 } };
     let modelMessages = messages;
     const latestPrompt = messages[messages.length - 1].content;
+    const skillInventory = getSkillCatalogStats();
+    if (/\b(how many|number of|total|exact)\b.{0,50}\b(skills?|skill catalogue|skill catalog)\b|\b(skills?|skill catalogue|skill catalog)\b.{0,50}\b(how many|total|installed|available)\b/i.test(latestPrompt)) {
+      return json({
+        answer: `ATLAS has ${skillInventory.skillCount} installed skill records in its bundled catalogue, sourced from ${skillInventory.skillCount} SKILL.md files. It can select up to ${skillInventory.maxSkillsPerRequest} relevant skills for one request. It has ${skillInventory.specialistCount} built-in specialist categories. The full catalogue is not injected into every prompt: relevant skill instructions are routed on demand. External software, credentials, GPUs, and services mentioned by a skill are not automatically installed or available.`,
+        provider: "ATLAS skill registry",
+        model: "bundled-skill-catalogue",
+        fallbackUsed: false,
+        research: { status: "skipped", sources: [], checkedAt: null },
+        skills: { selected: [], specialists: [], ...skillInventory },
+      });
+    }
     if (needsLiveResearch(latestPrompt)) {
       const searchResult = await searchWeb(latestPrompt);
       const evidence = formatResearchEvidence(searchResult);
@@ -235,13 +256,54 @@ export default {
       ];
     }
 
-    const routedSkills = isCopilot ? buildSkillContext(latestPrompt) : { context: "", skills: [], specialists: [] };
-    const systemPrompt = isCopilot
-      ? COPILOT_SYSTEM_PROMPT
-        + (routedSkills.context ? "\n\n" + routedSkills.context : "")
-        + (isCuOptTask(latestPrompt) ? "\n\n" + CUOPT_SKILL_PROMPT : "")
-      : SYSTEM_PROMPT;
+    // Route installed skills for the main ATLAS chat as well as Copilot.
+    // The catalog is generated from the workspace's installed skill files at deploy time.
+    const routedSkills = buildSkillContext(latestPrompt);
+    const baseSystemPrompt = isCopilot ? COPILOT_SYSTEM_PROMPT : SYSTEM_PROMPT;
+    const skillInventoryPrompt = `ATLAS SKILL REGISTRY FACTS (authoritative runtime metadata): ${skillInventory.skillCount} installed skill records; ${skillInventory.maxSkillsPerRequest} maximum selected for a single request; ${skillInventory.specialistCount} built-in specialist categories. These are distinct counts. Never confuse the per-request selection limit with the installed catalogue total. If asked for counts, use these exact values. The catalogue contains skill instructions; it does not automatically install external runtimes, GPUs, credentials, or services.`;
+    const systemPrompt = baseSystemPrompt
+      + "\n\n" + skillInventoryPrompt
+      + (routedSkills.context ? "\n\n" + routedSkills.context : "")
+      + (isCuOptTask(latestPrompt) ? "\n\n" + CUOPT_SKILL_PROMPT : "");
     const failures = [];
+    // NVIDIA is the primary model when configured. It receives the same system
+    // prompt and routed skill context as the native Workers AI fallback.
+    if (env.NVIDIA_API_KEY) {
+      const startedAt = Date.now();
+      try {
+        const upstream = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
+          method: "POST",
+          headers: { Authorization: "Bearer " + env.NVIDIA_API_KEY, "Content-Type": "application/json", Accept: "application/json" },
+          body: JSON.stringify({
+            model: "meta/llama-3.3-70b-instruct",
+            messages: [{ role: "system", content: systemPrompt }, ...modelMessages],
+            temperature: isCopilot ? 0.2 : 0.4,
+            max_tokens: isCopilot ? 6000 : 4096,
+            stream: false
+          }),
+          signal: AbortSignal.timeout(100_000)
+        });
+        const result = await upstream.json().catch(() => ({}));
+        if (upstream.ok) {
+          const answer = extractAnswer(result);
+          if (answer) {
+            const sourceFooter = research.sources.length
+              ? "\n\nSources checked (" + research.checkedAt + "):\n" + research.sources.map((source, index) => (index + 1) + ". " + source.title + " — " + source.url).join("\n") + "\nThese are search-result snippets; full source pages were not independently verified."
+              : research.status === "unavailable" || research.status === "no_results"
+                ? "\n\nLive web research could not provide usable sources for this request. Current facts have not been independently verified."
+                : "";
+            return json({ answer: answer.trim() + sourceFooter, provider: "NVIDIA API Catalog", model: "meta/llama-3.3-70b-instruct", fallbackUsed: false, research, skills: { selected: routedSkills.skills.map(({ id, name }) => ({ id, name })), specialists: routedSkills.specialists, ...skillInventory } });
+          }
+          failures.push({ provider: "nvidia", status: "empty_response", durationMs: Date.now() - startedAt });
+        } else {
+          failures.push({ provider: "nvidia", status: "upstream_error", httpStatus: upstream.status, durationMs: Date.now() - startedAt });
+          console.warn("ATLAS NVIDIA inference failed", upstream.status);
+        }
+      } catch {
+        failures.push({ provider: "nvidia", status: "connection_error", durationMs: Date.now() - startedAt });
+        console.warn("ATLAS NVIDIA inference connection failed");
+      }
+    }
     for (const model of MODELS) {
       const startedAt = Date.now();
       try {
@@ -266,6 +328,7 @@ export default {
             model: model.id,
             fallbackUsed: model.id !== MODELS[0].id,
             research,
+            skills: { selected: routedSkills.skills.map(({ id, name }) => ({ id, name })), specialists: routedSkills.specialists, ...skillInventory },
           });
         }
         failures.push({ model: model.id, status: "empty_response", durationMs });

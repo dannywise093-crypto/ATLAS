@@ -1,6 +1,6 @@
 // ATLAS model gateway client.
-// Production requests use same-origin Vercel serverless routes. The gateway
-// token and model-provider credentials remain server-side and never enter VITE_*.
+// Production requests use same-origin Cloudflare Pages Functions.
+// Gateway and NVIDIA credentials remain server-side and never enter VITE_*.
 const API_BASE = String(import.meta.env.VITE_ATLAS_API_URL || "").replace(/\/$/, "");
 
 export function getNeuralRuntimeStatus() {
@@ -40,6 +40,20 @@ export async function checkAtlasBackend(signal) {
   return requestJson("/api/health", { signal });
 }
 
+function appendSkillUsageNotice(answer, payload) {
+  const selected = Array.isArray(payload.skills?.selected) ? payload.skills.selected : [];
+  const inventory = Number.isInteger(payload.skills?.skillCount) ? payload.skills.skillCount : null;
+  const limit = Number.isInteger(payload.skills?.maxSkillsPerRequest) ? payload.skills.maxSkillsPerRequest : 4;
+  if (/\d+ installed skill records/i.test(answer) || /ATLAS skills used:/i.test(answer)) return answer;
+  if (selected.length) {
+    return answer + `\n\n---\n**ATLAS skills used:** ${selected.map((skill) => skill.name).join(", ")} (${selected.length} selected; up to ${limit} per request${inventory ? ` from ${inventory} installed` : ""}).`;
+  }
+  if (inventory !== null) {
+    return answer + `\n\n---\n**ATLAS skills:** No specialist skill was selected for this request. Catalogue: ${inventory} installed; up to ${limit} can be selected per request.`;
+  }
+  return answer;
+}
+
 export async function generateAtlasResponse(history, signal) {
   const messages = history
     .filter((item) => item && (item.role === "user" || item.role === "atlas" || item.role === "assistant"))
@@ -63,7 +77,7 @@ export async function generateAtlasResponse(history, signal) {
   if (typeof payload.answer !== "string" || !payload.answer.trim()) {
     throw new Error("The configured model returned an empty response.");
   }
-  return payload.answer.trim();
+  return appendSkillUsageNotice(payload.answer.trim(), payload);
 }
 
 export async function generateAtlasCopilotResponse(history, signal) {
@@ -89,7 +103,7 @@ export async function generateAtlasCopilotResponse(history, signal) {
   if (typeof payload.answer !== "string" || !payload.answer.trim()) {
     throw new Error("ATLAS Copilot returned an empty response.");
   }
-  return payload.answer.trim();
+  return appendSkillUsageNotice(payload.answer.trim(), payload);
 }
 
 export async function generateProviderResponse(provider, history, signal) {
@@ -103,5 +117,5 @@ export async function generateProviderResponse(provider, history, signal) {
   if (!messages.length || messages[messages.length - 1].role !== "user") throw new Error("Send a message before requesting a response.");
   const payload = await requestJson("/api/nvidia", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ messages }), signal });
   if (typeof payload.answer !== "string" || !payload.answer.trim()) throw new Error("NVIDIA returned an empty response.");
-  return payload.answer.trim();
+  return appendSkillUsageNotice(payload.answer.trim(), payload);
 }

@@ -50,6 +50,9 @@ test("chat uses the primary model and enables capacity-aware rejection", async (
   assert.equal(body.answer, "ATLAS test response");
   assert.equal(body.model, "@cf/meta/llama-3.3-70b-instruct-fp8-fast");
   assert.equal(body.fallbackUsed, false);
+  assert.equal(body.skills.skillCount, 451);
+  assert.equal(body.skills.maxSkillsPerRequest, 4);
+  assert.match(calledWith.input.messages[0].content, /451 installed skill records/);
   assert.equal(calledWith.input.messages.at(-1).role, "user");
   assert.deepEqual(calledWith.options, { rejectIfBusy: true });
   assert.equal(calledWith.input.max_tokens, 3000);
@@ -60,6 +63,21 @@ test("chat uses the primary model and enables capacity-aware rejection", async (
   assert.match(calledWith.input.messages[0].content, /keep code and data memory regions separate/);
   assert.match(calledWith.input.messages[0].content, /instruction widths/);
   assert.match(calledWith.input.messages[0].content, /direct memory loads read memory/);
+});
+
+test("main ATLAS chat routes NVIDIA skills and specialist context", async () => {
+  let systemPrompt;
+  const env = envWith(async (_model, input) => {
+    systemPrompt = input.messages[0].content;
+    return { choices: [{ message: { content: "NVIDIA skill-routed response" } }] };
+  });
+  const response = await worker.fetch(request("/api/chat", {
+    method: "POST",
+    body: { messages: [{ role: "user", content: "Use NVIDIA CUDA GPU kernel optimization." }] },
+  }), env);
+  assert.equal(response.status, 200);
+  assert.match(systemPrompt, /ATLAS SPECIALIST ROUTER/);
+  assert.match(systemPrompt, /CUDA & GPU Computing specialist/);
 });
 
 test("chat falls back when the primary model is unavailable", async () => {
@@ -239,8 +257,27 @@ test("skill catalog endpoint is authenticated and reports the bundled catalog", 
   assert.equal(response.status, 200);
   assert.ok(body.skillCount >= 451);
   assert.equal(body.skills.length, body.skillCount);
+  assert.equal(body.maxSkillsPerRequest, 4);
   assert.ok(body.specialistCount >= 5);
-  assert.equal(body.skills[0].id, "cuopt-numerical-optimization-api");
+  assert.ok(body.skills.some((skill) => skill.id === "cuopt-numerical-optimization-api"));
+});
+
+test("skill inventory questions return exact bundled catalogue counts without model guessing", async () => {
+  let modelCalled = false;
+  const env = envWith(async () => { modelCalled = true; return { choices: [{ message: { content: "wrong" } }] }; });
+  const response = await worker.fetch(request("/api/chat", {
+    method: "POST",
+    body: { messages: [{ role: "user", content: "How many skills are installed in ATLAS?" }] },
+  }), env);
+  const body = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(modelCalled, false);
+  assert.match(body.answer, /451 installed skill records/);
+  assert.match(body.answer, /up to 4 relevant skills/);
+  assert.match(body.answer, /6 built-in specialist categories/);
+  assert.equal(body.skills.skillCount, 451);
+  assert.equal(body.skills.maxSkillsPerRequest, 4);
+  assert.equal(body.skills.specialistCount, 6);
 });
 
 test("Copilot includes routed specialist context only when a skill matches", async () => {

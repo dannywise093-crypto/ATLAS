@@ -1,37 +1,91 @@
 import { SKILL_CATALOG } from "./generated-skill-catalog.js";
 
 const SPECIALISTS = [
-  { id: "ai-ml", name: "AI & Machine Learning", terms: ["ai", "machine learning", "deep learning", "llm", "neural", "model", "inference", "training"] },
-  { id: "cuda-gpu", name: "CUDA & GPU Computing", terms: ["cuda", "gpu", "kernel", "nvidia", "parallel", "tensorrt", "cutlass", "triton"] },
-  { id: "optimization", name: "Numerical Optimization & Operations Research", terms: ["optimization", "linear programming", "milp", "cuopt", "solver", "routing", "integer programming"] },
-  { id: "robotics-simulation", name: "Robotics & Simulation", terms: ["robot", "simulation", "physics", "control", "autonomous", "isaac", "digital twin"] },
-  { id: "vision", name: "Computer Vision & Imaging", terms: ["vision", "image", "video", "camera", "3d", "render", "perception"] },
-  { id: "developer-tools", name: "Software Engineering & Developer Tools", terms: ["code", "software", "developer", "debug", "compiler", "api", "python", "javascript"] },
+  { id: "ai-ml", name: "AI & Machine Learning", terms: ["ai", "machine learning", "deep learning", "llm", "neural network", "inference", "model", "training", "train"] },
+  { id: "cuda-gpu", name: "CUDA & GPU Computing", terms: ["cuda", "gpu", "kernel", "parallel computing", "tensorrt", "cutlass", "triton"] },
+  { id: "optimization", name: "Numerical Optimization & Operations Research", terms: ["optimization", "linear programming", "milp", "cuopt", "solver", "routing", "integer programming", "operations research"] },
+  { id: "robotics-simulation", name: "Robotics & Simulation", terms: ["robot", "robotics", "simulation", "physics", "control system", "autonomous", "isaac sim", "digital twin"] },
+  { id: "vision", name: "Computer Vision & Imaging", terms: ["computer vision", "image", "video", "camera", "rendering", "perception"] },
+  { id: "developer-tools", name: "Software Engineering & Developer Tools", terms: ["code", "software", "developer", "debugging", "compiler", "api", "python", "javascript"] },
 ];
 
+const STOP_WORDS = new Set([
+  "a", "an", "and", "are", "as", "at", "be", "build", "by", "can", "do", "does",
+  "explain", "for", "from", "help", "how", "i", "in", "is", "it", "me", "of",
+  "on", "or", "please", "should", "that", "the", "their", "this", "to", "use",
+  "we", "what", "when", "where", "which", "who", "why", "with", "work", "works",
+  "write", "you", "your",
+]);
+
 function tokenize(value) {
-  return String(value || "").toLowerCase().match(/[a-z0-9+#.-]{2,}/g) || [];
+  return String(value || "").toLowerCase().match(/[a-z0-9+#]+/g) || [];
 }
 
-export function routeSkills(prompt, catalog = SKILL_CATALOG, limit = 4) {
-  const query = new Set(tokenize(prompt));
+function meaningfulTokens(value) {
+  return tokenize(value).filter((token) => !STOP_WORDS.has(token) && token.length > 1);
+}
+
+function includesPhrase(haystackTokens, phraseTokens) {
+  if (!phraseTokens.length || phraseTokens.length > haystackTokens.length) return false;
+  for (let start = 0; start <= haystackTokens.length - phraseTokens.length; start += 1) {
+    if (phraseTokens.every((token, offset) => haystackTokens[start + offset] === token)) return true;
+  }
+  return false;
+}
+
+function matchesTerm(promptTokens, term) {
+  return includesPhrase(promptTokens, meaningfulTokens(term));
+}
+
+export const MAX_SKILLS_PER_REQUEST = 4;
+const MAX_SKILL_CONTEXT_CHARS = 12000;
+
+export function routeSkills(prompt, catalog = SKILL_CATALOG, limit = MAX_SKILLS_PER_REQUEST) {
+  const queryTokens = meaningfulTokens(prompt);
+  const query = new Set(queryTokens);
+
   const scored = catalog.map((skill) => {
-    const searchable = [skill.name, skill.description, ...(skill.tags || [])].join(" ").toLowerCase();
+    const nameTokens = meaningfulTokens(skill.name);
+    const tagTokens = meaningfulTokens((skill.tags || []).join(" "));
+    const descriptionTokens = meaningfulTokens(skill.description);
+    const searchableTokens = new Set([...nameTokens, ...tagTokens, ...descriptionTokens]);
     let score = 0;
+
     for (const token of query) {
-      if (searchable.includes(token)) score += token.length > 4 ? 3 : 1;
+      if (nameTokens.includes(token)) score += 10;
+      if (tagTokens.includes(token)) score += 7;
+      if (descriptionTokens.includes(token)) score += 2;
     }
-    if (query.has("nvidia") && /nvidia|cuda|gpu|cuopt/i.test(searchable)) score += 2;
+
+    // Give exact multi-word concepts a modest boost without rewarding substrings
+    // (for example, "ai" must not match the letters inside "explain").
+    const fields = [nameTokens, tagTokens, descriptionTokens];
+    const promptPhrases = [];
+    for (let size = 2; size <= Math.min(4, queryTokens.length); size += 1) {
+      for (let start = 0; start <= queryTokens.length - size; start += 1) {
+        promptPhrases.push(queryTokens.slice(start, start + size));
+      }
+    }
+    for (const phrase of promptPhrases) {
+      if (fields.some((field) => includesPhrase(field, phrase))) score += phrase.length * 2;
+    }
+
+    // Avoid low-confidence selections based on one generic description word.
+    if (score < 4 || searchableTokens.size === 0) score = 0;
     return { skill, score };
   }).filter((item) => item.score > 0)
-    .sort((a, b) => b.score - a.score || a.skill.name.localeCompare(b.skill.name))
-    .slice(0, limit);
+    .sort((a, b) => b.score - a.score || a.skill.name.localeCompare(b.skill.name));
+
+  const strongestScore = scored[0]?.score || 0;
+  const relevantSkills = scored
+    .filter((item) => item.score >= Math.max(6, strongestScore * 0.25))
+    .slice(0, Math.max(0, limit));
 
   const specialists = SPECIALISTS.filter((agent) =>
-    agent.terms.some((term) => query.has(term) || prompt.toLowerCase().includes(term))
+    agent.terms.some((term) => matchesTerm(queryTokens, term))
   ).map(({ id, name }) => ({ id, name }));
 
-  return { skills: scored.map(({ skill, score }) => ({ ...skill, score })), specialists };
+  return { skills: relevantSkills.map(({ skill, score }) => ({ ...skill, score })), specialists };
 }
 
 export function buildSkillContext(prompt, catalog = SKILL_CATALOG) {
@@ -60,5 +114,5 @@ export function buildSkillContext(prompt, catalog = SKILL_CATALOG) {
 }
 
 export function getSkillCatalogStats(catalog = SKILL_CATALOG) {
-  return { skillCount: catalog.length, specialistCount: SPECIALISTS.length };
+  return { skillCount: catalog.length, specialistCount: SPECIALISTS.length, maxSkillsPerRequest: MAX_SKILLS_PER_REQUEST };
 }
