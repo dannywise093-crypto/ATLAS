@@ -1,5 +1,6 @@
 import { formatResearchEvidence, needsLiveResearch, searchWeb } from "./knowledge.js";
 import { archiveResearchResults } from "./knowledgeArchive.js";
+import { buildSkillContext, getSkillCatalogStats } from "./skill-orchestrator.js";
 const MODELS = [
   // Live Workers AI measurement: Llama returned a complete 920-token code answer
   // in ~29 seconds. The previous 9-second deadline guaranteed false timeouts.
@@ -177,7 +178,15 @@ export default {
         provider: "Cloudflare Workers AI",
         model: MODELS[0].id,
         fallbackModels: MODELS.slice(1).map((model) => model.id),
+        skills: getSkillCatalogStats(),
       });
+    }
+    if (url.pathname === "/api/skills") {
+      if (request.method !== "GET") return json({ error: "Method not allowed." }, 405, { allow: "GET" });
+      if (!authorized(request, env)) return json({ error: "Unauthorized." }, 401);
+      const { skillCount, specialistCount } = getSkillCatalogStats();
+      const { SKILL_CATALOG } = await import("./generated-skill-catalog.js");
+      return json({ skillCount, specialistCount, skills: SKILL_CATALOG.map(({ id, name, description, tags, source }) => ({ id, name, description, tags, source })) });
     }
 
     const isCopilot = url.pathname === "/api/copilot";
@@ -226,8 +235,11 @@ export default {
       ];
     }
 
+    const routedSkills = isCopilot ? buildSkillContext(latestPrompt) : { context: "", skills: [], specialists: [] };
     const systemPrompt = isCopilot
-      ? (isCuOptTask(latestPrompt) ? COPILOT_SYSTEM_PROMPT + "\n\n" + CUOPT_SKILL_PROMPT : COPILOT_SYSTEM_PROMPT)
+      ? COPILOT_SYSTEM_PROMPT
+        + (routedSkills.context ? "\n\n" + routedSkills.context : "")
+        + (isCuOptTask(latestPrompt) ? "\n\n" + CUOPT_SKILL_PROMPT : "")
       : SYSTEM_PROMPT;
     const failures = [];
     for (const model of MODELS) {
