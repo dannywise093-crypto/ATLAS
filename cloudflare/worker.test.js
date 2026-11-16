@@ -78,6 +78,13 @@ test("main ATLAS chat routes NVIDIA skills and specialist context", async () => 
   assert.equal(response.status, 200);
   assert.match(systemPrompt, /ATLAS SPECIALIST ROUTER/);
   assert.match(systemPrompt, /CUDA & GPU Computing specialist/);
+  assert.match(systemPrompt, /Do not invent an expansion for the name ATLAS/);
+  assert.match(systemPrompt, /Numerical Optimization & Operations Research/);
+  assert.match(systemPrompt, /Computer Vision & Imaging/);
+  assert.match(systemPrompt, /lexical overlap across skill names, tags, and descriptions/);
+  assert.match(systemPrompt, /up to four relevant skill references/);
+  assert.match(systemPrompt, /not separate independently running AI agents/);
+  assert.match(systemPrompt, /Do not invent a generic encoder\/decoder architecture/);
 });
 
 test("chat falls back when the primary model is unavailable", async () => {
