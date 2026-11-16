@@ -25,3 +25,11 @@ test("normalizes valid telemetry and marks stale readings", () => {
 test("rejects non-finite sensor values", () => assert.throws(() => normalizeRoboticsTelemetry({ deviceId:"r",sensorId:"s",value:Infinity,unit:"C",timestamp:Date.now(),sourcePlugin:"p" }), /finite/));
 test("rejects future timestamps", () => assert.throws(() => normalizeRoboticsTelemetry({ deviceId:"r",sensorId:"s",value:1,unit:"C",timestamp:Date.now()+60_000,sourcePlugin:"p" }), /future/));
 test("rejects missing units", () => assert.throws(() => normalizeRoboticsTelemetry({ deviceId:"r",sensorId:"s",value:1,timestamp:Date.now(),sourcePlugin:"p" }), /unit/));
+
+test("accepts the expanded universal transport identifiers for read-only adapters", () => {
+  const transports = ["bluetooth-le", "bluetooth-classic", "wifi-lan", "wifi-direct", "ethernet", "usb-otg", "usb-serial", "can-bus", "ros2-dds", "micro-ros", "mqtt", "modbus", "opcua", "http-ws", "vendor-sdk", "camera-sensors"];
+  for (const transport of transports) {
+    const result = validateRoboticsManifest({ ...validManifest, transport });
+    assert.equal(result.valid, true, transport + " should be accepted");
+  }
+});
