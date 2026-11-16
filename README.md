@@ -118,3 +118,8 @@ runtime on GPU infrastructure and add a separately secured server-side adapter;
 never expose solver credentials or an unauthenticated solver service to browsers.
 See NVIDIA's [cuOpt documentation](https://docs.nvidia.com/cuopt/user-guide/latest/)
 and [cuOpt OpenAPI reference](https://docs.nvidia.com/cuopt/user-guide/latest/open-api.html).
+
+
+## NVIDIA skill orchestration
+
+ATLAS Copilot now has a skill-catalog generator and request router. Run `npm run skills:build` in a workspace containing the installed skill files to generate a catalog from `.agents/skills`, `.claude/skills`, `agent/skills`, and `agents/skills`. The Worker routes matching requests to relevant skill references and specialist roles; the bundled seed catalog currently includes cuOpt until the full local catalog is generated and committed. See [the NVIDIA multi-agent orchestrator guide](docs/NVIDIA_MULTI_AGENT_ORCHESTRATOR.md) for setup, boundaries, and verification.
