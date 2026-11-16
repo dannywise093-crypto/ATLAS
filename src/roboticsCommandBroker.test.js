@@ -8,6 +8,7 @@ const safeStatus = { emergencyStopReleased: true, interlocksHealthy: true, watch
 test("rejects profiles without vendor approval and independent safety review", () => {
   assert.equal(validateMotionAdapterProfile({ ...profile, vendorApproved: false }).valid, false);
   assert.equal(validateMotionAdapterProfile({ ...profile, independentlySafetyReviewed: false }).valid, false);
+  assert.equal(validateMotionAdapterProfile({ ...profile, transport: "unknown-bus" }).valid, false);
   assert.equal(validateMotionAdapterProfile({ ...profile, approvedCommands: ["free form movement"] }).valid, false);
 });
 
