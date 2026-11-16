@@ -63,5 +63,14 @@ export async function generateAtlasResponse(history, signal) {
   if (typeof payload.answer !== "string" || !payload.answer.trim()) {
     throw new Error("The configured model returned an empty response.");
   }
-  const sourceList = Array.isArray(payload.sources) ? payload.sources.filter((item) => item && typeof item.title === "string" && typeof item.url === "string" && /^https?:\\/\\//i.test(item.url)) : [];\n  const citations = sourceList.length ? "\\n\\n**Sources**\\n" + sourceList.map((item, index) => `${index + 1}. [${item.title.replace(/[\\[\\]\\n]/g, "")}](${item.url})`).join("\\n") : "";\n  return payload.answer.trim() + citations;
+  const sourceList = Array.isArray(payload.sources)
+    ? payload.sources.filter((item) => item && typeof item.title === "string" &&
+        typeof item.url === "string" && /^https?:\/\//i.test(item.url))
+    : [];
+  const citations = sourceList.length
+    ? "\\n\\n**Sources**\\n" + sourceList.map((item, index) =>
+        `${index + 1}. [${item.title.replace(/[\\[\\]\\n]/g, "")}](${item.url})`
+      ).join("\\n")
+    : "";
+  return payload.answer.trim() + citations;
 }
