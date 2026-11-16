@@ -1,8 +1,13 @@
+let activeAudio = null;
+let activeController = null;
+let activeObjectUrl = null;
+let activeReject = null;
+
 export function getVoiceCapabilities(environment = globalThis) {
   const Recognition = environment.SpeechRecognition || environment.webkitSpeechRecognition;
   return {
     speechRecognition: typeof Recognition === "function",
-    speechSynthesis: Boolean(environment.speechSynthesis && typeof environment.SpeechSynthesisUtterance === "function")
+    speechSynthesis: typeof environment.fetch === "function" && typeof environment.Audio === "function"
   };
 }
 
@@ -37,54 +42,74 @@ export function cleanTextForSpeech(value) {
     .trim();
 }
 
-const britishMaleVoiceName = /google uk english male|microsoft ryan|\b(?:daniel|george|arthur|oliver|ryan)\b|\bmale\b/i;
-const femaleVoiceName = /\bfemale\b|\b(?:susan|kate|hazel|samantha|victoria|serena|moira|tessa)\b/i;
-
-export function selectBritishMaleVoice(voices = []) {
-  const candidates = voices.filter(voice =>
-    /^en-GB(?:-|$)/i.test(voice.lang || "") &&
-    !femaleVoiceName.test(voice.name || "") &&
-    (voice.gender === "male" || britishMaleVoiceName.test(voice.name || ""))
-  );
-  return candidates.find(voice => /google uk english male/i.test(voice.name || "")) ||
-    candidates.find(voice => /microsoft ryan/i.test(voice.name || "")) ||
-    candidates[0] || null;
-}
-
-function getVoicesWhenReady(synthesis) {
-  const initial = synthesis.getVoices?.() || [];
-  if (initial.length) return Promise.resolve(initial);
-  return new Promise(resolve => {
-    let timer;
-    const finish = () => {
-      clearTimeout(timer);
-      synthesis.removeEventListener?.("voiceschanged", finish);
-      resolve(synthesis.getVoices?.() || []);
-    };
-    synthesis.addEventListener?.("voiceschanged", finish, { once: true });
-    timer = setTimeout(finish, 1200);
-  });
+export function stopSpeechPlayback() {
+  if (activeController) activeController.abort();
+  activeController = null;
+  if (activeAudio) {
+    activeAudio.pause();
+    activeAudio.removeAttribute?.("src");
+    activeAudio.load?.();
+  }
+  activeAudio = null;
+  if (activeObjectUrl) URL.revokeObjectURL(activeObjectUrl);
+  activeObjectUrl = null;
+  const reject = activeReject;
+  activeReject = null;
+  reject?.(new Error("Speech playback interrupted."));
 }
 
 export async function speakText(text, environment = globalThis) {
-  const capabilities = getVoiceCapabilities(environment);
-  if (!capabilities.speechSynthesis) throw new Error("Spoken responses are not supported by this browser.");
+  if (typeof environment.fetch !== "function" || typeof environment.Audio !== "function") {
+    throw new Error("Cloud speech playback is not supported by this browser.");
+  }
   const phrase = cleanTextForSpeech(text);
   if (!phrase) return;
-  const voices = await getVoicesWhenReady(environment.speechSynthesis);
-  const maleVoice = selectBritishMaleVoice(voices);
-  if (!maleVoice) {
-    throw new Error("No British male voice is installed or exposed by this device. Enable a British English male voice in Android Text-to-Speech settings; ATLAS will not use a female fallback.");
+  stopSpeechPlayback();
+  const controller = new AbortController();
+  activeController = controller;
+  try {
+    const response = await environment.fetch("/api/tts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "audio/mpeg" },
+      body: JSON.stringify({ text: phrase }),
+      signal: controller.signal
+    });
+    if (!response.ok) {
+      const detail = await response.json().catch(() => ({}));
+      throw new Error(detail.error || "Cloud speech generation failed (" + response.status + ").");
+    }
+    const blob = await response.blob();
+    if (controller.signal.aborted) throw new Error("Speech playback interrupted.");
+    if (!blob.size) throw new Error("The speech service returned empty audio.");
+    const objectUrl = (environment.URL || URL).createObjectURL(blob);
+    activeObjectUrl = objectUrl;
+    const audio = new environment.Audio(objectUrl);
+    activeAudio = audio;
+    await new Promise((resolve, reject) => {
+      activeReject = reject;
+      const cleanup = () => {
+        if (activeAudio === audio) activeAudio = null;
+        if (activeController === controller) activeController = null;
+        if (activeObjectUrl === objectUrl) {
+          (environment.URL || URL).revokeObjectURL(objectUrl);
+          activeObjectUrl = null;
+        }
+        if (activeReject === reject) activeReject = null;
+      };
+      audio.onended = () => { cleanup(); resolve(); };
+      audio.onerror = () => { cleanup(); reject(new Error("Audio playback failed on this device.")); };
+      Promise.resolve(audio.play()).catch(error => {
+        cleanup();
+        reject(new Error(error?.message || "Audio playback was blocked by the browser."));
+      });
+    });
+  } catch (error) {
+    if (activeController === controller) activeController = null;
+    if (activeObjectUrl) {
+      (environment.URL || URL).revokeObjectURL(activeObjectUrl);
+      activeObjectUrl = null;
+    }
+    if (controller.signal.aborted) throw new Error("Speech playback interrupted.");
+    throw error;
   }
-  return new Promise((resolve, reject) => {
-    environment.speechSynthesis.cancel();
-    const utterance = new environment.SpeechSynthesisUtterance(phrase);
-    utterance.lang = "en-GB";
-    utterance.rate = 0.88;
-    utterance.pitch = 0.78;
-    utterance.voice = maleVoice;
-    utterance.onend = () => resolve();
-    utterance.onerror = event => reject(new Error(event.error || "Speech playback failed."));
-    environment.speechSynthesis.speak(utterance);
-  });
 }
