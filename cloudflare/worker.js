@@ -154,8 +154,8 @@ async function runModelWithDeadline(env, model, messages, timeoutMs, systemPromp
     return await Promise.race([
       env.AI.run(model, {
         messages: [{ role: "system", content: systemPrompt }, ...messages],
-        max_tokens: systemPrompt === COPILOT_SYSTEM_PROMPT ? 6000 : 3000,
-        temperature: systemPrompt === COPILOT_SYSTEM_PROMPT ? 0.2 : 0.55,
+        max_tokens: systemPrompt.startsWith(COPILOT_SYSTEM_PROMPT) ? 6000 : 3000,
+        temperature: systemPrompt.startsWith(COPILOT_SYSTEM_PROMPT) ? 0.2 : 0.55,
         // Keep the request to documented chat-completion parameters. Model-
         // specific reasoning flags are not portable across Workers AI models.
       }, { rejectIfBusy: true }),
