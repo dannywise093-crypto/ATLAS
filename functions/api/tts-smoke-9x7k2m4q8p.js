@@ -1,5 +1,6 @@
 import { proxyTts } from "./_gateway.js";
 
+// One-time preview-only integration check; remove after the workflow completes.
 export async function onRequestGet({ request, env }) {
   const synthetic = new Request(new URL("/api/tts", request.url), {
     method: "POST",
