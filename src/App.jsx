@@ -161,7 +161,7 @@ export default function App() {
       voiceRestartTimerRef.current=setTimeout(()=>voiceStartRef.current?.(),100);
       await speakText(text);
     }catch(error){
-      if(voiceModeRef.current)setVoiceStatus("Spoken response unavailable: "+error.message);
+      if(voiceModeRef.current&&!voiceAwaitingCommandRef.current)setVoiceStatus("Spoken response unavailable: "+error.message);
     }finally{
       voiceSpeakingRef.current=false;
     }
@@ -274,7 +274,11 @@ export default function App() {
               void sendMessage(command,{speak:true,voiceModeActive:true});
             }else if(interim.trim()){
               if(voiceSpeakingRef.current){
-                setVoiceTranscript("Listening for an interruption…");
+                voiceSpeakingRef.current=false;
+                voiceAwaitingCommandRef.current=true;
+                window.speechSynthesis?.cancel();
+                setVoiceTranscript(interim.trim());
+                setVoiceStatus("I have stopped speaking. Listening to you, sir…");
               }else if(voiceAwaitingCommandRef.current||/\batlas\b/i.test(interim)){
                 setVoiceTranscript(interim.trim());
                 setVoiceStatus("Listening for your instruction…");
