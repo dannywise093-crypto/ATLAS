@@ -53,6 +53,31 @@ export async function proxy(request, env, path, method) {
   }
 }
 
+
+export async function proxyVoiceToken(request, env) {
+  if (request.method !== "POST") return json({ error: "Method not allowed." }, 405);
+  if (!env.ATLAS_GATEWAY_TOKEN) return json({ error: "ATLAS Cloudflare gateway token is not configured in Pages Functions." }, 503);
+  const ip = request.headers.get("CF-Connecting-IP") || "unknown";
+  const now = Date.now();
+  const bucket = buckets.get("voice-token:" + ip);
+  if (!bucket || now - bucket.start >= WINDOW_MS) buckets.set("voice-token:" + ip, { start: now, count: 1 });
+  else if (bucket.count >= 10) return json({ error: "Too many voice session requests. Please wait before trying again." }, 429);
+  else bucket.count++;
+  try {
+    const upstream = await fetch(GATEWAY_URL + "/api/voice-token", {
+      method: "POST",
+      headers: { Accept: "application/json", Authorization: "Bearer " + env.ATLAS_GATEWAY_TOKEN }
+    });
+    const text = await upstream.text();
+    return new Response(text, {
+      status: upstream.status,
+      headers: { "Content-Type": upstream.headers.get("Content-Type") || "application/json", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" }
+    });
+  } catch {
+    return json({ error: "ATLAS voice gateway could not be reached. Please retry." }, 502);
+  }
+}
+
 export { json };
 
 export async function proxyTts(request, env) {
