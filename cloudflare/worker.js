@@ -258,7 +258,7 @@ export default {
             headers: {
               "Authorization": "Bearer " + env.ATLAS_VOICE_CLONE_TOKEN,
               "Content-Type": "application/json",
-              "Accept": "audio/mpeg"
+              "Accept": "audio/wav"
             },
             body: JSON.stringify({
               input: speechText,
