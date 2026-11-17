@@ -264,7 +264,7 @@ export default {
               input: speechText,
               voice: "file://atlas-reference",
               language_id: "en",
-              response_format: "mp3"
+              response_format: "wav"
             })
           });
           if (!upstream.ok) {
