@@ -303,7 +303,7 @@ export default function App() {
       if(liveVoiceSessionRef.current===session)liveVoiceSessionRef.current=null;
       if(voiceModeRef.current){setVoiceStatus("Live Voice unavailable: "+error.message);voiceModeRef.current=false;setVoiceMode(false);}
     }
-
+  }
 
   useEffect(()=>{
     if(page==="Voice Center")startVoiceMode();
