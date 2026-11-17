@@ -251,6 +251,7 @@ export default {
             inputAudioTranscription: {},
             outputAudioTranscription: {},
             speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Aoede" } } },
+            realtimeInputConfig: { automaticActivityDetection: { disabled: false } },
             systemInstruction: {
               parts: [{ text: "You are ATLAS, the voice assistant inside the ATLAS application. Speak naturally, clearly, and concisely. This token is restricted to the ATLAS Gemini Live voice model and audio conversation configuration." }]
             }
