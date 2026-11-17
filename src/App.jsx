@@ -281,8 +281,20 @@ export default function App() {
     setVoiceMode(true);
     setVoiceTranscript("");
     setVoiceStatus("Requesting microphone access…");
+
+    // Android's Web Speech service often closes a recognition session after
+    // one utterance, even with continuous=true. Re-open it with one restart
+    // owner and a bounded backoff instead of treating onend as a fatal stop.
+    let retryDelay=500;
+    const scheduleListen=(delay=retryDelay)=>{
+      if(!voiceModeRef.current||voicePendingRef.current||voiceSpeakingRef.current)return;
+      clearTimeout(voiceRestartTimerRef.current);
+      voiceRestartTimerRef.current=setTimeout(()=>{
+        if(voiceModeRef.current&&!voicePendingRef.current&&!voiceSpeakingRef.current&&!voiceRecognitionRef.current)listen();
+      },delay);
+    };
     const listen=()=>{
-      if(!voiceModeRef.current||voicePendingRef.current||voiceRecognitionRef.current)return;
+      if(!voiceModeRef.current||voicePendingRef.current||voiceSpeakingRef.current||voiceRecognitionRef.current)return;
       let recognition;
       try{
         recognition=createSpeechRecognition(window,{
@@ -292,10 +304,8 @@ export default function App() {
             for(let index=event.resultIndex;index<event.results.length;index++){
               const result=event.results[index];
               const transcript=result?.[0]?.transcript||"";
-              const normalizedTranscript=transcript.toLowerCase().replace(/[^a-z0-9\s]/g," ").replace(/\s+/g," ").trim();
+              const normalizedTranscript=transcript.toLowerCase().replace(/[^a-z0-9\\s]/g," ").replace(/\\s+/g," ").trim();
               const spokenReply=voiceReplyTextRef.current;
-              // Mobile recognition may hear ATLAS through the device speaker.
-              // Ignore replayed TTS text; a distinct user utterance can still interrupt.
               const isTtsEcho=Boolean(voiceSpeakingRef.current&&normalizedTranscript&&spokenReply&&(
                 normalizedTranscript===spokenReply ||
                 (normalizedTranscript.split(" ").length>=3&&spokenReply.includes(normalizedTranscript))
@@ -311,23 +321,16 @@ export default function App() {
                 voiceSpeakingRef.current=false;
                 stopSpeechPlayback();
               }
-              // Ordinary speech is accepted as an instruction; saying ATLAS is optional.
-              // If playback is active, cancel it and handle the new instruction immediately.
-              const command=phrase.trim();
-              if(!command)return;
-              voiceAwaitingCommandRef.current=false;
               voicePendingRef.current=true;
-              setVoiceTranscript(command);
+              setVoiceTranscript(phrase);
               setVoiceStatus(wasSpeaking?"Interrupted. I'll handle your new instruction…":"I heard you. Processing your instruction…");
               try{recognition.stop();}catch{}
-              void sendMessage(command,{speak:true,voiceModeActive:true});
+              void sendMessage(phrase,{speak:true,voiceModeActive:true});
             }else if(interim.trim()){
-              // Stop TTS on the first partial transcript, not after the user
-              // finishes speaking. Recognition stays open for the final command.
               if(voiceSpeakingRef.current){
                 voiceSpeakingRef.current=false;
                 stopSpeechPlayback();
-                setVoiceStatus("I’m listening, sir. Finish your instruction.");
+                setVoiceStatus("I’m listening. Finish your instruction.");
               }else{
                 setVoiceStatus("Listening for your instruction…");
               }
@@ -339,18 +342,25 @@ export default function App() {
             if(event.error==="not-allowed"||event.error==="service-not-allowed"){
               voiceModeRef.current=false;
               setVoiceMode(false);
-              setVoiceStatus("Microphone permission was denied. Allow microphone access in your browser settings.");
-            }else if(event.error!=="no-speech"&&event.error!=="aborted"){
-              setVoiceStatus("Speech recognition issue: "+event.error+". Retrying…");
+              clearTimeout(voiceRestartTimerRef.current);
+              setVoiceStatus("Microphone permission was denied. Allow microphone access in your browser settings, then reopen Voice Center.");
+              return;
+            }
+            if(event.error==="no-speech"||event.error==="aborted"){
+              setVoiceStatus("Microphone paused briefly. Reconnecting…");
+            }else if(event.error==="audio-capture"){
+              setVoiceStatus("Microphone unavailable. Checking the microphone connection…");
+              retryDelay=Math.min(Math.max(retryDelay*2,1000),8000);
+            }else{
+              setVoiceStatus("Voice connection interrupted ("+event.error+"). Reconnecting…");
+              retryDelay=Math.min(Math.max(retryDelay*2,1000),8000);
             }
           },
           onEnd:()=>{
             if(voiceRecognitionRef.current===recognition)voiceRecognitionRef.current=null;
-            // A single restart owner prevents recognition from reopening during TTS
-            // or racing the post-response restart timer.
-            if(voiceModeRef.current&&!voicePendingRef.current){
-              clearTimeout(voiceRestartTimerRef.current);
-              voiceRestartTimerRef.current=setTimeout(listen,500);
+            if(voiceModeRef.current&&!voicePendingRef.current&&!voiceSpeakingRef.current){
+              scheduleListen(retryDelay);
+              retryDelay=Math.min(Math.max(retryDelay*2,500),8000);
             }
           }
         });
@@ -358,9 +368,17 @@ export default function App() {
         recognition.start();
         setVoiceStatus("Listening. Speak naturally; no wake word is required.");
       }catch(error){
-        voiceModeRef.current=false;
-        setVoiceMode(false);
-        setVoiceStatus("Could not start microphone recognition: "+error.message);
+        if(voiceRecognitionRef.current===recognition)voiceRecognitionRef.current=null;
+        if(!voiceModeRef.current)return;
+        if(error?.name==="NotAllowedError"||error?.name==="SecurityError"){
+          voiceModeRef.current=false;
+          setVoiceMode(false);
+          setVoiceStatus("Microphone access was blocked. Allow microphone access for this site, then reopen Voice Center.");
+          return;
+        }
+        setVoiceStatus("Reconnecting to the microphone…");
+        scheduleListen(retryDelay);
+        retryDelay=Math.min(Math.max(retryDelay*2,1000),8000);
       }
     };
     voiceStartRef.current=listen;
