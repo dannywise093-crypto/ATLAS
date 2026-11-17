@@ -395,7 +395,7 @@ test("cloud TTS routes through the configured self-hosted reference voice and ke
         controller.enqueue(bytes);
         controller.close();
       }
-    }), { status: 200, headers: { "Content-Type": "audio/mpeg" } });
+    }), { status: 200, headers: { "Content-Type": "audio/wav" } });
   };
   try {
     const env = {
