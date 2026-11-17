@@ -4,6 +4,7 @@ import { getBluetoothDiscoveryStatus, discoverBluetoothDevice, scanNativeBluetoo
 import { Capacitor } from "@capacitor/core";
 import { getRoboticsTransportCatalog } from "./roboticsTransports.js";
 import { createSpeechRecognition, getVoiceCapabilities, speakText, stopSpeechPlayback } from "./voiceInterface.js";
+import { createGeminiLiveVoice } from "./geminiLiveVoice.js";
 import { Code2 } from "lucide-react";
 import { getNeuralRuntimeStatus, checkAtlasBackend, generateAtlasResponse, generateAtlasCopilotResponse, generateProviderResponse } from "./modelRuntime.js";
 import { Activity, Bot, BrainCircuit, Camera, Check, Database, Eye, GraduationCap, Home, Menu, MessageSquare, Mic, Plus, Radio, Send, Settings, ShieldCheck, Sparkles, Trash2, Volume2, X } from "lucide-react";
@@ -69,6 +70,7 @@ export default function App() {
   const voiceReplyTextRef = useRef("");
   const voiceAwaitingCommandRef = useRef(false);
   const voiceRecognitionRef = useRef(null);
+  const liveVoiceSessionRef = useRef(null);
   const voiceStartRef = useRef(null);
   const voiceRestartTimerRef = useRef(null);
   const [robotSimRunning,setRobotSimRunning] = useState(false);
@@ -266,25 +268,43 @@ export default function App() {
     clearTimeout(voiceRestartTimerRef.current);
     try{voiceRecognitionRef.current?.stop();}catch{}
     voiceRecognitionRef.current=null;
+    try{liveVoiceSessionRef.current?.stop();}catch{}
+    liveVoiceSessionRef.current=null;
     stopSpeechPlayback();
     setVoiceStatus("Voice assistant is idle.");
   }
-  function startVoiceMode(){
-    const capabilities=getVoiceCapabilities(window);
-    if(!capabilities.speechRecognition||!capabilities.speechSynthesis){
-      setVoiceStatus("This browser does not support speech recognition or cloud audio playback. Try an updated Chromium browser and allow microphone access.");
-      return;
-    }
+  async function startVoiceMode(){
     if(voiceModeRef.current)return;
     voiceModeRef.current=true;
     voicePendingRef.current=false;
     setVoiceMode(true);
     setVoiceTranscript("");
-    setVoiceStatus("Requesting microphone access…");
+    setVoiceStatus("Starting ATLAS Live Voice. Allow microphone access when prompted…");
+    const session=createGeminiLiveVoice({
+      onStatus:message=>{if(voiceModeRef.current)setVoiceStatus(message);},
+      onInputTranscript:text=>{if(voiceModeRef.current)setVoiceTranscript(text);},
+      onOutputTranscript:text=>{if(voiceModeRef.current){setVoiceTranscript(text);setVoiceStatus("ATLAS is responding…");}},
+      onTurnComplete:({userText,assistantText})=>{
+        if(!voiceModeRef.current)return;
+        const additions=[];
+        if(userText)additions.push({role:"user",text:userText});
+        if(assistantText)additions.push({role:"atlas",text:assistantText});
+        if(additions.length)updateConversationMessages(activeConversation?.id,items=>[...items,...additions]);
+        setVoiceTranscript("");
+      },
+      onError:error=>{if(voiceModeRef.current)setVoiceStatus("Live Voice disconnected: "+(error?.message||"connection lost")); }
+    });
+    liveVoiceSessionRef.current=session;
+    try{
+      await session.start();
+      if(!voiceModeRef.current)session.stop();
+    }catch(error){
+      session.stop();
+      if(liveVoiceSessionRef.current===session)liveVoiceSessionRef.current=null;
+      if(voiceModeRef.current)setVoiceStatus("Live Voice unavailable: "+error.message);
+    }
+    return;
 
-    // Android's Web Speech service often closes a recognition session after
-    // one utterance, even with continuous=true. Re-open it with one restart
-    // owner and a bounded backoff instead of treating onend as a fatal stop.
     let retryDelay=500;
     const scheduleListen=(delay=retryDelay)=>{
       if(!voiceModeRef.current||voicePendingRef.current||voiceSpeakingRef.current)return;
