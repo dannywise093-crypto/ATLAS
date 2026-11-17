@@ -247,13 +247,15 @@ export default {
         liveConnectConstraints: {
           model: "models/gemini-3.8-live",
           config: {
-            responseModalities: ["AUDIO"],
+            generationConfig: {
+              responseModalities: ["AUDIO"],
+              speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Aoede" } } }
+            },
             inputAudioTranscription: {},
             outputAudioTranscription: {},
-            speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Aoede" } } },
             realtimeInputConfig: { automaticActivityDetection: { disabled: false } },
             systemInstruction: {
-              parts: [{ text: "You are ATLAS, the voice assistant inside the ATLAS application. Speak naturally, clearly, and concisely. This token is restricted to the ATLAS Gemini Live voice model and audio conversation configuration." }]
+              parts: [{ text: "You are ATLAS, the voice assistant inside the ATLAS application. Speak naturally, clearly, and concisely. Respond to the user's spoken request directly. Do not claim to control devices or perform actions unless a connected tool confirms it. This Live Voice session is only for voice conversations; the user's normal ATLAS text chat and other app features remain separate." }]
             }
           }
         }
