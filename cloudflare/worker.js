@@ -234,6 +234,47 @@ export default {
       return json({ skillCount, specialistCount, maxSkillsPerRequest, skills: SKILL_CATALOG.map(({ id, name, description, tags, source }) => ({ id, name, description, tags, source })) });
     }
 
+    if (url.pathname === "/api/voice-token") {
+      if (request.method !== "POST") return json({ error: "Method not allowed." }, 405, { allow: "POST" });
+      if (!authorized(request, env)) return json({ error: "Unauthorized." }, 401);
+      if (rateLimited(request)) return json({ error: "Voice session limit reached. Please wait before trying again." }, 429, { "retry-after": "60" });
+      if (!env.GEMINI_API_KEY) return json({ error: "Gemini Live is not configured yet. Add GEMINI_API_KEY as a secret on the ATLAS Cloudflare Worker." }, 503);
+      const now = Date.now();
+      const tokenRequest = {
+        uses: 1,
+        expireTime: new Date(now + 30 * 60 * 1000).toISOString(),
+        newSessionExpireTime: new Date(now + 60 * 1000).toISOString(),
+        liveConnectConstraints: {
+          model: "models/gemini-3.8-live",
+          config: {
+            responseModalities: ["AUDIO"],
+            inputAudioTranscription: {},
+            outputAudioTranscription: {},
+            speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Aoede" } } },
+            systemInstruction: {
+              parts: [{ text: "You are ATLAS, the voice assistant inside the ATLAS application. Speak naturally, clearly, and concisely. This token is restricted to the ATLAS Gemini Live voice model and audio conversation configuration." }]
+            }
+          }
+        }
+      };
+      try {
+        const upstream = await fetch("https://generativelanguage.googleapis.com/v1alpha/auth_tokens", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
+          body: JSON.stringify(tokenRequest)
+        });
+        const tokenData = await upstream.json().catch(() => ({}));
+        if (!upstream.ok || !tokenData.name) {
+          console.error("Gemini Live token provisioning failed:", upstream.status, tokenData.error?.status || "");
+          return json({ error: "Gemini Live could not create a temporary voice token. Check the Worker secret and Gemini API access." }, 502);
+        }
+        return json({ token: tokenData.name, expiresAt: tokenData.expireTime || tokenRequest.expireTime, model: "gemini-3.8-live" });
+      } catch (error) {
+        console.error("Gemini Live token provisioning request failed:", error?.message || "unknown error");
+        return json({ error: "Gemini Live token service could not be reached." }, 502);
+      }
+    }
+
     if (url.pathname === "/api/tts") {
       if (request.method !== "POST") return json({ error: "Method not allowed." }, 405, { allow: "POST" });
       if (!authorized(request, env)) return json({ error: "Unauthorized." }, 401);
