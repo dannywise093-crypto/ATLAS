@@ -64,19 +64,21 @@ limits, and monitor compute usage.
 
 ## Hosting note
 
-Cloudflare Workers AI's current built-in `draco` speaker is not a custom voice
-clone. The Cloudflare Worker is only the authenticated routing layer; the
-reference-voice model must run on separate compute with enough memory and
-preferably a compatible GPU. A normal CPU-only web instance may be too slow for
-interactive speech.
+The selected engine for this zero-budget prototype is **Kyutai Pocket TTS**.
+It accepts a reference audio file, runs on CPU, and exposes a local HTTP server.
+The Python API loads a voice state from a local audio file and generates speech.
+The ATLAS wrapper in `voice-service/` exposes the authenticated endpoint used by
+the Cloudflare Worker. Pocket TTS generates WAV natively, so ATLAS returns WAV
+rather than adding an MP3 transcoding dependency.
 
-The Chatterbox model family is one possible reference-conditioned engine, but
-the upstream Resemble AI repository announced in August 2026 that it is archived
-and no longer maintained. Treat it as a frozen model, review the exact model
-weights' licence and the selected API wrapper's security posture, and test the
-chosen runtime before using it in production. This adapter deliberately targets
-an OpenAI-compatible API contract so the model server can be changed without
-rewriting the ATLAS interface.
+Official documentation:
+- https://github.com/kyutai-labs/pocket-tts
+- https://kyutai-labs.github.io/pocket-tts/CLI%20Commands/serve/
+- https://kyutai-labs.github.io/pocket-tts/API%20Reference/python-api/
+
+Pocket TTS can run on CPU, but actual speed and memory use depend on the host.
+That does not guarantee a free hosted instance has sufficient memory or stays
+awake. Test the service on the intended host before routing production traffic.
 
 ## Verification
 
