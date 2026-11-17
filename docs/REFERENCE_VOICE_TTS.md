@@ -15,7 +15,7 @@ The Pages Function continues to proxy requests to the authenticated ATLAS Worker
 1. `src/voiceInterface.js` posts `{ "text": "..." }` to the same-origin `/api/tts`.
 2. `functions/api/tts.js` forwards the request to the ATLAS Cloudflare Worker.
 3. If `ATLAS_VOICE_CLONE_URL` and `ATLAS_VOICE_CLONE_TOKEN` are configured on the
-   Worker, it calls the private self-hosted OpenAI-compatible TTS endpoint.
+   Worker, it calls the private self-hosted ATLAS Pocket TTS adapter endpoint.
 4. The Worker streams the returned audio to the existing browser player.
 5. If the clone URL is not configured, the existing Cloudflare built-in voice
    remains the temporary fallback. If a clone URL is configured without a token,
