@@ -212,6 +212,9 @@ export default {
         nvidiaModel: "meta/llama-3.3-70b-instruct",
         model: env.NVIDIA_API_KEY ? "meta/llama-3.3-70b-instruct" : MODELS[0].id,
         fallbackModels: MODELS.slice(1).map((model) => model.id),
+        voiceBackend: env.ATLAS_VOICE_CLONE_URL
+          ? (env.ATLAS_VOICE_CLONE_TOKEN ? "reference_clone_configured" : "reference_clone_missing_token")
+          : "cloudflare_builtin",
         skills: getSkillCatalogStats(),
       });
     }
@@ -241,6 +244,52 @@ export default {
       const speechText = typeof body?.text === "string" ? body.text.trim() : "";
       if (!speechText || speechText.length > 4000) return json({ error: "Provide speech text between 1 and 4,000 characters." }, 400);
       if (speechRateLimited(request, speechText.length)) return json({ error: "Speech usage limit reached. Please wait before trying again." }, 429, { "retry-after": "60" });
+
+      // When configured, route speech to the user's self-hosted reference-voice API.
+      // The voice sample itself is stored on that server; browser clients never receive its credentials.
+      if (env.ATLAS_VOICE_CLONE_URL) {
+        if (!env.ATLAS_VOICE_CLONE_TOKEN) {
+          return json({ error: "The self-hosted ATLAS voice service is missing its server token." }, 503);
+        }
+        try {
+          const voiceUrl = new URL("/v1/audio/speech", env.ATLAS_VOICE_CLONE_URL);
+          const upstream = await fetch(voiceUrl, {
+            method: "POST",
+            headers: {
+              "Authorization": "Bearer " + env.ATLAS_VOICE_CLONE_TOKEN,
+              "Content-Type": "application/json",
+              "Accept": "audio/wav"
+            },
+            body: JSON.stringify({
+              input: speechText,
+              voice: "file://atlas-reference",
+              language_id: "en",
+              response_format: "wav"
+            })
+          });
+          if (!upstream.ok) {
+            console.error("ATLAS reference-voice service returned status:", upstream.status);
+            return json({ error: "ATLAS's self-hosted voice service could not generate speech." }, 503, { "retry-after": "3" });
+          }
+          const contentType = upstream.headers.get("content-type") || "";
+          if (!contentType.toLowerCase().startsWith("audio/") || !upstream.body) {
+            return json({ error: "ATLAS's self-hosted voice service returned an invalid audio response." }, 502);
+          }
+          return new Response(upstream.body, {
+            headers: {
+              "Content-Type": contentType,
+              "Cache-Control": "no-store",
+              "X-Content-Type-Options": "nosniff",
+              "X-ATLAS-Voice": "reference-clone"
+            }
+          });
+        } catch (error) {
+          console.error("ATLAS reference-voice request failed:", error?.message || "unknown error");
+          return json({ error: "ATLAS's self-hosted voice service is unreachable." }, 503, { "retry-after": "3" });
+        }
+      }
+
+      // Keep the existing voice available until the self-hosted clone is configured.
       if (!env.AI) return json({ error: "Cloudflare Workers AI is not configured for speech." }, 503);
       try {
         const audio = await env.AI.run("@cf/deepgram/aura-2-en", {

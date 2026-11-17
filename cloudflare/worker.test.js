@@ -382,3 +382,58 @@ test("cloud TTS endpoint requires authorization and valid bounded text", async (
   }), env);
   assert.equal(tooLong.status, 400);
 });
+
+
+test("cloud TTS routes through the configured self-hosted reference voice and keeps credentials server-side", async () => {
+  const originalFetch = globalThis.fetch;
+  let upstreamCall;
+  const bytes = new Uint8Array([73, 68, 51, 7, 8, 9]);
+  globalThis.fetch = async (url, init) => {
+    upstreamCall = { url: String(url), init };
+    return new Response(new ReadableStream({
+      start(controller) {
+        controller.enqueue(bytes);
+        controller.close();
+      }
+    }), { status: 200, headers: { "Content-Type": "audio/wav" } });
+  };
+  try {
+    const env = {
+      ...envWith(async () => { throw new Error("Workers AI should not be used when clone backend is configured"); }),
+      ATLAS_VOICE_CLONE_URL: "https://voice.example.test",
+      ATLAS_VOICE_CLONE_TOKEN: "server-only-test-token"
+    };
+    const response = await worker.fetch(request("/api/tts", {
+      method: "POST",
+      body: { text: "Good evening, sir." }
+    }), env);
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get("content-type"), "audio/wav");
+    assert.equal(response.headers.get("x-atlas-voice"), "reference-clone");
+    assert.equal(upstreamCall.url, "https://voice.example.test/v1/audio/speech");
+    assert.equal(upstreamCall.init.headers.Authorization, "Bearer server-only-test-token");
+    assert.deepEqual(JSON.parse(upstreamCall.init.body), {
+      input: "Good evening, sir.",
+      voice: "file://atlas-reference",
+      language_id: "en",
+      response_format: "wav"
+    });
+    assert.deepEqual(new Uint8Array(await response.arrayBuffer()), bytes);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("cloud TTS does not silently use the default voice when clone backend token is missing", async () => {
+  let workersAiCalled = false;
+  const env = {
+    ...envWith(async () => { workersAiCalled = true; return new ReadableStream(); }),
+    ATLAS_VOICE_CLONE_URL: "https://voice.example.test"
+  };
+  const response = await worker.fetch(request("/api/tts", {
+    method: "POST",
+    body: { text: "Hello ATLAS." }
+  }), env);
+  assert.equal(response.status, 503);
+  assert.equal(workersAiCalled, false);
+});

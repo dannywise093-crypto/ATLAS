@@ -71,7 +71,7 @@ export async function speakText(text, environment = globalThis) {
   try {
     const response = await environment.fetch("/api/tts", {
       method: "POST",
-      headers: { "Content-Type": "application/json", Accept: "audio/mpeg" },
+      headers: { "Content-Type": "application/json", Accept: "audio/wav, audio/mpeg" },
       body: JSON.stringify({ text: phrase }),
       signal: controller.signal
     });
