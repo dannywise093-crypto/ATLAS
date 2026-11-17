@@ -177,24 +177,52 @@ function extractAnswer(result) {
   return "";
 }
 
+function classifyAIError(error) {
+  const message = String(error?.message || error || "").slice(0, 300);
+  const code = String(error?.code || error?.cause?.code || (message.match(/\\b(?:30\\d{2}|50\\d{2})\\b/) || [])[0] || "");
+  const detail = (code + " " + message).toLowerCase();
+  if (/3036|daily free allocation|account limited/.test(detail)) return { status: "account_limited", code };
+  if (/3040|out of capacity|capacity temporarily exceeded|capacity unavailable/.test(detail)) return { status: "capacity_unavailable", code };
+  if (/5028|model deprecated/.test(detail)) return { status: "model_deprecated", code };
+  if (/3042|5007|invalid model|no such model/.test(detail)) return { status: "model_unavailable", code };
+  if (/429|rate.?limit/.test(detail)) return { status: "rate_limited", code };
+  if (/deadline exceeded|timed? ?out/.test(detail)) return { status: "timeout", code };
+  return { status: "inference_error", code };
+}
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 async function runModelWithDeadline(env, model, messages, timeoutMs, systemPrompt = SYSTEM_PROMPT) {
   let timer;
   const timeout = new Promise((_, reject) => {
     timer = setTimeout(() => reject(new Error("Model response deadline exceeded.")), timeoutMs);
   });
   try {
+    // Do not set rejectIfBusy:true: it converts temporary model congestion
+    // into immediate failures instead of allowing Cloudflare to queue work.
     return await Promise.race([
       env.AI.run(model, {
         messages: [{ role: "system", content: systemPrompt }, ...messages],
         max_tokens: systemPrompt.startsWith(COPILOT_SYSTEM_PROMPT) ? 6000 : 3000,
         temperature: systemPrompt.startsWith(COPILOT_SYSTEM_PROMPT) ? 0.2 : 0.55,
-        // Keep the request to documented chat-completion parameters. Model-
-        // specific reasoning flags are not portable across Workers AI models.
-      }, { rejectIfBusy: true }),
+      }),
       timeout,
     ]);
   } finally {
     clearTimeout(timer);
+  }
+}
+
+async function runModelWithCapacityRetry(env, model, messages, timeoutMs, systemPrompt) {
+  try {
+    return await runModelWithDeadline(env, model, messages, timeoutMs, systemPrompt);
+  } catch (error) {
+    const details = classifyAIError(error);
+    // Retry only transient capacity pressure. Account quota and invalid model
+    // errors will not improve by repeating the same request.
+    if (details.status !== "capacity_unavailable") throw error;
+    await sleep(500);
+    return runModelWithDeadline(env, model, messages, timeoutMs, systemPrompt);
   }
 }
 
@@ -470,7 +498,7 @@ export default {
     for (const model of MODELS) {
       const startedAt = Date.now();
       try {
-        const result = await runModelWithDeadline(env, model.id, modelMessages, model.timeoutMs, systemPrompt);
+        const result = await runModelWithCapacityRetry(env, model.id, modelMessages, model.timeoutMs, systemPrompt);
         const durationMs = Date.now() - startedAt;
         if (isTruncated(result)) {
           failures.push({ model: model.id, status: "truncated", durationMs });
@@ -498,9 +526,11 @@ export default {
         console.warn("ATLAS model returned an empty response", model.id, durationMs);
       } catch (error) {
         const durationMs = Date.now() - startedAt;
-        const timedOut = /deadline exceeded/i.test(error?.message || "");
-        failures.push({ model: model.id, status: timedOut ? "timeout" : "inference_error", durationMs });
-        console.warn("ATLAS model attempt failed", model.id, timedOut ? "timeout" : "inference_error", durationMs);
+        const details = classifyAIError(error);
+        failures.push({ model: model.id, status: details.status, ...(details.code ? { code: details.code } : {}), durationMs });
+        // Keep provider error text out of client responses, but retain a short
+        // server-side diagnostic so quota, capacity, and model errors differ.
+        console.warn("ATLAS model attempt failed", model.id, details.status, details.code || "no-code", String(error?.message || "").slice(0, 180), durationMs);
       }
     }
     console.error("All ATLAS model attempts failed", JSON.stringify(failures));
