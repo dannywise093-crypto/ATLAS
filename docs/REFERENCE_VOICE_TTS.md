@@ -43,12 +43,13 @@ Request body:
   "input": "Text ATLAS should speak",
   "voice": "file://atlas-reference",
   "language_id": "en",
-  "response_format": "mp3"
+  "response_format": "wav"
 }
 ```
 
-It must return an audio response with an `audio/*` content type. The Worker
-keeps the service token server-side and never returns it to the browser.
+It must return a WAV response with an `audio/wav` content type. The service currently
+supports WAV only; it rejects MP3 requests rather than returning WAV under an MP3
+contract. The Worker keeps the service token server-side and never returns it to the browser.
 
 ## Reference audio preparation
 
@@ -69,7 +70,8 @@ It accepts a reference audio file, runs on CPU, and exposes a local HTTP server.
 The Python API loads a voice state from a local audio file and generates speech.
 The ATLAS wrapper in `voice-service/` exposes the authenticated endpoint used by
 the Cloudflare Worker. Pocket TTS generates WAV natively, so ATLAS returns WAV
-rather than adding an MP3 transcoding dependency.
+rather than adding an MP3 transcoding dependency. Its model inference method is not
+thread-safe, so the service serializes generation requests around its single in-memory model.
 
 Official documentation:
 - https://github.com/kyutai-labs/pocket-tts
