@@ -77,7 +77,7 @@ export async function proxyTts(request, env) {
     const upstream = await fetch(gatewayUrl + "/api/tts", {
       method: "POST",
       headers: {
-        Accept: "audio/mpeg, application/json",
+        Accept: "audio/wav, audio/mpeg, application/json",
         Authorization: "Bearer " + gatewayToken,
         "Content-Type": "application/json"
       },
