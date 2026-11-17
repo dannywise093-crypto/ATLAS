@@ -408,7 +408,7 @@ test("cloud TTS routes through the configured self-hosted reference voice and ke
       body: { text: "Good evening, sir." }
     }), env);
     assert.equal(response.status, 200);
-    assert.equal(response.headers.get("content-type"), "audio/mpeg");
+    assert.equal(response.headers.get("content-type"), "audio/wav");
     assert.equal(response.headers.get("x-atlas-voice"), "reference-clone");
     assert.equal(upstreamCall.url, "https://voice.example.test/v1/audio/speech");
     assert.equal(upstreamCall.init.headers.Authorization, "Bearer server-only-test-token");
@@ -416,7 +416,7 @@ test("cloud TTS routes through the configured self-hosted reference voice and ke
       input: "Good evening, sir.",
       voice: "file://atlas-reference",
       language_id: "en",
-      response_format: "mp3"
+      response_format: "wav"
     });
     assert.deepEqual(new Uint8Array(await response.arrayBuffer()), bytes);
   } finally {
