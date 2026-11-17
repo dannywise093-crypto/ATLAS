@@ -207,3 +207,37 @@ body{background:radial-gradient(ellipse at 82% 0%,rgba(38,103,207,.17),transpare
 .voice-center-page>.grid .panel{min-height:120px}
 .voice-center-page>.notice{font-size:10px;line-height:1.6;color:#91a4bd}
 @media(max-width:700px){.voice-console{grid-template-columns:1fr;justify-items:center;padding:18px;text-align:center}.voice-console-copy{width:100%}.voice-console-actions{width:100%;min-width:0}.voice-transcript{text-align:left}.voice-console-copy h3{font-size:18px}}
+
+/* Video-matched ATLAS voice selection screen */
+.voice-session-active{min-height:100dvh;background:#171717;color:#f4f4f4}
+.voice-session-active .sidebar,.voice-session-active .top{display:none!important}
+.voice-session-active main{margin:0;min-height:100dvh}
+.voice-session-active .content{width:100%;max-width:none;height:100dvh;min-height:100dvh;margin:0;padding:0;overflow:hidden}
+.voice-session-screen{position:relative;width:100%;height:100dvh;min-height:100svh;overflow:hidden;background:#171717;color:#f5f5f5}
+.voice-top-notch{position:absolute;top:max(7px,env(safe-area-inset-top));left:50%;width:38px;height:4px;transform:translateX(-50%);border-radius:8px;background:#555;opacity:.72}
+.voice-selection-header{position:absolute;top:calc(max(34px,env(safe-area-inset-top) + 24px));left:0;right:0;height:42px;display:flex;align-items:center;justify-content:center;padding:0 24px}
+.voice-selection-header h1{margin:0;color:#f3f3f3;font:500 21px/1.2 Inter,'DM Sans',sans-serif;letter-spacing:-.55px}
+.voice-confirm{position:absolute;right:clamp(22px,6vw,34px);top:50%;width:36px;height:36px;transform:translateY(-50%);display:grid;place-items:center;padding:0;border:0;background:transparent;color:#f2f2f2;opacity:.95}
+.voice-confirm:active{transform:translateY(-50%) scale(.92)}
+.voice-orb-stage{position:absolute;left:50%;top:47%;width:min(42vw,180px);height:min(42vw,180px);min-width:150px;min-height:150px;transform:translate(-50%,-50%);filter:drop-shadow(0 0 18px rgba(105,103,164,.08));}
+.cosmic-orb{position:relative;width:100%;height:100%;overflow:hidden;border-radius:50%;isolation:isolate;border:1px solid rgba(198,190,218,.42);background:radial-gradient(ellipse at 50% 48%,#17151f 0%,#0d0c12 56%,#08090e 76%,#17151c 100%);box-shadow:inset 0 0 13px rgba(255,255,255,.12),inset -9px -7px 20px rgba(0,0,0,.88),inset 5px 4px 13px rgba(210,203,239,.13),0 0 3px rgba(235,225,255,.2);animation:orb-drift 7s ease-in-out infinite}
+.cosmic-orb:before{content:"";position:absolute;inset:-8%;z-index:1;border-radius:50%;background:radial-gradient(ellipse at 81% 18%,rgba(186,135,255,.4),transparent 17%),radial-gradient(ellipse at 14% 43%,rgba(54,193,255,.22),transparent 13%),radial-gradient(ellipse at 73% 76%,rgba(248,88,176,.17),transparent 20%),radial-gradient(ellipse at 24% 84%,rgba(47,109,255,.23),transparent 17%);filter:blur(7px);animation:orb-colour-flow 9s ease-in-out infinite alternate}
+.orb-nebula{position:absolute;inset:12%;z-index:0;border-radius:50%;background:radial-gradient(ellipse at 52% 46%,rgba(98,69,120,.2),transparent 35%),radial-gradient(ellipse at 36% 70%,rgba(27,47,86,.17),transparent 32%);filter:blur(11px)}
+.orb-light-ribbons{position:absolute;z-index:2;inset:-18%;border-radius:50%;background:conic-gradient(from 210deg at 76% 28%,transparent 0deg,transparent 108deg,rgba(111,211,255,.06) 132deg,rgba(185,123,255,.75) 144deg,rgba(247,236,255,.88) 148deg,rgba(105,150,255,.3) 153deg,transparent 166deg,transparent 360deg);filter:blur(4px);mix-blend-mode:screen;animation:orb-ribbon-turn 13s linear infinite}
+.orb-starfield{position:absolute;z-index:3;inset:0;border-radius:50%;overflow:hidden}
+.orb-starfield i{position:absolute;left:var(--x);top:var(--y);width:var(--size);height:var(--size);border-radius:50%;background:#f4f2ff;box-shadow:0 0 4px rgba(235,231,255,.95),0 0 8px rgba(151,176,255,.45);opacity:.5;animation:orb-star-twinkle var(--twinkle) ease-in-out var(--delay) infinite alternate}
+.orb-starfield i:nth-child(7n){background:#7ddcff;box-shadow:0 0 5px #60d9ff,0 0 9px #60d9ff66}
+.orb-starfield i:nth-child(11n){background:#d8a5ff;box-shadow:0 0 5px #c18bff,0 0 9px #c18bff66}
+.orb-glass-shine{position:absolute;z-index:4;inset:0;border-radius:50%;background:radial-gradient(ellipse at 27% 13%,rgba(255,255,255,.2),transparent 18%),radial-gradient(ellipse at 82% 24%,rgba(255,255,255,.13),transparent 9%),linear-gradient(115deg,transparent 38%,rgba(255,255,255,.035) 48%,transparent 58%);box-shadow:inset 0 0 0 1px rgba(255,255,255,.08),inset -8px -8px 18px rgba(0,0,0,.5);pointer-events:none}
+.voice-orb-stage.is-listening .cosmic-orb{animation:orb-drift 7s ease-in-out infinite,orb-listening 2.4s ease-in-out infinite}
+.voice-orb-stage.is-speaking .orb-light-ribbons{filter:blur(2px);opacity:1;animation-duration:3.5s}
+.voice-orb-stage.is-thinking .orb-nebula{filter:blur(15px);animation:orb-think 1.8s ease-in-out infinite alternate}
+.voice-session-accessible-status{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+@keyframes orb-drift{0%,100%{transform:translateY(0) rotate(-2deg)}50%{transform:translateY(-3px) rotate(2deg)}}
+@keyframes orb-colour-flow{0%{transform:rotate(-12deg) scale(.95)}100%{transform:rotate(18deg) scale(1.08)}}
+@keyframes orb-ribbon-turn{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
+@keyframes orb-star-twinkle{0%{opacity:.18;transform:scale(.7)}100%{opacity:.95;transform:scale(1.25)}}
+@keyframes orb-listening{0%,100%{box-shadow:inset 0 0 13px rgba(255,255,255,.12),inset -9px -7px 20px rgba(0,0,0,.88),inset 5px 4px 13px rgba(210,203,239,.13),0 0 12px rgba(111,170,255,.1)}50%{box-shadow:inset 0 0 18px rgba(255,255,255,.18),inset -9px -7px 20px rgba(0,0,0,.88),inset 5px 4px 13px rgba(210,203,239,.13),0 0 30px rgba(141,118,255,.24)}}
+@keyframes orb-think{from{transform:scale(.9);opacity:.65}to{transform:scale(1.12);opacity:1}}
+@media(max-width:700px){.voice-selection-header h1{font-size:20px}.voice-orb-stage{top:47%;width:42vw;height:42vw;min-width:150px;min-height:150px;max-width:180px;max-height:180px}}
+@media(prefers-reduced-motion:reduce){.cosmic-orb,.cosmic-orb:before,.orb-light-ribbons,.orb-starfield i,.voice-orb-stage.is-listening .cosmic-orb{animation:none!important}}
