@@ -56,7 +56,7 @@ test("chat uses the primary model and enables capacity-aware rejection", async (
   assert.match(calledWith.input.messages[0].content, /keep all routing and catalogue metadata internal/);
   assert.match(calledWith.input.messages[0].content, /Use relevant skill guidance silently/);
   assert.equal(calledWith.input.messages.at(-1).role, "user");
-  assert.deepEqual(calledWith.options, { rejectIfBusy: true });
+  assert.equal(calledWith.options, undefined);
   assert.equal(calledWith.input.max_tokens, 3000);
   assert.equal("reasoning_effort" in calledWith.input, false);
   assert.equal("chat_template_kwargs" in calledWith.input, false);
@@ -115,6 +115,20 @@ test("ordinary text chat does not activate the voice persona", async () => {
   const response = await worker.fetch(request("/api/chat", { method: "POST", body: validBody }), env);
   assert.equal(response.status, 200);
   assert.doesNotMatch(systemPrompt, /J\.A\.R\.V\.I\.S\.-inspired butler manner/);
+});
+
+test("chat allows Cloudflare to queue busy inference instead of rejecting immediately", async () => {
+  let callCount = 0;
+  const env = envWith(async () => {
+    callCount += 1;
+    if (callCount === 1) throw new Error("3040 Capacity temporarily exceeded");
+    return { choices: [{ message: { content: "Recovered after brief capacity pressure" } }] };
+  });
+  const response = await worker.fetch(request("/api/chat", { method: "POST", body: validBody }), env);
+  const body = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(body.answer, "Recovered after brief capacity pressure");
+  assert.equal(callCount, 2);
 });
 
 test("chat falls back when the primary model is unavailable", async () => {
