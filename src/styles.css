@@ -252,3 +252,13 @@ body{background:radial-gradient(ellipse at 82% 0%,rgba(38,103,207,.17),transpare
 .voice-stop-button{background:linear-gradient(135deg,#754c70,#914b59);border-color:rgba(255,170,190,.55)}
 .voice-privacy-note{max-width:320px;margin:0;color:#aaa6b7;font:400 12px/1.5 Inter,'DM Sans',sans-serif}
 @media(max-height:620px){.voice-orb-stage{top:37%;width:130px;height:130px;min-width:130px;min-height:130px}.voice-controls{top:calc(37% + 100px);gap:9px}.voice-action-button{min-height:46px}}
+
+
+/* ATLAS Google account control */
+.atlas-auth-control{display:flex;align-items:center;justify-content:flex-end;gap:10px;min-width:0}
+.atlas-google-button{min-height:40px;display:flex;align-items:center}
+.atlas-auth-status{font-size:9px;color:#8397b5;white-space:nowrap}
+.atlas-auth-user{max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#c8d9f3;font-size:10px}
+.atlas-auth-button{border:1px solid #3b5f88;border-radius:20px;padding:8px 12px;background:#14243a;color:#dbeaff;font-size:10px;font-weight:700}
+.atlas-auth-button:disabled{opacity:.55}
+@media(max-width:700px){.atlas-auth-control{gap:5px}.atlas-auth-user{max-width:105px}.atlas-auth-status{display:none}.atlas-google-button iframe{max-width:190px}}
