@@ -78,11 +78,14 @@ export function createCloudflareVoice(handlers = {}, environment = globalThis) {
     if (!recorder || recorder.state === "inactive") return;
     const current = recorder;
     recorder = null;
+    transcribing = true;
     current.onstop = () => {
       const blob = new environment.Blob(chunks, { type: current.mimeType || "audio/webm" });
       chunks = [];
       if (!closed && !paused && Date.now() - segmentStartedAt >= MIN_SEGMENT_MS) {
         void transcribe(blob);
+      } else {
+        transcribing = false;
       }
     };
     current.stop();
