@@ -121,6 +121,9 @@ deep_researcher_data_science = "deep_researcher_agent.agents.data_science.regist
 deep_researcher_data_source_registry = "deep_researcher_agent.common.data_source_registry"
 deep_researcher_guardrails = "deep_researcher_agent.guardrails.register"
 
+[project.entry-points."deep_researcher_api.validators"]
+atlas_gateway = "deep_researcher_agent.auth.atlas_validator:get_validators"
+
 [tool.pytest.ini_options]
 testpaths = ["tests", "sources/**/tests"]
 addopts = "--import-mode=importlib"
