@@ -232,6 +232,9 @@ export default {
     const url = new URL(request.url);
     if (url.pathname.startsWith("/api/auth/")) {
       if (!authorized(request, env)) return json({ error: "Unauthorized." }, 401);
+      if (url.pathname === "/api/auth/google" && rateLimited(request)) {
+        return json({ error: "Too many sign-in attempts. Please wait and try again." }, 429, { "retry-after": "60" });
+      }
       const authResponse = await handleAuthRequest(request, env);
       if (authResponse) return authResponse;
     }
