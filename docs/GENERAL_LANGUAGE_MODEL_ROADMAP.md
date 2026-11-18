@@ -23,7 +23,8 @@ This does not mean ATLAS trains or owns the foundation model weights.
 The Worker URL is `https://atlas-model-gateway.dannywise093.workers.dev`.
 The Cloudflare Pages project receives `ATLAS_GATEWAY_TOKEN` as a server-side
 Pages environment variable for Production and Preview; the Worker has the matching
-`ATLAS_GATEWAY_TOKEN` secret. The frontend and API routes run on Cloudflare.
+`ATLAS_GATEWAY_TOKEN` secret. The frontend, API routes, and AI gateway run on
+Cloudflare. Vercel is not part of the deployment.
 
 Cloudflare Workers AI currently includes 10,000 free Neurons per account per day.
 The quota is shared across Workers AI usage and resets at 00:00 UTC. Usage beyond
