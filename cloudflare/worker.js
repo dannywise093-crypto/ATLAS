@@ -294,15 +294,56 @@ export default {
           headers: { "Content-Type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
           body: JSON.stringify(tokenRequest)
         });
-        const tokenData = await upstream.json().catch(() => ({}));
+        const responseText = await upstream.text();
+        let tokenData = {};
+        try {
+          tokenData = responseText ? JSON.parse(responseText) : {};
+        } catch {
+          tokenData = {};
+        }
         if (!upstream.ok || !tokenData.name) {
-          console.error("Gemini Live token provisioning failed:", upstream.status, tokenData.error?.status || "");
-          return json({ error: "Gemini Live could not create a temporary voice token. Check the Worker secret and Gemini API access." }, 502);
+          const googleError = tokenData?.error || {};
+          const googleStatus = typeof googleError.status === "string" ? googleError.status : "UNKNOWN";
+          const googleCode = Number.isInteger(googleError.code) ? googleError.code : upstream.status;
+          // Keep diagnostics useful without returning credentials, request headers,
+          // token material, or the raw upstream response to the browser.
+          const rawMessage = typeof googleError.message === "string" ? googleError.message : "";
+          const safeMessage = rawMessage
+            .replace(/AIza[0-9A-Za-z_-]{20,}/g, "[REDACTED]")
+            .replace(/(key|token|authorization)\s*[:=]\s*[^\s,;]+/ig, "$1=[REDACTED]")
+            .replace(/https?:\/\/[^\s"']+/g, "[UPSTREAM_URL]")
+            .slice(0, 240);
+          const diagnostic = {
+            stage: "temporary_token_creation",
+            upstream: "Google Gemini API",
+            httpStatus: upstream.status,
+            googleStatus,
+            googleCode,
+            message: safeMessage || "Google returned no token and no readable error message.",
+            requestId: request.headers.get("cf-ray") || null
+          };
+          console.error("ATLAS Gemini Live token provisioning failed", JSON.stringify(diagnostic));
+          return json({
+            error: "Gemini Live could not create a temporary voice token.",
+            diagnostic
+          }, 502);
         }
         return json({ token: tokenData.name, expiresAt: tokenData.expireTime || tokenRequest.expireTime, model: "gemini-3.8-live" });
       } catch (error) {
-        console.error("Gemini Live token provisioning request failed:", error?.message || "unknown error");
-        return json({ error: "Gemini Live token service could not be reached." }, 502);
+        const diagnostic = {
+          stage: "temporary_token_request",
+          upstream: "Google Gemini API",
+          errorType: error?.name || "Error",
+          message: String(error?.message || "Unknown network error")
+            .replace(/AIza[0-9A-Za-z_-]{20,}/g, "[REDACTED]")
+            .slice(0, 200),
+          requestId: request.headers.get("cf-ray") || null
+        };
+        console.error("ATLAS Gemini Live token request failed", JSON.stringify(diagnostic));
+        return json({
+          error: "Gemini Live token service could not be reached.",
+          diagnostic
+        }, 502);
       }
     }
 
