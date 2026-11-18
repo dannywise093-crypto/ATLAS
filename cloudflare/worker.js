@@ -177,8 +177,8 @@ export default {
         status: env.AI ? "configured" : "not_configured",
         provider: env.NVIDIA_API_KEY ? "NVIDIA API Catalog (primary), Cloudflare Workers AI (fallback)" : "Cloudflare Workers AI",
         nvidiaConfigured: Boolean(env.NVIDIA_API_KEY),
-        nvidiaModel: "meta/llama-3.3-70b-instruct",
-        model: env.NVIDIA_API_KEY ? "meta/llama-3.3-70b-instruct" : MODELS[0].id,
+        nvidiaModel: "nvidia/nemotron-3-ultra-550b-a55b",
+        model: env.NVIDIA_API_KEY ? "nvidia/nemotron-3-ultra-550b-a55b" : MODELS[0].id,
         fallbackModels: MODELS.slice(1).map((model) => model.id),
         skills: getSkillCatalogStats(),
       });
@@ -188,7 +188,7 @@ export default {
       if (!authorized(request, env)) return json({ error: "Unauthorized." }, 401);
       return json({ defaultProvider: env.NVIDIA_API_KEY ? "nvidia" : "atlas", providers: {
         atlas: { configured: Boolean(env.AI), label: "Cloudflare Workers AI", role: env.NVIDIA_API_KEY ? "fallback" : "primary" },
-        nvidia: { configured: Boolean(env.NVIDIA_API_KEY), label: "NVIDIA API Catalog", model: "meta/llama-3.3-70b-instruct", role: env.NVIDIA_API_KEY ? "primary" : "not_configured" }
+        nvidia: { configured: Boolean(env.NVIDIA_API_KEY), label: "NVIDIA API Catalog", model: "nvidia/nemotron-3-ultra-550b-a55b", role: env.NVIDIA_API_KEY ? "primary" : "not_configured" }
       }, skills: getSkillCatalogStats() });
     }
     if (url.pathname === "/api/skills") {
@@ -275,7 +275,7 @@ export default {
           method: "POST",
           headers: { Authorization: "Bearer " + env.NVIDIA_API_KEY, "Content-Type": "application/json", Accept: "application/json" },
           body: JSON.stringify({
-            model: "meta/llama-3.3-70b-instruct",
+            model: "nvidia/nemotron-3-ultra-550b-a55b",
             messages: [{ role: "system", content: systemPrompt }, ...modelMessages],
             temperature: isCopilot ? 0.2 : 0.4,
             max_tokens: isCopilot ? 6000 : 4096,
@@ -292,7 +292,7 @@ export default {
               : research.status === "unavailable" || research.status === "no_results"
                 ? "\n\nLive web research could not provide usable sources for this request. Current facts have not been independently verified."
                 : "";
-            return json({ answer: answer.trim() + sourceFooter, provider: "NVIDIA API Catalog", model: "meta/llama-3.3-70b-instruct", fallbackUsed: false, research, skills: { selected: routedSkills.skills.map(({ id, name }) => ({ id, name })), specialists: routedSkills.specialists, ...skillInventory } });
+            return json({ answer: answer.trim() + sourceFooter, provider: "NVIDIA API Catalog", model: "nvidia/nemotron-3-ultra-550b-a55b", fallbackUsed: false, research, skills: { selected: routedSkills.skills.map(({ id, name }) => ({ id, name })), specialists: routedSkills.specialists, ...skillInventory } });
           }
           failures.push({ provider: "nvidia", status: "empty_response", durationMs: Date.now() - startedAt });
         } else {

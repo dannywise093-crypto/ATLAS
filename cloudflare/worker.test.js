@@ -50,9 +50,9 @@ test("chat uses the primary model and enables capacity-aware rejection", async (
   assert.equal(body.answer, "ATLAS test response");
   assert.equal(body.model, "@cf/meta/llama-3.3-70b-instruct-fp8-fast");
   assert.equal(body.fallbackUsed, false);
-  assert.equal(body.skills.skillCount, 451);
+  assert.equal(body.skills.skillCount, 468);
   assert.equal(body.skills.maxSkillsPerRequest, 4);
-  assert.match(calledWith.input.messages[0].content, /451 installed skill records/);
+  assert.match(calledWith.input.messages[0].content, /468 installed skill records/);
   assert.equal(calledWith.input.messages.at(-1).role, "user");
   assert.deepEqual(calledWith.options, { rejectIfBusy: true });
   assert.equal(calledWith.input.max_tokens, 3000);
@@ -272,10 +272,10 @@ test("skill inventory questions return exact bundled catalogue counts without mo
   const body = await response.json();
   assert.equal(response.status, 200);
   assert.equal(modelCalled, false);
-  assert.match(body.answer, /451 installed skill records/);
+  assert.match(body.answer, /468 installed skill records/);
   assert.match(body.answer, /up to 4 relevant skills/);
   assert.match(body.answer, /6 built-in specialist categories/);
-  assert.equal(body.skills.skillCount, 451);
+  assert.equal(body.skills.skillCount, 468);
   assert.equal(body.skills.maxSkillsPerRequest, 4);
   assert.equal(body.skills.specialistCount, 6);
 });
