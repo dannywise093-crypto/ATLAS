@@ -1,14 +1,20 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { createHmac } from "node:crypto";
 import worker from "./worker.js";
 
 const token = "test-only-atlas-token";
-function request(path, { method = "GET", body, auth = true } = {}) {
+const sessionSecret = "test-only-session-secret-with-sufficient-entropy";
+const sessionPayload = Buffer.from(JSON.stringify({ sub: "test-google-sub", email: "test@example.com", name: "ATLAS Test", exp: Math.floor(Date.now() / 1000) + 3600 })).toString("base64url");
+const sessionSignature = createHmac("sha256", sessionSecret).update(sessionPayload).digest("base64url");
+const sessionCookie = "atlas_session=" + sessionPayload + "." + sessionSignature;
+function request(path, { method = "GET", body, auth = true, session = true } = {}) {
   return new Request(`https://atlas.test${path}`, {
     method,
     headers: {
       ...(body === undefined ? {} : { "content-type": "application/json" }),
       ...(auth ? { authorization: `Bearer ${token}` } : {}),
+      ...(session ? { cookie: sessionCookie } : {}),
     },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
@@ -16,6 +22,7 @@ function request(path, { method = "GET", body, auth = true } = {}) {
 function envWith(run) {
   return {
     ATLAS_GATEWAY_TOKEN: token,
+    ATLAS_SESSION_SECRET: sessionSecret,
     AI: { run },
   };
 }
@@ -24,6 +31,12 @@ const validBody = { messages: [{ role: "user", content: "Hello ATLAS" }] };
 test("health endpoint requires the gateway token", async () => {
   const response = await worker.fetch(request("/api/health", { auth: false }), envWith(async () => ({})));
   assert.equal(response.status, 401);
+});
+
+test("application APIs reject requests without a signed-in user session", async () => {
+  const response = await worker.fetch(request("/api/chat", { method: "POST", body: validBody, session: false }), envWith(async () => ({})));
+  assert.equal(response.status, 401);
+  assert.equal((await response.json()).error, "Sign-in required.");
 });
 
 test("health endpoint advertises the primary and backup models", async () => {
