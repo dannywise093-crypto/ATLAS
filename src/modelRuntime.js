@@ -6,7 +6,7 @@ const API_BASE = String(import.meta.env.VITE_ATLAS_API_URL || "").replace(/\/$/,
 export function getNeuralRuntimeStatus() {
   return {
     id: "atlas-cloudflare-workers-ai",
-    label: "Cloudflare Workers AI · GLM-4.7-Flash",
+    label: "ATLAS hosted inference · NVIDIA + Cloudflare Workers AI",
     available: false,
     reason: "Checking the secured ATLAS inference gateway.",
   };
@@ -40,21 +40,12 @@ export async function checkAtlasBackend(signal) {
   return requestJson("/api/health", { signal });
 }
 
-function appendSkillUsageNotice(answer, payload) {
-  const selected = Array.isArray(payload.skills?.selected) ? payload.skills.selected : [];
-  const inventory = Number.isInteger(payload.skills?.skillCount) ? payload.skills.skillCount : null;
-  const limit = Number.isInteger(payload.skills?.maxSkillsPerRequest) ? payload.skills.maxSkillsPerRequest : 4;
-  if (/\d+ installed skill records/i.test(answer) || /ATLAS skills used:/i.test(answer)) return answer;
-  if (selected.length) {
-    return answer + `\n\n---\n**ATLAS skills used:** ${selected.map((skill) => skill.name).join(", ")} (${selected.length} selected; up to ${limit} per request${inventory ? ` from ${inventory} installed` : ""}).`;
-  }
-  if (inventory !== null) {
-    return answer + `\n\n---\n**ATLAS skills:** No specialist skill was selected for this request. Catalogue: ${inventory} installed; up to ${limit} can be selected per request.`;
-  }
+function appendSkillUsageNotice(answer) {
+  // Skill routing is internal implementation detail; expose it only when the user asks.
   return answer;
 }
 
-export async function generateAtlasResponse(history, signal) {
+export async function generateAtlasResponse(history, signal, options = {}) {
   const messages = history
     .filter((item) => item && (item.role === "user" || item.role === "atlas" || item.role === "assistant"))
     .slice(-24)
@@ -71,7 +62,7 @@ export async function generateAtlasResponse(history, signal) {
   const payload = await requestJson("/api/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ messages }),
+    body: JSON.stringify({ messages, voiceMode: options.voiceMode === true }),
     signal,
   });
   if (typeof payload.answer !== "string" || !payload.answer.trim()) {
@@ -106,8 +97,8 @@ export async function generateAtlasCopilotResponse(history, signal) {
   return appendSkillUsageNotice(payload.answer.trim(), payload);
 }
 
-export async function generateProviderResponse(provider, history, signal) {
-  if (provider === "atlas") return generateAtlasResponse(history, signal);
+export async function generateProviderResponse(provider, history, signal, options = {}) {
+  if (provider === "atlas") return generateAtlasResponse(history, signal, options);
   if (provider !== "nvidia") throw new Error("This provider adapter is not available in this ATLAS build.");
   const messages = history
     .filter((item) => item && (item.role === "user" || item.role === "atlas" || item.role === "assistant"))
@@ -115,7 +106,7 @@ export async function generateProviderResponse(provider, history, signal) {
     .map((item) => ({ role: item.role === "atlas" ? "assistant" : item.role, content: String(item.text || "").trim().slice(0, 12000) }))
     .filter((item) => item.content.length > 0);
   if (!messages.length || messages[messages.length - 1].role !== "user") throw new Error("Send a message before requesting a response.");
-  const payload = await requestJson("/api/nvidia", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ messages }), signal });
+  const payload = await requestJson("/api/nvidia", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ messages, voiceMode: options.voiceMode === true }), signal });
   if (typeof payload.answer !== "string" || !payload.answer.trim()) throw new Error("NVIDIA returned an empty response.");
   return appendSkillUsageNotice(payload.answer.trim(), payload);
 }

@@ -38,6 +38,20 @@ test("health endpoint advertises the primary and backup models", async () => {
   ]);
 });
 
+test("health and provider discovery preserve NVIDIA as primary when configured", async () => {
+  const env = { ...envWith(async () => ({})), NVIDIA_API_KEY: "test-only-nvidia-key" };
+  const health = await worker.fetch(request("/api/health"), env);
+  const healthBody = await health.json();
+  assert.equal(healthBody.provider, "NVIDIA API Catalog (primary), Cloudflare Workers AI (fallback)");
+  assert.equal(healthBody.model, "nvidia/nemotron-3-ultra-550b-a55b");
+
+  const providers = await worker.fetch(request("/api/providers"), env);
+  const providerBody = await providers.json();
+  assert.equal(providerBody.defaultProvider, "nvidia");
+  assert.equal(providerBody.providers.nvidia.configured, true);
+  assert.equal(providerBody.providers.atlas.role, "fallback");
+});
+
 test("chat uses the primary model and enables capacity-aware rejection", async () => {
   let calledWith;
   const env = envWith(async (model, input, options) => {
@@ -53,8 +67,10 @@ test("chat uses the primary model and enables capacity-aware rejection", async (
   assert.equal(body.skills.skillCount, 468);
   assert.equal(body.skills.maxSkillsPerRequest, 4);
   assert.match(calledWith.input.messages[0].content, /468 installed skill records/);
+  assert.match(calledWith.input.messages[0].content, /keep all routing and catalogue metadata internal/);
+  assert.match(calledWith.input.messages[0].content, /Use relevant skill guidance silently/);
   assert.equal(calledWith.input.messages.at(-1).role, "user");
-  assert.deepEqual(calledWith.options, { rejectIfBusy: true });
+  assert.equal(calledWith.options, undefined);
   assert.equal(calledWith.input.max_tokens, 3000);
   assert.equal("reasoning_effort" in calledWith.input, false);
   assert.equal("chat_template_kwargs" in calledWith.input, false);
@@ -78,13 +94,62 @@ test("main ATLAS chat routes NVIDIA skills and specialist context", async () => 
   assert.equal(response.status, 200);
   assert.match(systemPrompt, /ATLAS SPECIALIST ROUTER/);
   assert.match(systemPrompt, /CUDA & GPU Computing specialist/);
+  assert.match(systemPrompt, /Do not invent an expansion for the name ATLAS/);
+  assert.match(systemPrompt, /Numerical Optimization & Operations Research/);
+  assert.match(systemPrompt, /Computer Vision & Imaging/);
+  assert.match(systemPrompt, /lexical overlap across skill names, tags, and descriptions/);
+  assert.match(systemPrompt, /up to four relevant skill references/);
+  assert.match(systemPrompt, /not separate independently running AI agents/);
+  assert.match(systemPrompt, /Do not invent a generic encoder\/decoder architecture/);
+});
+
+test("voice sessions receive the requested JARVIS-inspired British spoken style", async () => {
+  let systemPrompt;
+  const env = envWith(async (_model, input) => {
+    systemPrompt = input.messages[0].content;
+    return { choices: [{ message: { content: "Certainly, sir." } }] };
+  });
+  const response = await worker.fetch(request("/api/chat", {
+    method: "POST",
+    body: { messages: [{ role: "user", content: "What is the status?" }], voiceMode: true },
+  }), env);
+  assert.equal(response.status, 200);
+  assert.match(systemPrompt, /J\.A\.R\.V\.I\.S\.-inspired butler manner/);
+  assert.match(systemPrompt, /Address the user as “sir” in every reply/);
+  assert.match(systemPrompt, /polished British English/);
+  assert.match(systemPrompt, /Avoid markdown, headings, bullet lists and tables/);
+});
+
+test("ordinary text chat does not activate the voice persona", async () => {
+  let systemPrompt;
+  const env = envWith(async (_model, input) => {
+    systemPrompt = input.messages[0].content;
+    return { choices: [{ message: { content: "Hello." } }] };
+  });
+  const response = await worker.fetch(request("/api/chat", { method: "POST", body: validBody }), env);
+  assert.equal(response.status, 200);
+  assert.doesNotMatch(systemPrompt, /J\.A\.R\.V\.I\.S\.-inspired butler manner/);
+});
+
+test("chat allows Cloudflare to queue busy inference instead of rejecting immediately", async () => {
+  let callCount = 0;
+  const env = envWith(async () => {
+    callCount += 1;
+    if (callCount === 1) throw new Error("3040 Capacity temporarily exceeded");
+    return { choices: [{ message: { content: "Recovered after brief capacity pressure" } }] };
+  });
+  const response = await worker.fetch(request("/api/chat", { method: "POST", body: validBody }), env);
+  const body = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(body.answer, "Recovered after brief capacity pressure");
+  assert.equal(callCount, 2);
 });
 
 test("chat falls back when the primary model is unavailable", async () => {
   const attempts = [];
   const env = envWith(async (model) => {
     attempts.push(model);
-    if (model === "@cf/meta/llama-3.3-70b-instruct-fp8-fast") throw new Error("capacity unavailable");
+    if (model === "@cf/meta/llama-3.3-70b-instruct-fp8-fast") throw new Error("3042 Model unavailable");
     return { choices: [{ message: { content: "Backup model response" } }] };
   });
   const response = await worker.fetch(request("/api/chat", { method: "POST", body: validBody }), env);
@@ -293,4 +358,151 @@ test("Copilot includes routed specialist context only when a skill matches", asy
   assert.equal(response.status, 200);
   assert.match(systemPrompt, /ATLAS SPECIALIST ROUTER/);
   assert.match(systemPrompt, /CUDA & GPU Computing specialist/);
+});
+
+
+test("Cloudflare transcription endpoint sends uploaded audio to Whisper and returns text", async () => {
+  let call;
+  const env = envWith(async (model, input) => {
+    call = { model, input };
+    return { text: "Hello ATLAS, can you help me?" };
+  });
+  const form = new FormData();
+  form.append("audio", new Blob([new Uint8Array(512).fill(7)], { type: "audio/webm" }), "voice.webm");
+  const response = await worker.fetch(new Request("https://atlas.test/api/transcribe", {
+    method: "POST",
+    headers: { authorization: "Bearer " + token },
+    body: form
+  }), env);
+  const body = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(body.text, "Hello ATLAS, can you help me?");
+  assert.equal(body.model, "@cf/openai/whisper-large-v3-turbo");
+  assert.equal(call.model, "@cf/openai/whisper-large-v3-turbo");
+  assert.equal(call.input.task, "transcribe");
+  assert.equal(call.input.audio, btoa(String.fromCharCode(...new Uint8Array(512).fill(7))));
+});
+
+test("Cloudflare transcription endpoint validates authorization and audio uploads", async () => {
+  const env = envWith(async () => ({ text: "should not run" }));
+  const deniedForm = new FormData();
+  deniedForm.append("audio", new Blob([new Uint8Array(512)], { type: "audio/webm" }), "voice.webm");
+  const denied = await worker.fetch(new Request("https://atlas.test/api/transcribe", {
+    method: "POST", body: deniedForm
+  }), env);
+  assert.equal(denied.status, 401);
+
+  const invalidForm = new FormData();
+  invalidForm.append("audio", new Blob(["not audio"], { type: "text/plain" }), "voice.txt");
+  const invalid = await worker.fetch(new Request("https://atlas.test/api/transcribe", {
+    method: "POST",
+    headers: { authorization: "Bearer " + token },
+    body: invalidForm
+  }), env);
+  assert.equal(invalid.status, 400);
+});
+
+test("cloud TTS endpoint generates Draco MP3 audio through Workers AI", async () => {
+  let call;
+  const audioBytes = new Uint8Array([73, 68, 51, 1, 2, 3]);
+  const env = envWith(async (model, input) => {
+    call = { model, input };
+    return new ReadableStream({
+      start(controller) {
+        controller.enqueue(audioBytes);
+        controller.close();
+      }
+    });
+  });
+  const response = await worker.fetch(request("/api/tts", {
+    method: "POST",
+    body: { text: "Good afternoon, sir." }
+  }), env);
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("content-type"), "audio/mpeg");
+  assert.equal(response.headers.get("x-atlas-voice"), "draco");
+  assert.equal(call.model, "@cf/deepgram/aura-2-en");
+  assert.deepEqual(call.input, {
+    text: "Good afternoon, sir.",
+    speaker: "draco",
+    encoding: "mp3"
+  });
+  assert.deepEqual(new Uint8Array(await response.arrayBuffer()), audioBytes);
+});
+
+test("cloud TTS endpoint requires authorization and valid bounded text", async () => {
+  const env = envWith(async () => new ReadableStream());
+  const denied = await worker.fetch(request("/api/tts", {
+    method: "POST",
+    body: { text: "Hello" },
+    auth: false
+  }), env);
+  assert.equal(denied.status, 401);
+
+  const invalid = await worker.fetch(request("/api/tts", {
+    method: "POST",
+    body: { text: "   " }
+  }), env);
+  assert.equal(invalid.status, 400);
+
+  const tooLong = await worker.fetch(request("/api/tts", {
+    method: "POST",
+    body: { text: "x".repeat(4001) }
+  }), env);
+  assert.equal(tooLong.status, 400);
+});
+
+
+test("cloud TTS routes through the configured self-hosted reference voice and keeps credentials server-side", async () => {
+  const originalFetch = globalThis.fetch;
+  let upstreamCall;
+  const bytes = new Uint8Array([73, 68, 51, 7, 8, 9]);
+  globalThis.fetch = async (url, init) => {
+    upstreamCall = { url: String(url), init };
+    return new Response(new ReadableStream({
+      start(controller) {
+        controller.enqueue(bytes);
+        controller.close();
+      }
+    }), { status: 200, headers: { "Content-Type": "audio/wav" } });
+  };
+  try {
+    const env = {
+      ...envWith(async () => { throw new Error("Workers AI should not be used when clone backend is configured"); }),
+      ATLAS_VOICE_CLONE_URL: "https://voice.example.test",
+      ATLAS_VOICE_CLONE_TOKEN: "server-only-test-token"
+    };
+    const response = await worker.fetch(request("/api/tts", {
+      method: "POST",
+      body: { text: "Good evening, sir." }
+    }), env);
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get("content-type"), "audio/wav");
+    assert.equal(response.headers.get("x-atlas-voice"), "reference-clone");
+    assert.equal(upstreamCall.url, "https://voice.example.test/v1/audio/speech");
+    assert.equal(upstreamCall.init.headers.Authorization, "Bearer server-only-test-token");
+    assert.deepEqual(JSON.parse(upstreamCall.init.body), {
+      input: "Good evening, sir.",
+      voice: "file://atlas-reference",
+      language_id: "en",
+      response_format: "wav"
+    });
+    assert.deepEqual(new Uint8Array(await response.arrayBuffer()), bytes);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("cloud TTS does not silently use the default voice when clone backend token is missing", async () => {
+  let workersAiCalled = false;
+  const env = {
+    ...envWith(async () => { workersAiCalled = true; return new ReadableStream(); }),
+    ATLAS_VOICE_CLONE_URL: "https://voice.example.test"
+  };
+  const response = await worker.fetch(request("/api/tts", {
+    method: "POST",
+    body: { text: "Hello ATLAS." }
+  }), env);
+  assert.equal(response.status, 503);
+  assert.equal(workersAiCalled, false);
 });

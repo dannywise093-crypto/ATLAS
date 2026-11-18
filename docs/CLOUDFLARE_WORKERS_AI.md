@@ -9,9 +9,10 @@ The repository's `wrangler.jsonc` binds Workers AI as `env.AI`. Deploy the
 Worker with Wrangler or the Cloudflare Workers Script Upload API, then add the
 secret `ATLAS_GATEWAY_TOKEN` as a Worker secret.
 
-The Vercel server-side proxy forwards `/api/chat` and `/api/health` to the
-Worker using `ATLAS_GATEWAY_URL` and `ATLAS_GATEWAY_TOKEN`. Neither the token
-nor provider credentials are exposed to browser code.
+The Cloudflare Pages Functions proxy forwards same-origin `/api/*` requests to
+the Worker using the `ATLAS_GATEWAY_TOKEN` Pages environment binding. Neither
+the token nor provider credentials are exposed to browser code. Vercel serverless
+functions are not used by ATLAS.
 
 ## Usage and model
 
@@ -25,10 +26,10 @@ later by changing the Worker model constant and running the model regression set
 
 ## Security
 
-The Worker requires a bearer token for both endpoints and validates message count,
-roles, message size, and method. The Vercel proxy keeps the bearer token server-side.
+The Worker requires a bearer token and validates message count, roles, message
+size, and method. Cloudflare Pages Functions keep the bearer token server-side.
 The in-memory rate limiter is best-effort and may reset between isolates; configure
-Cloudflare rate limiting and Vercel edge protection before public launch.
+Cloudflare rate limiting before public launch.
 
 ## Limitations
 

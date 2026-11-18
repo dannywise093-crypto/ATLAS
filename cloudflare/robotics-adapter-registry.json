@@ -1,0 +1,154 @@
+{
+  "schemaVersion": "1.0",
+  "project": "ATLAS",
+  "architecture": "vendor-neutral-adapter-registry",
+  "status": "specification-only",
+  "defaultPermissions": [],
+  "defaultSafetyClass": "read-only",
+  "actuationEnabled": false,
+  "adapterFamilies": [
+    {
+      "id": "bluetooth-le",
+      "name": "Bluetooth LE",
+      "status": "implemented-native-android",
+      "capabilities": [
+        "device.discovery"
+      ]
+    },
+    {
+      "id": "bluetooth-classic",
+      "name": "Bluetooth Classic",
+      "status": "planned",
+      "capabilities": [
+        "device.discovery",
+        "telemetry.read"
+      ]
+    },
+    {
+      "id": "wifi-lan",
+      "name": "Wi-Fi / LAN",
+      "status": "planned",
+      "capabilities": [
+        "device.discovery",
+        "telemetry.read"
+      ]
+    },
+    {
+      "id": "wifi-direct",
+      "name": "Wi-Fi Direct",
+      "status": "planned",
+      "capabilities": [
+        "device.discovery",
+        "telemetry.read"
+      ]
+    },
+    {
+      "id": "ethernet",
+      "name": "Ethernet",
+      "status": "planned",
+      "capabilities": [
+        "device.discovery",
+        "telemetry.read"
+      ]
+    },
+    {
+      "id": "usb-otg",
+      "name": "USB OTG",
+      "status": "planned",
+      "capabilities": [
+        "device.discovery",
+        "telemetry.read"
+      ]
+    },
+    {
+      "id": "usb-serial",
+      "name": "USB Serial",
+      "status": "planned",
+      "capabilities": [
+        "device.discovery",
+        "telemetry.read"
+      ]
+    },
+    {
+      "id": "can-bus",
+      "name": "CAN / CAN FD via compatible adapter",
+      "status": "planned",
+      "capabilities": [
+        "device.discovery",
+        "telemetry.read"
+      ]
+    },
+    {
+      "id": "ros2-dds",
+      "name": "ROS 2 / DDS via edge gateway",
+      "status": "planned",
+      "capabilities": [
+        "device.discovery",
+        "telemetry.read"
+      ]
+    },
+    {
+      "id": "micro-ros",
+      "name": "micro-ROS via Agent",
+      "status": "planned",
+      "capabilities": [
+        "device.discovery",
+        "telemetry.read"
+      ]
+    },
+    {
+      "id": "mqtt",
+      "name": "MQTT over TLS",
+      "status": "planned",
+      "capabilities": [
+        "device.discovery",
+        "telemetry.read"
+      ]
+    },
+    {
+      "id": "modbus",
+      "name": "Modbus TCP / RTU",
+      "status": "planned",
+      "capabilities": [
+        "device.discovery",
+        "telemetry.read"
+      ]
+    },
+    {
+      "id": "opcua",
+      "name": "OPC UA",
+      "status": "planned",
+      "capabilities": [
+        "device.discovery",
+        "telemetry.read"
+      ]
+    },
+    {
+      "id": "http-ws",
+      "name": "HTTP / WebSocket",
+      "status": "planned",
+      "capabilities": [
+        "device.discovery",
+        "telemetry.read"
+      ]
+    },
+    {
+      "id": "vendor-sdk",
+      "name": "Manufacturer SDKs",
+      "status": "planned",
+      "capabilities": [
+        "device.discovery",
+        "telemetry.read"
+      ]
+    },
+    {
+      "id": "camera-sensors",
+      "name": "Camera and sensor adapters",
+      "status": "planned",
+      "capabilities": [
+        "device.discovery",
+        "telemetry.read"
+      ]
+    }
+  ]
+}
