@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { cleanTextForSpeech, createSpeechRecognition, getVoiceCapabilities, speakText, stopSpeechPlayback } from "./voiceInterface.js";
 
 class FakeRecognition {
-  start() { this.started = true; }
+  start() { this.started = true; this.onstart?.({ type: "start" }); }
   stop() { this.stopped = true; }
 }
 
@@ -21,11 +21,9 @@ test("creates a one-turn English UK recognition session without starting the mic
   assert.equal(recognition.lang, "en-GB");
   assert.equal(recognition.continuous, false);
   assert.equal(recognition.started, undefined);
-  const startEvent = { type: "start" };
-  recognition.onstart(startEvent);
   recognition.start();
   assert.equal(recognition.started, true);
-  assert.equal(started, startEvent);
+  assert.deepEqual(started, { type: "start" });
   assert.equal(recognition.interimResults, true);
   const event = { resultIndex: 0, results: [] };
   recognition.onresult(event);
