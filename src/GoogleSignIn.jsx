@@ -3,23 +3,33 @@ import React, { useEffect, useRef, useState } from "react";
 const GOOGLE_CLIENT_ID = "170041686354-of35b5ml5hd40h5tjqpotki075ps820e.apps.googleusercontent.com";
 const GOOGLE_SCRIPT = "https://accounts.google.com/gsi/client";
 
-export default function GoogleSignIn() {
+export default function GoogleSignIn({ children }) {
   const buttonRef = useRef(null);
   const [user, setUser] = useState(null);
-  const [status, setStatus] = useState("Checking account…");
+  const [status, setStatus] = useState("Checking your ATLAS session…");
+  const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     let active = true;
     fetch("/api/auth/me", { credentials: "same-origin", cache: "no-store" })
-      .then(async (response) => response.ok ? response.json() : { user: null })
-      .then((data) => { if (active) { setUser(data.user || null); setStatus(data.user ? "Signed in" : "Not signed in"); } })
-      .catch(() => { if (active) setStatus("Sign-in service unavailable"); });
+      .then(async (response) => {
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !data.user) throw new Error("No active session");
+        return data.user;
+      })
+      .then((account) => {
+        if (active) { setUser(account); setStatus("Signed in"); }
+      })
+      .catch(() => {
+        if (active) { setUser(null); setStatus("Sign in with Google to continue."); }
+      })
+      .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, []);
 
   useEffect(() => {
-    if (user || !buttonRef.current) return;
+    if (loading || user || !buttonRef.current) return;
     let active = true;
     const render = () => {
       if (!active || !window.google?.accounts?.id || !buttonRef.current) return;
@@ -28,7 +38,7 @@ export default function GoogleSignIn() {
         callback: async (response) => {
           if (!response?.credential || busy) return;
           setBusy(true);
-          setStatus("Verifying Google account…");
+          setStatus("Verifying your Google account…");
           try {
             const result = await fetch("/api/auth/google", {
               method: "POST",
@@ -47,7 +57,10 @@ export default function GoogleSignIn() {
         }
       });
       buttonRef.current.replaceChildren();
-      window.google.accounts.id.renderButton(buttonRef.current, { theme: "filled_black", size: "large", shape: "pill", text: "continue_with", width: 210 });
+      window.google.accounts.id.renderButton(buttonRef.current, {
+        theme: "filled_black", size: "large", shape: "pill",
+        text: "continue_with", width: 260
+      });
     };
     if (window.google?.accounts?.id) render();
     else {
@@ -60,24 +73,51 @@ export default function GoogleSignIn() {
         document.head.appendChild(script);
       }
       script.addEventListener("load", render);
+      script.addEventListener("error", () => {
+        if (active) setStatus("Google sign-in could not load. Check your connection and retry.");
+      });
     }
     return () => { active = false; };
-  }, [user, busy]);
+  }, [loading, user, busy]);
 
   async function signOut() {
     setBusy(true);
     try {
-      await fetch("/api/auth/logout", { method: "POST", credentials: "same-origin" });
+      const response = await fetch("/api/auth/logout", {
+        method: "POST", credentials: "same-origin"
+      });
+      if (!response.ok) throw new Error("Sign-out request failed.");
       window.google?.accounts?.id?.disableAutoSelect();
       setUser(null);
-      setStatus("Signed out");
+      setStatus("You have signed out.");
     } catch {
       setStatus("Could not sign out. Please retry.");
     } finally { setBusy(false); }
   }
 
-  return <div className="atlas-auth-control" aria-live="polite">
-    {user ? <><span className="atlas-auth-user" title={user.email}>{user.name || user.email}</span><button type="button" className="atlas-auth-button" onClick={signOut} disabled={busy}>Sign out</button></> :
-      <><div ref={buttonRef} className="atlas-google-button"/><span className="atlas-auth-status">{busy ? "Verifying…" : status}</span></>}
+  if (loading) {
+    return <main className="atlas-login-screen"><div className="atlas-login-card"><div className="atlas-login-mark">A</div><h1>ATLAS AI</h1><p>Checking your secure session…</p></div></main>;
+  }
+
+  if (!user) {
+    return <main className="atlas-login-screen">
+      <section className="atlas-login-card" aria-labelledby="atlas-login-title">
+        <div className="atlas-login-mark">A</div>
+        <p className="atlas-login-eyebrow">PRIVATE AI WORKSPACE</p>
+        <h1 id="atlas-login-title">Welcome to ATLAS</h1>
+        <p className="atlas-login-copy">Sign in with your Google account to access your ATLAS workspace.</p>
+        <div className="atlas-login-google" ref={buttonRef} />
+        <p className="atlas-login-status" role="status" aria-live="polite">{busy ? "Verifying your account…" : status}</p>
+        <small>Your account is verified before the workspace is opened.</small>
+      </section>
+    </main>;
+  }
+
+  return <div className="atlas-authenticated-shell">
+    <div className="atlas-session-bar">
+      <span>{user.name || user.email}</span>
+      <button type="button" onClick={signOut} disabled={busy}>{busy ? "Signing out…" : "Sign out"}</button>
+    </div>
+    {children}
   </div>;
 }
