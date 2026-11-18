@@ -199,7 +199,9 @@ export default function App() {
     const userMessage={role:"user",text:messageText};
     const nextMessages=[...activeMessages,userMessage];
     if(isCopilot)updateCopilotConversationMessages(targetId,items=>[...items,userMessage]);else updateConversationMessages(targetId,items=>[...items,userMessage]);
-    if(!isCopilot)setInput("");
+    // Clear both chat composers immediately after accepting the message.
+    // The submitted text is already persisted in the conversation history.
+    setInput("");
     const localCommand=!isCopilot && /^(remember that|remember|save this|store this|what do you remember|show memory|list memories|my memories|find |search memory for |do you remember |help$|roadmap$|development plan$)/i.test(messageText);
     if(localCommand){
       const result=runAtlasCore(messageText,memory,activeMessages);

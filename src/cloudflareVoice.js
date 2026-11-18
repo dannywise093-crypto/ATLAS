@@ -1,7 +1,9 @@
-const SPEECH_THRESHOLD = 0.018;
+// Mobile microphones often produce quieter PCM levels than desktop devices.
+// Use a lower RMS threshold so normal speech is not mistaken for silence.
+const SPEECH_THRESHOLD = 0.008;
 const SILENCE_MS = 1100;
-const MAX_SEGMENT_MS = 12_000;
-const MIN_SEGMENT_MS = 450;
+const MAX_SEGMENT_MS = 10_000;
+const MIN_SEGMENT_MS = 600;
 
 function supportedMimeType(MediaRecorderClass) {
   const choices = ["audio/webm;codecs=opus", "audio/webm", "audio/ogg;codecs=opus", "audio/mp4"];
@@ -108,7 +110,9 @@ export function createCloudflareVoice(handlers = {}, environment = globalThis) {
         if (event.data?.size) chunks.push(event.data);
       };
       recorder.onerror = event => handlers.onError?.(event.error || new Error("Microphone recording failed."));
-      recorder.start();
+      // A short timeslice makes mobile browsers flush encoded audio regularly;
+      // the final stop event still closes the current segment before upload.
+      recorder.start(250);
       status("Listening. Speak naturally…");
     } catch (error) {
       recorder = null;
@@ -160,7 +164,8 @@ export function createCloudflareVoice(handlers = {}, environment = globalThis) {
       await audioContext.resume();
       const source = audioContext.createMediaStreamSource(stream);
       analyser = audioContext.createAnalyser();
-      analyser.fftSize = 1024;
+      analyser.fftSize = 2048;
+      analyser.smoothingTimeConstant = 0.18;
       sampleBuffer = new Uint8Array(analyser.fftSize);
       source.connect(analyser);
       const silentGain = audioContext.createGain();
