@@ -36,7 +36,7 @@ export default function GoogleSignIn({ children }) {
       window.google.accounts.id.initialize({
         client_id: GOOGLE_CLIENT_ID,
         callback: async (response) => {
-          if (!response?.credential || busy) return;
+          if (!response?.credential) return;
           setBusy(true);
           setStatus("Verifying your Google account…");
           try {
@@ -78,7 +78,7 @@ export default function GoogleSignIn({ children }) {
       });
     }
     return () => { active = false; };
-  }, [loading, user, busy]);
+  }, [loading, user]);
 
   async function signOut() {
     setBusy(true);
