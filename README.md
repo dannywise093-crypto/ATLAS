@@ -76,10 +76,11 @@ a Play Store release build.
 
 ## Security and limitations
 
-The Worker requires bearer authentication and the Vercel proxy keeps the token
-server-side. The in-memory rate limiter is best-effort because isolates do not
-share state; configure durable edge rate limiting and monitor usage before public
-launch. Never commit secrets or expose them through `VITE_*` variables.
+The Worker requires bearer authentication, and Cloudflare Pages Functions keep
+the gateway token server-side. Vercel serverless functions are not part of the
+ATLAS runtime. The in-memory rate limiter is best-effort because isolates do not
+share state; configure durable Cloudflare edge rate limiting and monitor usage
+before public launch. Never commit secrets or expose them through `VITE_*` variables.
 
 The hosted model is a real inference service, but it is not a model trained by
 ATLAS. The separate local quantized Android model, vision, voice, retrieval,
