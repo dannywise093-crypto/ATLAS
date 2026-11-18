@@ -110,7 +110,7 @@ export async function handleAuthRequest(request, env) {
       await env.KNOWLEDGE_DB.prepare("INSERT INTO atlas_users (google_sub, email, display_name, picture_url, created_at, last_login_at) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(google_sub) DO UPDATE SET email = excluded.email, display_name = excluded.display_name, picture_url = excluded.picture_url, last_login_at = excluded.last_login_at")
         .bind(user.sub, user.email, user.name, user.picture, now, now).run();
       const session = await createSession(user, env.ATLAS_SESSION_SECRET);
-      return json({ user: { email: user.email, name: user.name, picture: user.picture } }, 200, { "set-cookie": cookieHeader(session, SESSION_TTL_SECONDS) });
+      return json({ user: { id: user.sub, email: user.email, name: user.name, picture: user.picture } }, 200, { "set-cookie": cookieHeader(session, SESSION_TTL_SECONDS) });
     } catch (error) {
       console.warn("ATLAS Google sign-in rejected:", String(error?.message || "credential error").slice(0, 100));
       return json({ error: "Google sign-in could not be verified. Please try again." }, 401);
@@ -119,7 +119,7 @@ export async function handleAuthRequest(request, env) {
   if (url.pathname === "/api/auth/me") {
     if (request.method !== "GET") return json({ error: "Method not allowed." }, 405, { allow: "GET" });
     const user = await readSession(request, env.ATLAS_SESSION_SECRET);
-    return user ? json({ user: { email: user.email, name: user.name } }) : json({ user: null }, 401);
+    return user ? json({ user: { id: user.sub, email: user.email, name: user.name } }) : json({ user: null }, 401);
   }
   if (url.pathname === "/api/auth/logout") {
     if (request.method !== "POST") return json({ error: "Method not allowed." }, 405, { allow: "POST" });
