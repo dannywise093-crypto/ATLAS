@@ -188,7 +188,7 @@ export default function App() {
     }
   }
   function startVoiceInput(){
-    if(isListening||generating)return;
+    if(voiceRecognitionRef.current||isListening||generating)return;
     if(!voiceInputAvailable){
       setVoiceStatus("Voice input is not supported in this browser. Try the ATLAS website in a supported browser, or type your message.");
       return;
