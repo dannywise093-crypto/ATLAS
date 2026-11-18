@@ -186,11 +186,27 @@ Each agent can be run individually or as part of the orchestrated workflow. For 
 
 ## Getting Started
 
-### Clone the Repository
+### Get the Repository from ATLAS
+
+The Deep Researcher source is already included in the ATLAS repository. Do not
+clone the NVIDIA upstream repository separately when working with the ATLAS
+copy.
+
+For a fresh checkout, clone ATLAS and enter the vendored project directory:
 
 ```bash
-git clone https://github.com/NVIDIA-AI-Blueprints/deep-researcher-agent.git deep-researcher && cd deep-researcher
+git clone https://github.com/dannywise093-crypto/ATLAS.git
+cd ATLAS/agents/nvidia-deep-researcher
 ```
+
+If you already have ATLAS cloned, run this from the ATLAS repository root:
+
+```bash
+cd agents/nvidia-deep-researcher
+```
+
+The imported source is maintained at this path in ATLAS. Its upstream origin and
+imported revision are documented in [UPSTREAM.md](UPSTREAM.md).
 
 ### Automated Setup
 
