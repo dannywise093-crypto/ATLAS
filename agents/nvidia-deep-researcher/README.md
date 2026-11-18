@@ -192,14 +192,17 @@ The Deep Researcher source is already included in the ATLAS repository. Do not
 clone the NVIDIA upstream repository separately when working with the ATLAS
 copy.
 
-For a fresh checkout, clone ATLAS and enter the vendored project directory:
+For a fresh checkout, clone ATLAS, enter the ATLAS repository, then enter
+the Deep Researcher directory:
 
 ```bash
 git clone https://github.com/dannywise093-crypto/ATLAS.git
-cd ATLAS/agents/nvidia-deep-researcher
+cd ATLAS
+cd agents/nvidia-deep-researcher
 ```
 
-If you already have ATLAS cloned, run this from the ATLAS repository root:
+If you already have ATLAS cloned, first make sure your current directory is
+the ATLAS repository root, then run:
 
 ```bash
 cd agents/nvidia-deep-researcher
