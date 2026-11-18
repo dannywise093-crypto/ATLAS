@@ -10,9 +10,9 @@ This does not mean ATLAS trains or owns the foundation model weights.
 
 - Hosted foundation model: `@cf/zai-org/glm-4.7-flash` through Cloudflare Workers AI.
 - Cloudflare Worker gateway with the `AI` binding.
-- Server-side bearer authentication; the secret is stored in Cloudflare and Vercel,
-  never in frontend code or the Git repository.
-- Vercel server-side API routes forward browser requests to the Worker.
+- Server-side bearer authentication; the token is stored only in Cloudflare Worker
+  secrets and Cloudflare Pages environment bindings, never in frontend code or Git.
+- Cloudflare Pages Functions forward same-origin browser requests to the Worker.
 - Request validation, bounded conversation history, and best-effort throttling.
 - Live health check in the ATLAS dashboard.
 - Automated Worker tests for authentication, health, valid chat, and invalid inputs.
@@ -21,8 +21,9 @@ This does not mean ATLAS trains or owns the foundation model weights.
 ## Current hosted inference configuration
 
 The Worker URL is `https://atlas-model-gateway.dannywise093.workers.dev`.
-Vercel projects `atlas` and `atlas-cqig` receive the server-side environment
-variables `ATLAS_GATEWAY_URL` and `ATLAS_GATEWAY_TOKEN` in Production and Preview.
+The Cloudflare Pages project receives `ATLAS_GATEWAY_TOKEN` as a server-side
+Pages environment variable for Production and Preview; the Worker has the matching
+`ATLAS_GATEWAY_TOKEN` secret. The frontend and API routes run on Cloudflare.
 
 Cloudflare Workers AI currently includes 10,000 free Neurons per account per day.
 The quota is shared across Workers AI usage and resets at 00:00 UTC. Usage beyond
@@ -32,15 +33,15 @@ usage and confirm pricing before enabling paid usage.
 ## Deployment and verification
 
 1. Cloudflare Worker deployed with Workers AI binding and bearer secret.
-2. Vercel server-side proxy variables configured in both ATLAS projects.
-3. Redeploy Vercel projects and verify `/api/health`.
+2. Cloudflare Pages `ATLAS_GATEWAY_TOKEN` binding matches the Worker secret.
+3. Deploy Cloudflare Pages and verify `/api/health`.
 4. Send real test prompts from web and Android and check actual model responses.
 5. Add durable edge rate limiting, quotas, monitoring, and billing alerts before
    public traffic.
 
 ## Next milestones
 
-1. Verify the Vercel preview and production endpoints end-to-end after deployment.
+1. Verify Cloudflare Pages preview and production endpoints end-to-end after deployment.
 2. Benchmark response quality, latency, model limits, and neuron consumption.
 3. Add streaming responses, cancellation, and robust conversation persistence.
 4. Select a quantized local Android model after measuring target-device RAM,
