@@ -47,7 +47,8 @@ export function createCloudflareVoice(handlers = {}, environment = globalThis) {
   }
 
   async function transcribe(blob) {
-    if (closed || blob.size < 256) return;
+    if (closed) return;
+    if (blob.size < 256) { transcribing = false; return; }
     transcribing = true;
     status("Transcribing your voice securely with Cloudflare…");
     try {
@@ -162,6 +163,10 @@ export function createCloudflareVoice(handlers = {}, environment = globalThis) {
       analyser.fftSize = 1024;
       sampleBuffer = new Uint8Array(analyser.fftSize);
       source.connect(analyser);
+      const silentGain = audioContext.createGain();
+      silentGain.gain.value = 0;
+      analyser.connect(silentGain);
+      silentGain.connect(audioContext.destination);
       closed = false;
       paused = false;
       status("Connected to Cloudflare voice. Listening…");
