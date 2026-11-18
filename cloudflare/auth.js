@@ -80,7 +80,13 @@ function cookieHeader(value, maxAge) {
 }
 function originAllowed(request, env) {
   const origin = request.headers.get("origin");
-  return Boolean(origin && origin === (env.ATLAS_APP_ORIGIN || "https://atlas-coding-chat.pages.dev"));
+  if (!origin) return false;
+  const configured = (env.ATLAS_ALLOWED_ORIGINS || env.ATLAS_APP_ORIGIN || "https://atlas-coding-chat.pages.dev")
+    .split(",").map((value) => value.trim()).filter(Boolean);
+  const allowed = new Set(configured);
+  // Always retain the canonical production origin when a preview allow-list is configured.
+  allowed.add(env.ATLAS_APP_ORIGIN || "https://atlas-coding-chat.pages.dev");
+  return allowed.has(origin);
 }
 function json(body, status = 200, headers = {}) {
   return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", "x-content-type-options": "nosniff", ...headers } });
