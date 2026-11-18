@@ -405,7 +405,7 @@ test("Cloudflare transcription endpoint validates authorization and audio upload
   invalidForm.append("audio", new Blob(["not audio"], { type: "text/plain" }), "voice.txt");
   const invalid = await worker.fetch(new Request("https://atlas.test/api/transcribe", {
     method: "POST",
-    headers: { authorization: "Bearer " + token },
+    headers: { authorization: "Bearer " + token, "cf-connecting-ip": "192.0.2.99" },
     body: invalidForm
   }), env);
   assert.equal(invalid.status, 400);
