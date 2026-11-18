@@ -4,7 +4,7 @@ import { getBluetoothDiscoveryStatus, discoverBluetoothDevice, scanNativeBluetoo
 import { Capacitor } from "@capacitor/core";
 import { getRoboticsTransportCatalog } from "./roboticsTransports.js";
 import { createSpeechRecognition, getVoiceCapabilities, speakText, stopSpeechPlayback } from "./voiceInterface.js";
-import { createGeminiLiveVoice } from "./geminiLiveVoice.js";
+import { createCloudflareVoice } from "./cloudflareVoice.js";
 import { Code2 } from "lucide-react";
 import { getNeuralRuntimeStatus, checkAtlasBackend, generateAtlasResponse, generateAtlasCopilotResponse, generateProviderResponse } from "./modelRuntime.js";
 import { Activity, Bot, BrainCircuit, Camera, Check, Database, Eye, GraduationCap, Home, Menu, MessageSquare, Mic, Plus, Radio, Send, Settings, ShieldCheck, Sparkles, Trash2, Volume2, X } from "lucide-react";
@@ -70,7 +70,7 @@ export default function App() {
   const voiceReplyTextRef = useRef("");
   const voiceAwaitingCommandRef = useRef(false);
   const voiceRecognitionRef = useRef(null);
-  const liveVoiceSessionRef = useRef(null);
+  const cloudVoiceSessionRef = useRef(null);
   const voiceStartRef = useRef(null);
   const voiceRestartTimerRef = useRef(null);
   const [robotSimRunning,setRobotSimRunning] = useState(false);
@@ -188,6 +188,7 @@ export default function App() {
     voiceRestartTimerRef.current=setTimeout(()=>{
       if(voiceModeRef.current&&!voicePendingRef.current&&!voiceRecognitionRef.current)voiceStartRef.current?.();
     },350);
+    cloudVoiceSessionRef.current?.pause?.();
     try{
       await speakText(text);
     }catch(error){
@@ -196,6 +197,7 @@ export default function App() {
     }finally{
       voiceSpeakingRef.current=false;
       voiceReplyTextRef.current="";
+      if(voiceModeRef.current)cloudVoiceSessionRef.current?.resume?.();
     }
     if(voiceModeRef.current&&!voicePendingRef.current){
       voiceAwaitingCommandRef.current=false;
@@ -268,8 +270,8 @@ export default function App() {
     clearTimeout(voiceRestartTimerRef.current);
     try{voiceRecognitionRef.current?.stop();}catch{}
     voiceRecognitionRef.current=null;
-    try{liveVoiceSessionRef.current?.stop();}catch{}
-    liveVoiceSessionRef.current=null;
+    try{cloudVoiceSessionRef.current?.stop();}catch{}
+    cloudVoiceSessionRef.current=null;
     stopSpeechPlayback();
     setVoiceStatus("Voice assistant is idle.");
   }
@@ -279,29 +281,35 @@ export default function App() {
     voicePendingRef.current=false;
     setVoiceMode(true);
     setVoiceTranscript("");
-    setVoiceStatus("Starting ATLAS Live Voice. Allow microphone access when prompted…");
-    const session=createGeminiLiveVoice({
+    setVoiceStatus("Starting Cloudflare Voice. Allow microphone access when prompted…");
+    const session=createCloudflareVoice({
       onStatus:message=>{if(voiceModeRef.current)setVoiceStatus(message);},
-      onInputTranscript:text=>{if(voiceModeRef.current)setVoiceTranscript(text);},
-      onOutputTranscript:text=>{if(voiceModeRef.current){setVoiceTranscript(text);setVoiceStatus("ATLAS is responding…");}},
-      onTurnComplete:({userText,assistantText})=>{
+      onTranscript:async text=>{
         if(!voiceModeRef.current)return;
-        const additions=[];
-        if(userText)additions.push({role:"user",text:userText});
-        if(assistantText)additions.push({role:"atlas",text:assistantText});
-        if(additions.length)updateConversationMessages(activeConversation?.id,items=>[...items,...additions]);
-        setVoiceTranscript("");
+        setVoiceTranscript(text);
+        setVoiceStatus("Processing your request with ATLAS…");
+        await sendMessage(text,{speak:true,voiceModeActive:true});
+        if(voiceModeRef.current){
+          setVoiceTranscript("");
+          setVoiceStatus("Listening. Speak naturally; ATLAS is ready.");
+        }
       },
-      onError:error=>{if(voiceModeRef.current){setVoiceStatus("Live Voice disconnected: "+(error?.message||"connection lost"));voiceModeRef.current=false;setVoiceMode(false);}}
+      onError:error=>{
+        if(voiceModeRef.current)setVoiceStatus("Cloudflare Voice: "+(error?.message||"transcription problem"));
+      }
     });
-    liveVoiceSessionRef.current=session;
+    cloudVoiceSessionRef.current=session;
     try{
       await session.start();
       if(!voiceModeRef.current)session.stop();
     }catch(error){
       session.stop();
-      if(liveVoiceSessionRef.current===session)liveVoiceSessionRef.current=null;
-      if(voiceModeRef.current){setVoiceStatus("Live Voice unavailable: "+error.message);voiceModeRef.current=false;setVoiceMode(false);}
+      if(cloudVoiceSessionRef.current===session)cloudVoiceSessionRef.current=null;
+      if(voiceModeRef.current){
+        setVoiceStatus("Cloudflare Voice unavailable: "+error.message);
+        voiceModeRef.current=false;
+        setVoiceMode(false);
+      }
     }
   }
 
