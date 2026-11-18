@@ -19,7 +19,7 @@ export default function GoogleSignIn({ children }) {
         return data.user;
       })
       .then((account) => {
-        if (active) { setUser(account); setStatus("Signed in"); }
+        if (active) { localStorage.setItem("atlas-user-scope", account.id); setUser(account); setStatus("Signed in"); }
       })
       .catch(() => {
         if (active) { setUser(null); setStatus("Sign in with Google to continue."); }
@@ -48,7 +48,7 @@ export default function GoogleSignIn({ children }) {
             });
             const data = await result.json().catch(() => ({}));
             if (!result.ok || !data.user) throw new Error(data.error || "Google sign-in failed.");
-            if (active) { setUser(data.user); setStatus("Signed in"); }
+            if (active) { localStorage.setItem("atlas-user-scope", data.user.id); setUser(data.user); setStatus("Signed in"); }
           } catch (error) {
             if (active) setStatus(error.message || "Google sign-in failed");
           } finally {
@@ -88,6 +88,7 @@ export default function GoogleSignIn({ children }) {
       });
       if (!response.ok) throw new Error("Sign-out request failed.");
       window.google?.accounts?.id?.disableAutoSelect();
+      localStorage.removeItem("atlas-user-scope");
       setUser(null);
       setStatus("You have signed out.");
     } catch {
