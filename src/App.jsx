@@ -1,4 +1,3 @@
-import GoogleSignIn from "./GoogleSignIn.jsx";
 import React, { useEffect, useRef, useState } from "react";
 import { runAtlasCore } from "./atlasCore.js";
 import { getBluetoothDiscoveryStatus, discoverBluetoothDevice, scanNativeBluetoothDevices } from "./roboticsDiscovery.js";
@@ -11,10 +10,27 @@ import { getNeuralRuntimeStatus, checkAtlasBackend, generateAtlasResponse, gener
 import { Activity, Bot, BrainCircuit, Camera, Check, Database, Eye, GraduationCap, Home, Menu, MessageSquare, Mic, Plus, Radio, Send, Settings, ShieldCheck, Sparkles, Trash2, Volume2, X } from "lucide-react";
 
 function atlasStorageKey(key) {
-  // The account scope is a global bootstrap key; do not namespace its own lookup.
-  // Calling atlasStorageKey() here caused infinite recursion and crashed the workspace.
-  const userId = localStorage.getItem("atlas-user-scope");
-  return "atlas-user:" + (userId || "unavailable") + ":" + key;
+  // ATLAS is now an open workspace: chat and settings use device-local keys,
+  // not an authenticated Google account. Migrate existing conversations once.
+  const storageKey = "atlas:" + key;
+  try {
+    if (localStorage.getItem(storageKey) === null) {
+      const userId = localStorage.getItem("atlas-user-scope");
+      const legacyKeys = [
+        userId ? "atlas-user:" + userId + ":" + key : null,
+        "atlas-user:unavailable:" + key
+      ].filter(Boolean);
+      for (const legacyKey of legacyKeys) {
+        const value = localStorage.getItem(legacyKey);
+        if (value !== null) {
+          localStorage.setItem(storageKey, value);
+          break;
+        }
+      }
+    }
+    localStorage.removeItem("atlas-user-scope");
+  } catch {}
+  return storageKey;
 }
 
 function AtlasLogo({ className = "" }) {
@@ -352,5 +368,5 @@ function AtlasWorkspace() {
 }
 
 export default function App() {
-  return <GoogleSignIn><AtlasWorkspace /></GoogleSignIn>;
+  return <AtlasWorkspace />;
 }
