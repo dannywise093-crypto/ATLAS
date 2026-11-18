@@ -1,3 +1,4 @@
+import { handleAuthRequest } from "./auth.js";
 import { formatResearchEvidence, needsLiveResearch, searchWeb } from "./knowledge.js";
 import { archiveResearchResults } from "./knowledgeArchive.js";
 import { buildSkillContext, getSkillCatalogStats } from "./skill-orchestrator.js";
@@ -229,6 +230,11 @@ async function runModelWithCapacityRetry(env, model, messages, timeoutMs, system
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    if (url.pathname.startsWith("/api/auth/")) {
+      if (!authorized(request, env)) return json({ error: "Unauthorized." }, 401);
+      const authResponse = await handleAuthRequest(request, env);
+      if (authResponse) return authResponse;
+    }
     if (url.pathname === "/api/health") {
       if (request.method !== "GET") return json({ error: "Method not allowed." }, 405, { allow: "GET" });
       if (!authorized(request, env)) return json({ error: "Unauthorized." }, 401);
