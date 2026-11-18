@@ -10,6 +10,11 @@ import { Code2 } from "lucide-react";
 import { getNeuralRuntimeStatus, checkAtlasBackend, generateAtlasResponse, generateAtlasCopilotResponse, generateProviderResponse } from "./modelRuntime.js";
 import { Activity, Bot, BrainCircuit, Camera, Check, Database, Eye, GraduationCap, Home, Menu, MessageSquare, Mic, Plus, Radio, Send, Settings, ShieldCheck, Sparkles, Trash2, Volume2, X } from "lucide-react";
 
+function atlasStorageKey(key) {
+  const userId = localStorage.getItem(atlasStorageKey("atlas-user-scope"));
+  return "atlas-user:" + (userId || "unavailable") + ":" + key;
+}
+
 function AtlasLogo({ className = "" }) {
   return <img className={className} src="/atlas-logo.svg" alt="ATLAS logo" />;
 }
@@ -24,40 +29,40 @@ function AtlasWorkspace() {
   const [page,setPage] = useState("Overview");
   const [conversations,setConversations] = useState(()=>{
     try {
-      const saved=JSON.parse(localStorage.getItem("atlas-conversations"));
+      const saved=JSON.parse(localStorage.getItem(atlasStorageKey("atlas-conversations")));
       if(Array.isArray(saved)&&saved.length)return saved;
-      const legacy=JSON.parse(localStorage.getItem("atlas-messages"));
+      const legacy=JSON.parse(localStorage.getItem(atlasStorageKey("atlas-messages")));
       return [{id:crypto.randomUUID(),title:"Welcome to ATLAS",messages:Array.isArray(legacy)&&legacy.length?legacy:initial,updatedAt:Date.now()}];
     } catch { return [{id:crypto.randomUUID(),title:"Welcome to ATLAS",messages:initial,updatedAt:Date.now()}]; }
   });
   const conversationsRef = useRef(conversations);
   const sendInProgressRef = useRef(false);
   const [activeConversationId,setActiveConversationId] = useState(()=>{
-    try{return localStorage.getItem("atlas-active-conversation")||"";}catch{return "";}
+    try{return localStorage.getItem(atlasStorageKey("atlas-active-conversation"))||"";}catch{return "";}
   });
   const activeConversation=conversations.find(item=>item.id===activeConversationId)||conversations[0];
   const messages=activeConversation?.messages||initial;
   const copilotWelcome=[{role:"atlas",text:"ATLAS Copilot is ready for coding questions, complete implementations, debugging, and code reviews."}];
   const [copilotConversations,setCopilotConversations] = useState(()=>{
     try {
-      const saved=JSON.parse(localStorage.getItem("atlas-copilot-conversations"));
+      const saved=JSON.parse(localStorage.getItem(atlasStorageKey("atlas-copilot-conversations")));
       if(Array.isArray(saved)&&saved.length)return saved;
-      const legacy=JSON.parse(localStorage.getItem("atlas-copilot-messages"));
+      const legacy=JSON.parse(localStorage.getItem(atlasStorageKey("atlas-copilot-messages")));
       return [{id:crypto.randomUUID(),title:"Welcome to Copilot",messages:Array.isArray(legacy)&&legacy.length?legacy:copilotWelcome,updatedAt:Date.now()}];
     } catch { return [{id:crypto.randomUUID(),title:"Welcome to Copilot",messages:copilotWelcome,updatedAt:Date.now()}]; }
   });
   const copilotConversationsRef = useRef(copilotConversations);
   const [activeCopilotConversationId,setActiveCopilotConversationId] = useState(()=>{
-    try{return localStorage.getItem("atlas-active-copilot-conversation")||"";}catch{return "";}
+    try{return localStorage.getItem(atlasStorageKey("atlas-active-copilot-conversation"))||"";}catch{return "";}
   });
   const activeCopilotConversation=copilotConversations.find(item=>item.id===activeCopilotConversationId)||copilotConversations[0];
   const copilotMessages=activeCopilotConversation?.messages||copilotWelcome;
-  const [memory,setMemory] = useState(()=>{try{return JSON.parse(localStorage.getItem("atlas-memory"))||["ATLAS is a general-purpose Physical AI project.","Architecture preference: hybrid cloud and local computing."]}catch{return []}});
+  const [memory,setMemory] = useState(()=>{try{return JSON.parse(localStorage.getItem(atlasStorageKey("atlas-memory")))||["ATLAS is a general-purpose Physical AI project.","Architecture preference: hybrid cloud and local computing."]}catch{return []}});
   const [input,setInput] = useState("");
-  const [provider,setProvider] = useState(()=>localStorage.getItem("atlas-provider")||"atlas");
+  const [provider,setProvider] = useState(()=>localStorage.getItem(atlasStorageKey("atlas-provider"))||"atlas");
   const [providerStates,setProviderStates] = useState({});
   useEffect(()=>{fetch("/api/providers").then(r=>r.ok?r.json():{}).then(data=>setProviderStates(data.providers||{})).catch(()=>setProviderStates({}));},[]);
-  useEffect(()=>localStorage.setItem("atlas-provider",provider),[provider]);
+  useEffect(()=>localStorage.setItem(atlasStorageKey("atlas-provider"),provider),[provider]);
   const [image,setImage] = useState("");
   const [menu,setMenu] = useState(false);
   const [notice,setNotice] = useState("");
@@ -94,7 +99,7 @@ function AtlasWorkspace() {
     const next=typeof updater==="function"?updater(current):updater;
     conversationsRef.current=next;
     setConversations(next);
-    try{localStorage.setItem("atlas-conversations",JSON.stringify(next));}
+    try{localStorage.setItem(atlasStorageKey("atlas-conversations"),JSON.stringify(next));}
     catch(error){console.warn("ATLAS could not persist chat history locally.",error);}
   }
   function commitCopilotConversations(updater){
@@ -102,14 +107,14 @@ function AtlasWorkspace() {
     const next=typeof updater==="function"?updater(current):updater;
     copilotConversationsRef.current=next;
     setCopilotConversations(next);
-    try{localStorage.setItem("atlas-copilot-conversations",JSON.stringify(next));}
+    try{localStorage.setItem(atlasStorageKey("atlas-copilot-conversations"),JSON.stringify(next));}
     catch(error){console.warn("ATLAS could not persist Copilot history locally.",error);}
   }
-  useEffect(()=>{try{localStorage.setItem("atlas-conversations",JSON.stringify(conversations));}catch(error){console.warn("ATLAS chat history persistence failed.",error);}},[conversations]);
-  useEffect(()=>{if(activeConversation?.id){setActiveConversationId(activeConversation.id);localStorage.setItem("atlas-active-conversation",activeConversation.id);}},[activeConversation?.id]);
-  useEffect(()=>{try{localStorage.setItem("atlas-copilot-conversations",JSON.stringify(copilotConversations));}catch(error){console.warn("ATLAS Copilot history persistence failed.",error);}},[copilotConversations]);
-  useEffect(()=>{if(activeCopilotConversation?.id){setActiveCopilotConversationId(activeCopilotConversation.id);localStorage.setItem("atlas-active-copilot-conversation",activeCopilotConversation.id);}},[activeCopilotConversation?.id]);
-  useEffect(()=>localStorage.setItem("atlas-memory",JSON.stringify(memory)),[memory]);
+  useEffect(()=>{try{localStorage.setItem(atlasStorageKey("atlas-conversations"),JSON.stringify(conversations));}catch(error){console.warn("ATLAS chat history persistence failed.",error);}},[conversations]);
+  useEffect(()=>{if(activeConversation?.id){setActiveConversationId(activeConversation.id);localStorage.setItem(atlasStorageKey("atlas-active-conversation"),activeConversation.id);}},[activeConversation?.id]);
+  useEffect(()=>{try{localStorage.setItem(atlasStorageKey("atlas-copilot-conversations"),JSON.stringify(copilotConversations));}catch(error){console.warn("ATLAS Copilot history persistence failed.",error);}},[copilotConversations]);
+  useEffect(()=>{if(activeCopilotConversation?.id){setActiveCopilotConversationId(activeCopilotConversation.id);localStorage.setItem(atlasStorageKey("atlas-active-copilot-conversation"),activeCopilotConversation.id);}},[activeCopilotConversation?.id]);
+  useEffect(()=>localStorage.setItem(atlasStorageKey("atlas-memory"),JSON.stringify(memory)),[memory]);
   function updateConversationMessages(id,updater){
     commitConversations(items=>items.map(item=>{
       if(item.id!==id)return item;
@@ -122,7 +127,7 @@ function AtlasWorkspace() {
     const id=crypto.randomUUID();
     commitConversations(items=>[{id,title:"New conversation",messages:initial,updatedAt:Date.now()},...items]);
     setActiveConversationId(id);
-    localStorage.setItem("atlas-active-conversation",id);
+    localStorage.setItem(atlasStorageKey("atlas-active-conversation"),id);
     setInput("");
     setPage("AI Assistant");
   }
@@ -133,10 +138,10 @@ function AtlasWorkspace() {
     const remaining=conversations.filter(item=>item.id!==id);
     if(remaining.length){
       commitConversations(remaining);
-      if(activeConversationId===id){setActiveConversationId(remaining[0].id);localStorage.setItem("atlas-active-conversation",remaining[0].id);}
+      if(activeConversationId===id){setActiveConversationId(remaining[0].id);localStorage.setItem(atlasStorageKey("atlas-active-conversation"),remaining[0].id);}
     }else{
       const fresh={id:crypto.randomUUID(),title:"New conversation",messages:initial,updatedAt:Date.now()};
-      commitConversations([fresh]);setActiveConversationId(fresh.id);localStorage.setItem("atlas-active-conversation",fresh.id);
+      commitConversations([fresh]);setActiveConversationId(fresh.id);localStorage.setItem(atlasStorageKey("atlas-active-conversation"),fresh.id);
     }
   }
   function updateCopilotConversationMessages(id,updater){
@@ -151,7 +156,7 @@ function AtlasWorkspace() {
     const id=crypto.randomUUID();
     commitCopilotConversations(items=>[{id,title:"New Copilot chat",messages:copilotWelcome,updatedAt:Date.now()},...items]);
     setActiveCopilotConversationId(id);
-    localStorage.setItem("atlas-active-copilot-conversation",id);
+    localStorage.setItem(atlasStorageKey("atlas-active-copilot-conversation"),id);
     setInput("");
     setPage("Copilot");
   }
@@ -161,10 +166,10 @@ function AtlasWorkspace() {
     const remaining=copilotConversations.filter(item=>item.id!==id);
     if(remaining.length){
       commitCopilotConversations(remaining);
-      if(activeCopilotConversationId===id){setActiveCopilotConversationId(remaining[0].id);localStorage.setItem("atlas-active-copilot-conversation",remaining[0].id);}
+      if(activeCopilotConversationId===id){setActiveCopilotConversationId(remaining[0].id);localStorage.setItem(atlasStorageKey("atlas-active-copilot-conversation"),remaining[0].id);}
     }else{
       const fresh={id:crypto.randomUUID(),title:"New Copilot chat",messages:copilotWelcome,updatedAt:Date.now()};
-      commitCopilotConversations([fresh]);setActiveCopilotConversationId(fresh.id);localStorage.setItem("atlas-active-copilot-conversation",fresh.id);
+      commitCopilotConversations([fresh]);setActiveCopilotConversationId(fresh.id);localStorage.setItem(atlasStorageKey("atlas-active-copilot-conversation"),fresh.id);
     }
   }
   async function speakVoiceReply(text){
@@ -334,7 +339,7 @@ function AtlasWorkspace() {
     <h2>DEVELOPMENT MODULES</h2><div className="grid two">{card(<MessageSquare/>,"Conversational intelligence","NVIDIA when configured, with Cloudflare Workers AI model fallbacks; otherwise Cloudflare Workers AI is primary.","Interface ready")}{card(<Eye/>,"Perception & vision","Prepare image inputs for future computer vision.","Preview ready")}{card(<GraduationCap/>,"Learning system","Plan supervised demonstrations and evaluation.","Planned")}{card(<Bot/>,"Robotics integration","A safe bridge to controllers after simulation and testing.","Not connected")}</div>
     <div className="safety"><ShieldCheck/><div><b>Safety-first development</b><p>This is a software prototype. It does not control physical devices. Real robot movement must use independent safety limits and supervised testing.</p></div></div>
   </section> : page==="AI Assistant" ? <section className="stack grok-page"><div className="grok-workspace"><aside className="grok-history"><button className="grok-new-chat" onClick={newConversation}><Plus size={17}/> <span>New chat</span></button><div className="grok-history-label">YOUR CHATS</div><div className="grok-history-list" aria-label="ATLAS conversation history">{conversations.map(item=><div className={item.id===activeConversation?.id?"grok-history-item active":"grok-history-item"} key={item.id}><button className="grok-history-open" onClick={()=>{setActiveConversationId(item.id);setInput("");}} title={item.title}>{item.title}</button><button className="grok-history-delete" onClick={()=>deleteConversation(item.id)} aria-label={"Delete "+item.title} title="Delete conversation"><Trash2 size={14}/></button></div>)}</div><div className="grok-history-foot"><span className="grok-status-dot"/> ATLAS · PRIVATE SESSION</div></aside><div className="grok-chat-main"><div className="grok-topbar"><div className="grok-title"><span className="grok-mark"><AtlasLogo/></span><div><b>ATLAS</b><small>GENERAL INTELLIGENCE</small></div></div><div className="grok-top-actions"><span className="grok-model-tag">AUTO MODEL</span><span className="grok-online"><i/> {gatewayReady?"ONLINE":"CONNECTING"}</span></div></div><div className="grok-messages">{messages.map((m,i)=><div className={"grok-message "+m.role} key={i}>{m.role==="atlas"&&<span className="grok-message-avatar"><AtlasLogo/></span>}<div className="grok-message-body">{m.role==="user"&&<b>YOU</b>}<p>{m.text}</p></div></div>)}</div><div className="grok-compose-area"><div className="grok-model-row"><label htmlFor="atlas-provider">MODEL</label><select id="atlas-provider" value={provider} onChange={e=>setProvider(e.target.value)}><option value="atlas">ATLAS · Auto</option><option value="nvidia" disabled={!providerStates.nvidia?.configured}>NVIDIA API Catalog{providerStates.nvidia?.configured?"":" · unavailable"}</option></select></div><form className="grok-composer" onSubmit={send}><textarea aria-label="Message ATLAS" rows="1" value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();e.currentTarget.form.requestSubmit();}}} placeholder="Ask ATLAS anything…"/><div className="grok-composer-bottom"><span>Enter to send · Shift + Enter for a new line</span><button aria-label="Send message" disabled={!input.trim()||generating}><Send size={17}/></button></div></form><small>{generating?"ATLAS is thinking…":"AI can make mistakes. Verify important information."}</small></div></div></div></section>
-  : page==="Copilot" ? <section className="stack grok-page"><div className="grok-workspace"><aside className="grok-history"><button className="grok-new-chat" onClick={newCopilotConversation}><Plus size={17}/> <span>New chat</span></button><div className="grok-history-label">COPILOT CHATS</div><div className="grok-history-list" aria-label="Copilot conversation history">{copilotConversations.map(item=><div className={item.id===activeCopilotConversation?.id?"grok-history-item active":"grok-history-item"} key={item.id}><button className="grok-history-open" onClick={()=>{setActiveCopilotConversationId(item.id);localStorage.setItem("atlas-active-copilot-conversation",item.id);setInput("");}} title={item.title}>{item.title}</button><button className="grok-history-delete" onClick={()=>deleteCopilotConversation(item.id)} aria-label={"Delete "+item.title} title="Delete Copilot conversation"><Trash2 size={14}/></button></div>)}</div><div className="grok-history-foot"><span className="grok-status-dot"/> ATLAS COPILOT · PRIVATE SESSION</div></aside><div className="grok-chat-main"><div className="grok-topbar"><div className="grok-title"><span className="grok-mark"><AtlasLogo/></span><div><b>ATLAS Copilot</b><small>SOFTWARE ENGINEERING</small></div></div><div className="grok-top-actions"><span className="grok-model-tag">CODING MODE</span><span className="grok-online"><i/> {gatewayReady?"ONLINE":"CONNECTING"}</span></div></div><div className="grok-messages">{copilotMessages.map((m,i)=><div className={"grok-message "+m.role} key={i}>{m.role==="atlas"&&<span className="grok-message-avatar"><AtlasLogo/></span>}<div className="grok-message-body">{m.role==="user"&&<b>YOU</b>}<p>{m.text}</p></div></div>)}</div><div className="grok-compose-area"><div className="grok-composer-hint">Ask Copilot to write, explain, debug, or review code.</div><form className="grok-composer" onSubmit={send}><textarea aria-label="Message ATLAS Copilot" rows="1" value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();e.currentTarget.form.requestSubmit();}}} placeholder="Ask ATLAS Copilot about your code…"/><div className="grok-composer-bottom"><span>Enter to send · Shift + Enter for a new line</span><button aria-label="Send message" disabled={!input.trim()||generating}><Send size={17}/></button></div></form><small>{generating?"Copilot is thinking…":"AI can make mistakes. Review generated code before using it."}</small></div></div></div></section>
+  : page==="Copilot" ? <section className="stack grok-page"><div className="grok-workspace"><aside className="grok-history"><button className="grok-new-chat" onClick={newCopilotConversation}><Plus size={17}/> <span>New chat</span></button><div className="grok-history-label">COPILOT CHATS</div><div className="grok-history-list" aria-label="Copilot conversation history">{copilotConversations.map(item=><div className={item.id===activeCopilotConversation?.id?"grok-history-item active":"grok-history-item"} key={item.id}><button className="grok-history-open" onClick={()=>{setActiveCopilotConversationId(item.id);localStorage.setItem(atlasStorageKey("atlas-active-copilot-conversation"),item.id);setInput("");}} title={item.title}>{item.title}</button><button className="grok-history-delete" onClick={()=>deleteCopilotConversation(item.id)} aria-label={"Delete "+item.title} title="Delete Copilot conversation"><Trash2 size={14}/></button></div>)}</div><div className="grok-history-foot"><span className="grok-status-dot"/> ATLAS COPILOT · PRIVATE SESSION</div></aside><div className="grok-chat-main"><div className="grok-topbar"><div className="grok-title"><span className="grok-mark"><AtlasLogo/></span><div><b>ATLAS Copilot</b><small>SOFTWARE ENGINEERING</small></div></div><div className="grok-top-actions"><span className="grok-model-tag">CODING MODE</span><span className="grok-online"><i/> {gatewayReady?"ONLINE":"CONNECTING"}</span></div></div><div className="grok-messages">{copilotMessages.map((m,i)=><div className={"grok-message "+m.role} key={i}>{m.role==="atlas"&&<span className="grok-message-avatar"><AtlasLogo/></span>}<div className="grok-message-body">{m.role==="user"&&<b>YOU</b>}<p>{m.text}</p></div></div>)}</div><div className="grok-compose-area"><div className="grok-composer-hint">Ask Copilot to write, explain, debug, or review code.</div><form className="grok-composer" onSubmit={send}><textarea aria-label="Message ATLAS Copilot" rows="1" value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();e.currentTarget.form.requestSubmit();}}} placeholder="Ask ATLAS Copilot about your code…"/><div className="grok-composer-bottom"><span>Enter to send · Shift + Enter for a new line</span><button aria-label="Send message" disabled={!input.trim()||generating}><Send size={17}/></button></div></form><small>{generating?"Copilot is thinking…":"AI can make mistakes. Review generated code before using it."}</small></div></div></div></section>
   : page==="Vision Center" ? <section className="stack">{heading(page,"Prepare image input for future computer-vision features.","NOT CONNECTED")}<div className="panel"><Camera size={30}/><h3>Image input</h3><p>Choose a picture from your phone to preview it here. This prototype does not send images to an AI model.</p><label className="button">Choose image<input hidden type="file" accept="image/*" onChange={e=>{const f=e.target.files?.[0];if(f){setImage(URL.createObjectURL(f));setNotice("Local preview only. AI analysis is not connected.")}}}/></label>{image&&<img className="preview" src={image} alt="Selected preview"/>}{notice&&<p className="notice">{notice}</p>}</div>{card(<ShieldCheck/>,"Planned vision capabilities","Object recognition, camera integration, visual Q&A and privacy controls.")}</section>
   : page==="Voice Center" ? <section className="voice-session-screen" aria-label="ATLAS voice session"><div className="voice-top-notch" aria-hidden="true"/><header className="voice-selection-header"><h1>ATLAS Voice</h1><button type="button" className="voice-confirm" onClick={()=>setPage("Overview")} aria-label="Leave Voice Center"><Check size={24} strokeWidth={1.8}/></button></header><div className={`voice-orb-stage ${voiceMode?"is-listening":""} ${voiceStatus.toLowerCase().includes("speaking")?"is-speaking":""} ${voiceStatus.toLowerCase().includes("processing")?"is-thinking":""}`} role="img" aria-label="Animated cosmic glass orb"><div className="cosmic-orb"><div className="orb-nebula"/><div className="orb-light-ribbons"/><div className="orb-starfield">{Array.from({length:38},(_,index)=><i key={index} style={{"--x":`${(index*37+11)%92+4}%`,"--y":`${(index*53+7)%90+5}%`,"--size":`${index%5===0?2.4:index%3===0?1.7:1.1}px`,"--delay":`${(index%9)*-.37}s`,"--twinkle":`${1.8+(index%5)*.45}s`}}/> )}</div><div className="orb-glass-shine"/></div></div><div className="voice-controls"><p className="voice-session-status" role="status" aria-live="polite">{voiceStatus}{voiceTranscript?` · ${voiceTranscript}`:""}</p>{voiceMode?<button type="button" className="voice-action-button voice-stop-button" onClick={stopVoiceMode}><X size={19}/> Stop voice conversation</button>:<button type="button" className="voice-action-button" onClick={startVoiceMode}><Mic size={19}/> Start voice conversation</button>}<p className="voice-privacy-note">Your microphone stays off until you start a conversation. You can stop at any time.</p></div></section>
   : page==="Memory" ? <section className="stack">{heading("Project Memory","Notes are stored in this browser on this device.")}<div className="toolbar"><span>{memory.length} saved notes</span><button onClick={addMemory}>+ Add memory</button></div>{memory.map((m,i)=><div className="memory" key={i}><Database/><p>{m}</p><button className="delete" onClick={()=>setMemory(a=>a.filter((_,n)=>n!==i))}>Delete</button></div>)}<p className="notice">Notes are stored locally. They are not synced to a server or shared across devices.</p></section>
