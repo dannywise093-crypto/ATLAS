@@ -241,3 +241,12 @@ body{background:radial-gradient(ellipse at 82% 0%,rgba(38,103,207,.17),transpare
 @keyframes orb-think{from{transform:scale(.9);opacity:.65}to{transform:scale(1.12);opacity:1}}
 @media(max-width:700px){.voice-selection-header h1{font-size:20px}.voice-orb-stage{top:47%;width:42vw;height:42vw;min-width:150px;min-height:150px;max-width:180px;max-height:180px}}
 @media(prefers-reduced-motion:reduce){.cosmic-orb,.cosmic-orb:before,.orb-light-ribbons,.orb-starfield i,.voice-orb-stage.is-listening .cosmic-orb{animation:none!important}}
+
+
+/* Opt-in, one-turn voice-to-voice controls */
+.voice-input-controls{display:flex;justify-content:center;align-items:center;gap:10px;margin:12px 0 8px;flex-wrap:wrap}
+.voice-mic-button{display:inline-flex;align-items:center;justify-content:center;gap:9px;border:1px solid #579cff;background:linear-gradient(110deg,#3477e8,#4d9aff);color:#fff;border-radius:999px;padding:13px 22px;font-size:12px;font-weight:700;min-height:48px}
+.voice-mic-button.listening{background:linear-gradient(110deg,#a33c4b,#d05261);border-color:#ef8490;box-shadow:0 0 0 4px #d0526122}
+.voice-mic-button:disabled{opacity:.45;cursor:not-allowed}
+.voice-privacy-note{display:block;max-width:520px;margin:0 auto 12px;color:#8fa4c3;font-size:10px;line-height:1.6;text-align:center}
+.voice-tts-panel .secondary{margin:8px auto 0}
