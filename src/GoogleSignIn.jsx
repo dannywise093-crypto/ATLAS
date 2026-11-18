@@ -22,6 +22,7 @@ export default function GoogleSignIn({ children }) {
         if (active) { localStorage.setItem("atlas-user-scope", account.id); setUser(account); setStatus("Signed in"); }
       })
       .catch(() => {
+        localStorage.removeItem("atlas-user-scope");
         if (active) { setUser(null); setStatus("Sign in with Google to continue."); }
       })
       .finally(() => { if (active) setLoading(false); });
@@ -84,13 +85,14 @@ export default function GoogleSignIn({ children }) {
     setBusy(true);
     try {
       const response = await fetch("/api/auth/logout", {
-        method: "POST", credentials: "same-origin"
+        method: "POST", credentials: "same-origin", cache: "no-store"
       });
       if (!response.ok) throw new Error("Sign-out request failed.");
       window.google?.accounts?.id?.disableAutoSelect();
       localStorage.removeItem("atlas-user-scope");
       setUser(null);
       setStatus("You have signed out.");
+      window.location.replace("/");
     } catch {
       setStatus("Could not sign out. Please retry.");
     } finally { setBusy(false); }
