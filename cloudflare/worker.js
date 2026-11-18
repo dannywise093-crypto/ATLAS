@@ -310,8 +310,8 @@ export default {
           const rawMessage = typeof googleError.message === "string" ? googleError.message : "";
           const safeMessage = rawMessage
             .replace(/AIza[0-9A-Za-z_-]{20,}/g, "[REDACTED]")
-            .replace(/(key|token|authorization)\\s*[:=]\\s*[^\\s,;]+/ig, "$1=[REDACTED]")
-            .replace(/https?:\\/\\/[^\\s"']+/g, "[UPSTREAM_URL]")
+            .replace(/(key|token|authorization)\s*[:=]\s*[^\s,;]+/ig, "$1=[REDACTED]")
+            .replace(/https?:\/\/[^\s"']+/g, "[UPSTREAM_URL]")
             .slice(0, 240);
           const diagnostic = {
             stage: "temporary_token_creation",
