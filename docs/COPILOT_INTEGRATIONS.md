@@ -2,7 +2,7 @@
 
 ## What this branch implements
 
-- A dedicated `POST /api/copilot` Vercel API route.
+- A dedicated `POST /api/copilot` Cloudflare Pages Function route.
 - A dedicated `POST /api/copilot` Cloudflare Worker route.
 - A separate ATLAS Copilot system instruction set while retaining the existing
   Workers AI model fallback chain.
