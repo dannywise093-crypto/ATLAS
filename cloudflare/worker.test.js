@@ -66,7 +66,7 @@ test("chat falls back when the primary model is unavailable", async () => {
   const attempts = [];
   const env = envWith(async (model) => {
     attempts.push(model);
-    if (model === "@cf/meta/llama-3.3-70b-instruct-fp8-fast") throw new Error("capacity unavailable");
+    if (model === "@cf/meta/llama-3.3-70b-instruct-fp8-fast") throw new Error("3042 Model unavailable");
     return { choices: [{ message: { content: "Backup model response" } }] };
   });
   const response = await worker.fetch(request("/api/chat", { method: "POST", body: validBody }), env);
