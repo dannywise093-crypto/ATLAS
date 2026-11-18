@@ -7,7 +7,7 @@ function isAllowedOrigin(origin) {
     if (url.protocol !== "https:" || url.origin !== origin) return false;
     if (origin === PRODUCTION_ORIGIN) return true;
     // Cloudflare Pages PR preview origins use a hexadecimal deployment ID.
-    return /^[a-f0-9]{8,32}\\.atlas-coding-chat\\.pages\\.dev$/i.test(url.hostname);
+    return /^[a-f0-9]{8,32}\.atlas-coding-chat\.pages\.dev$/i.test(url.hostname);
   } catch {
     return false;
   }
