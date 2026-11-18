@@ -26,6 +26,7 @@ export async function onRequest({ request, env }) {
         Accept: "application/json",
         Authorization: "Bearer " + env.ATLAS_GATEWAY_TOKEN,
         ...(request.headers.get("cookie") ? { Cookie: request.headers.get("cookie") } : {}),
+        ...(origin ? { Origin: origin } : {}),
         ...(body ? { "Content-Type": "application/json" } : {})
       },
       ...(body ? { body: JSON.stringify(body) } : {})
