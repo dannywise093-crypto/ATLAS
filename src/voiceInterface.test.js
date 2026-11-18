@@ -20,8 +20,11 @@ test("creates a one-turn English UK recognition session without starting the mic
   assert.equal(recognition.lang, "en-GB");
   assert.equal(recognition.continuous, false);
   assert.equal(recognition.started, undefined);
+  let startedEvent;
+  recognition.onstart({ type: "start" });
   recognition.start();
   assert.equal(recognition.started, true);
+  assert.equal(startedEvent, undefined);
   assert.equal(recognition.interimResults, true);
   const event = { resultIndex: 0, results: [] };
   recognition.onresult(event);
