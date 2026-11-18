@@ -42,6 +42,7 @@ export async function proxy(request, env, path, method) {
       headers: {
         Accept: "application/json",
         Authorization: "Bearer " + env.ATLAS_GATEWAY_TOKEN,
+        ...(request.headers.get("cookie") ? { Cookie: request.headers.get("cookie") } : {}),
         ...(body ? { "Content-Type": "application/json" } : {})
       },
       ...(body ? { body: JSON.stringify(body) } : {})
@@ -75,7 +76,7 @@ export async function proxyTranscription(request, env) {
   try {
     const upstream = await fetch(GATEWAY_URL + "/api/transcribe", {
       method: "POST",
-      headers: { Accept: "application/json", Authorization: "Bearer " + env.ATLAS_GATEWAY_TOKEN },
+      headers: { Accept: "application/json", Authorization: "Bearer " + env.ATLAS_GATEWAY_TOKEN, ...(request.headers.get("cookie") ? { Cookie: request.headers.get("cookie") } : {}) },
       body: forwardForm
     });
     const text = await upstream.text();
@@ -114,6 +115,7 @@ export async function proxyTts(request, env) {
       headers: {
         Accept: "audio/wav, audio/mpeg, application/json",
         Authorization: "Bearer " + gatewayToken,
+        ...(request.headers.get("cookie") ? { Cookie: request.headers.get("cookie") } : {}),
         "Content-Type": "application/json"
       },
       body: JSON.stringify({ text: body.text.trim() })
