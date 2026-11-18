@@ -1,7 +1,7 @@
-import { proxyVoiceToken } from "./_gateway.js";
+import { proxyTranscription } from "./_gateway.js";
 
 export async function onRequestPost({ request, env }) {
-  return proxyVoiceToken(request, env);
+  return proxyTranscription(request, env);
 }
 
 export async function onRequest({ request }) {

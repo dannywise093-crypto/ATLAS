@@ -1,6 +1,8 @@
 """ATLAS model gateway.
 
-The gateway accepts requests only from the trusted Vercel server-side proxy when
+This legacy Python gateway is for local development only. Production ATLAS web
+requests use Cloudflare Pages Functions and the Cloudflare Worker. If this local
+gateway is enabled, it accepts requests only from a trusted proxy when
 ATLAS_GATEWAY_TOKEN is configured. Provider credentials never reach the browser.
 """
 from __future__ import annotations

@@ -262,88 +262,38 @@ export default {
       return json({ skillCount, specialistCount, maxSkillsPerRequest, skills: SKILL_CATALOG.map(({ id, name, description, tags, source }) => ({ id, name, description, tags, source })) });
     }
 
-    if (url.pathname === "/api/voice-token") {
+    if (url.pathname === "/api/transcribe") {
       if (request.method !== "POST") return json({ error: "Method not allowed." }, 405, { allow: "POST" });
       if (!authorized(request, env)) return json({ error: "Unauthorized." }, 401);
-      if (rateLimited(request)) return json({ error: "Voice session limit reached. Please wait before trying again." }, 429, { "retry-after": "60" });
-      if (!env.GEMINI_API_KEY) return json({ error: "Gemini Live is not configured yet. Add GEMINI_API_KEY as a secret on the ATLAS Cloudflare Worker." }, 503);
-      const now = Date.now();
-      const tokenRequest = {
-        uses: 1,
-        expireTime: new Date(now + 30 * 60 * 1000).toISOString(),
-        newSessionExpireTime: new Date(now + 60 * 1000).toISOString(),
-        liveConnectConstraints: {
-          model: "models/gemini-3.8-live",
-          config: {
-            generationConfig: {
-              responseModalities: ["AUDIO"],
-              speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: "Aoede" } } }
-            },
-            inputAudioTranscription: {},
-            outputAudioTranscription: {},
-            realtimeInputConfig: { automaticActivityDetection: { disabled: false } },
-            systemInstruction: {
-              parts: [{ text: "You are ATLAS, the voice assistant inside the ATLAS application. Speak naturally, clearly, and concisely. Respond to the user's spoken request directly. Do not claim to control devices or perform actions unless a connected tool confirms it. This Live Voice session is only for voice conversations; the user's normal ATLAS text chat and other app features remain separate." }]
-            }
-          }
-        }
-      };
+      if (rateLimited(request)) return json({ error: "Voice transcription limit reached. Please wait before trying again." }, 429, { "retry-after": "60" });
+      if (!env.AI) return json({ error: "Cloudflare Workers AI is not configured for speech recognition." }, 503);
+      const contentLength = Number(request.headers.get("content-length") || 0);
+      if (contentLength > 9 * 1024 * 1024) return json({ error: "Audio upload is too large. Keep each voice segment under 8 MB." }, 413);
+      let form;
+      try { form = await request.formData(); } catch { return json({ error: "A valid multipart audio upload is required." }, 400); }
+      const audio = form.get("audio");
+      if (!audio || typeof audio.arrayBuffer !== "function" || !String(audio.type || "").toLowerCase().startsWith("audio/")) {
+        return json({ error: "Attach an audio recording using the audio field." }, 400);
+      }
+      if (audio.size < 256 || audio.size > 8 * 1024 * 1024) {
+        return json({ error: "Audio must be between 256 bytes and 8 MB." }, 413);
+      }
       try {
-        const upstream = await fetch("https://generativelanguage.googleapis.com/v1alpha/auth_tokens", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "x-goog-api-key": env.GEMINI_API_KEY },
-          body: JSON.stringify(tokenRequest)
+        const bytes = new Uint8Array(await audio.arrayBuffer());
+        let binary = "";
+        for (let offset = 0; offset < bytes.length; offset += 0x8000) {
+          binary += String.fromCharCode(...bytes.subarray(offset, Math.min(offset + 0x8000, bytes.length)));
+        }
+        const result = await env.AI.run("@cf/openai/whisper-large-v3-turbo", {
+          audio: btoa(binary),
+          task: "transcribe"
         });
-        const responseText = await upstream.text();
-        let tokenData = {};
-        try {
-          tokenData = responseText ? JSON.parse(responseText) : {};
-        } catch {
-          tokenData = {};
-        }
-        if (!upstream.ok || !tokenData.name) {
-          const googleError = tokenData?.error || {};
-          const googleStatus = typeof googleError.status === "string" ? googleError.status : "UNKNOWN";
-          const googleCode = Number.isInteger(googleError.code) ? googleError.code : upstream.status;
-          // Keep diagnostics useful without returning credentials, request headers,
-          // token material, or the raw upstream response to the browser.
-          const rawMessage = typeof googleError.message === "string" ? googleError.message : "";
-          const safeMessage = rawMessage
-            .replace(/AIza[0-9A-Za-z_-]{20,}/g, "[REDACTED]")
-            .replace(/(key|token|authorization)\s*[:=]\s*[^\s,;]+/ig, "$1=[REDACTED]")
-            .replace(/https?:\/\/[^\s"']+/g, "[UPSTREAM_URL]")
-            .slice(0, 240);
-          const diagnostic = {
-            stage: "temporary_token_creation",
-            upstream: "Google Gemini API",
-            httpStatus: upstream.status,
-            googleStatus,
-            googleCode,
-            message: safeMessage || "Google returned no token and no readable error message.",
-            requestId: request.headers.get("cf-ray") || null
-          };
-          console.error("ATLAS Gemini Live token provisioning failed", JSON.stringify(diagnostic));
-          return json({
-            error: "Gemini Live could not create a temporary voice token.",
-            diagnostic
-          }, 502);
-        }
-        return json({ token: tokenData.name, expiresAt: tokenData.expireTime || tokenRequest.expireTime, model: "gemini-3.8-live" });
+        const transcript = typeof result?.text === "string" ? result.text.trim() : "";
+        if (!transcript) return json({ text: "", model: "@cf/openai/whisper-large-v3-turbo", empty: true });
+        return json({ text: transcript, model: "@cf/openai/whisper-large-v3-turbo" });
       } catch (error) {
-        const diagnostic = {
-          stage: "temporary_token_request",
-          upstream: "Google Gemini API",
-          errorType: error?.name || "Error",
-          message: String(error?.message || "Unknown network error")
-            .replace(/AIza[0-9A-Za-z_-]{20,}/g, "[REDACTED]")
-            .slice(0, 200),
-          requestId: request.headers.get("cf-ray") || null
-        };
-        console.error("ATLAS Gemini Live token request failed", JSON.stringify(diagnostic));
-        return json({
-          error: "Gemini Live token service could not be reached.",
-          diagnostic
-        }, 502);
+        console.error("ATLAS Cloudflare transcription failed:", classifyAIError(error).status);
+        return json({ error: "Cloudflare could not transcribe this audio. Please try speaking again.", retryable: true }, 503, { "retry-after": "3" });
       }
     }
 

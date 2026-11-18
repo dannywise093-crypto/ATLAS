@@ -38,6 +38,20 @@ test("health endpoint advertises the primary and backup models", async () => {
   ]);
 });
 
+test("health and provider discovery preserve NVIDIA as primary when configured", async () => {
+  const env = { ...envWith(async () => ({})), NVIDIA_API_KEY: "test-only-nvidia-key" };
+  const health = await worker.fetch(request("/api/health"), env);
+  const healthBody = await health.json();
+  assert.equal(healthBody.provider, "NVIDIA API Catalog (primary), Cloudflare Workers AI (fallback)");
+  assert.equal(healthBody.model, "meta/llama-3.3-70b-instruct");
+
+  const providers = await worker.fetch(request("/api/providers"), env);
+  const providerBody = await providers.json();
+  assert.equal(providerBody.defaultProvider, "nvidia");
+  assert.equal(providerBody.providers.nvidia.configured, true);
+  assert.equal(providerBody.providers.atlas.role, "fallback");
+});
+
 test("chat uses the primary model and enables capacity-aware rejection", async () => {
   let calledWith;
   const env = envWith(async (model, input, options) => {
@@ -346,6 +360,47 @@ test("Copilot includes routed specialist context only when a skill matches", asy
   assert.match(systemPrompt, /CUDA & GPU Computing specialist/);
 });
 
+
+test("Cloudflare transcription endpoint sends uploaded audio to Whisper and returns text", async () => {
+  let call;
+  const env = envWith(async (model, input) => {
+    call = { model, input };
+    return { text: "Hello ATLAS, can you help me?" };
+  });
+  const form = new FormData();
+  form.append("audio", new Blob([new Uint8Array(512).fill(7)], { type: "audio/webm" }), "voice.webm");
+  const response = await worker.fetch(new Request("https://atlas.test/api/transcribe", {
+    method: "POST",
+    headers: { authorization: "Bearer " + token },
+    body: form
+  }), env);
+  const body = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(body.text, "Hello ATLAS, can you help me?");
+  assert.equal(body.model, "@cf/openai/whisper-large-v3-turbo");
+  assert.equal(call.model, "@cf/openai/whisper-large-v3-turbo");
+  assert.equal(call.input.task, "transcribe");
+  assert.equal(call.input.audio, btoa(String.fromCharCode(...new Uint8Array(512).fill(7))));
+});
+
+test("Cloudflare transcription endpoint validates authorization and audio uploads", async () => {
+  const env = envWith(async () => ({ text: "should not run" }));
+  const deniedForm = new FormData();
+  deniedForm.append("audio", new Blob([new Uint8Array(512)], { type: "audio/webm" }), "voice.webm");
+  const denied = await worker.fetch(new Request("https://atlas.test/api/transcribe", {
+    method: "POST", body: deniedForm
+  }), env);
+  assert.equal(denied.status, 401);
+
+  const invalidForm = new FormData();
+  invalidForm.append("audio", new Blob(["not audio"], { type: "text/plain" }), "voice.txt");
+  const invalid = await worker.fetch(new Request("https://atlas.test/api/transcribe", {
+    method: "POST",
+    headers: { authorization: "Bearer " + token },
+    body: invalidForm
+  }), env);
+  assert.equal(invalid.status, 400);
+});
 
 test("cloud TTS endpoint generates Draco MP3 audio through Workers AI", async () => {
   let call;

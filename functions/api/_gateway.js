@@ -54,19 +54,29 @@ export async function proxy(request, env, path, method) {
 }
 
 
-export async function proxyVoiceToken(request, env) {
+export async function proxyTranscription(request, env) {
   if (request.method !== "POST") return json({ error: "Method not allowed." }, 405);
   if (!env.ATLAS_GATEWAY_TOKEN) return json({ error: "ATLAS Cloudflare gateway token is not configured in Pages Functions." }, 503);
   const ip = request.headers.get("CF-Connecting-IP") || "unknown";
   const now = Date.now();
-  const bucket = buckets.get("voice-token:" + ip);
-  if (!bucket || now - bucket.start >= WINDOW_MS) buckets.set("voice-token:" + ip, { start: now, count: 1 });
-  else if (bucket.count >= 10) return json({ error: "Too many voice session requests. Please wait before trying again." }, 429);
+  const bucket = buckets.get("transcribe:" + ip);
+  if (!bucket || now - bucket.start >= WINDOW_MS) buckets.set("transcribe:" + ip, { start: now, count: 1 });
+  else if (bucket.count >= 10) return json({ error: "Too many voice transcription requests. Please wait before trying again." }, 429);
   else bucket.count++;
+  let form;
+  try { form = await request.formData(); } catch { return json({ error: "A valid multipart audio upload is required." }, 400); }
+  const audio = form.get("audio");
+  if (!audio || typeof audio.arrayBuffer !== "function" || !String(audio.type || "").toLowerCase().startsWith("audio/")) {
+    return json({ error: "Attach an audio recording using the audio field." }, 400);
+  }
+  if (audio.size < 256 || audio.size > 8 * 1024 * 1024) return json({ error: "Audio must be between 256 bytes and 8 MB." }, 413);
+  const forwardForm = new FormData();
+  forwardForm.set("audio", audio, audio.name || "voice-recording.webm");
   try {
-    const upstream = await fetch(GATEWAY_URL + "/api/voice-token", {
+    const upstream = await fetch(GATEWAY_URL + "/api/transcribe", {
       method: "POST",
-      headers: { Accept: "application/json", Authorization: "Bearer " + env.ATLAS_GATEWAY_TOKEN }
+      headers: { Accept: "application/json", Authorization: "Bearer " + env.ATLAS_GATEWAY_TOKEN },
+      body: forwardForm
     });
     const text = await upstream.text();
     return new Response(text, {
@@ -74,7 +84,7 @@ export async function proxyVoiceToken(request, env) {
       headers: { "Content-Type": upstream.headers.get("Content-Type") || "application/json", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" }
     });
   } catch {
-    return json({ error: "ATLAS voice gateway could not be reached. Please retry." }, 502);
+    return json({ error: "ATLAS Cloudflare transcription service could not be reached. Please retry." }, 502);
   }
 }
 

@@ -3,17 +3,17 @@
 ## Implemented in this branch
 
 - ATLAS Native AI remains the default and continues using the existing Cloudflare Workers AI gateway.
-- NVIDIA API Catalog hosted inference is implemented as a separate Vercel server-side route at `POST /api/nvidia`.
-- NVIDIA credentials are read only from `process.env.NVIDIA_API_KEY`; they are never exposed to browser code.
+- NVIDIA API Catalog hosted inference is handled inside the Cloudflare Worker gateway; the NVIDIA credential is never sent to the browser.
+- The Worker reads `NVIDIA_API_KEY` from its private Cloudflare Worker secret; it is never exposed to browser code.
 - `GET /api/providers` reports server-side configuration state without returning credentials.
 - The general AI Assistant has an independent provider selector. NVIDIA is disabled until its server-side key is configured. A failed NVIDIA request does not alter ATLAS Native AI configuration.
 
 ## NVIDIA deployment
 
 1. Create an NVIDIA API Catalog account and generate an API key through NVIDIA's official developer portal.
-2. In each Vercel project that serves ATLAS (Production and Preview as appropriate), add the server-side environment variable `NVIDIA_API_KEY`.
-3. Do not prefix it with `VITE_`; never put it in React, localStorage, a Worker binding exposed to clients, or source control.
-4. Redeploy Vercel. Visit `/api/providers` to confirm NVIDIA reports `configured: true`.
+2. Add `NVIDIA_API_KEY` as a private secret on the `atlas-model-gateway` Cloudflare Worker.
+3. Never put it in React, localStorage, a `VITE_*` variable, or source control.
+4. Redeploy the Worker. Visit the same-origin `/api/providers` endpoint to confirm NVIDIA reports `configured: true`.
 5. NVIDIA usage, model availability, and any applicable account limits are controlled by NVIDIA.
 
 Default model: `meta/llama-3.3-70b-instruct`. The route uses NVIDIA's OpenAI-compatible Chat Completions endpoint.
@@ -67,4 +67,4 @@ Official docs:
 
 ## Provider independence
 
-Each provider has separate credentials and health state. ATLAS Native AI remains the fallback/default and does not depend on NVIDIA, GitHub, or Microsoft availability. Secrets belong in private Vercel environment variables or the dedicated provider service's secret manager. Never send secrets in chat or commit them.
+Each provider has separate credentials and health state. ATLAS Native AI remains the fallback/default and does not depend on NVIDIA, GitHub, or Microsoft availability. Secrets belong in private Cloudflare Worker secrets or the dedicated provider service's secret manager. Never send secrets in chat or commit them.

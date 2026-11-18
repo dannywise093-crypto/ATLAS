@@ -6,7 +6,7 @@ const API_BASE = String(import.meta.env.VITE_ATLAS_API_URL || "").replace(/\/$/,
 export function getNeuralRuntimeStatus() {
   return {
     id: "atlas-cloudflare-workers-ai",
-    label: "Cloudflare Workers AI · GLM-4.7-Flash",
+    label: "ATLAS hosted inference · NVIDIA + Cloudflare Workers AI",
     available: false,
     reason: "Checking the secured ATLAS inference gateway.",
   };

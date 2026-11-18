@@ -16,7 +16,10 @@ open-weight model; this repository does not claim to train its own LLM weights.
 
 ## Hosted model
 
-The primary model is `@cf/meta/llama-3.3-70b-instruct-fp8-fast`; the configured fallbacks are `@cf/google/gemma-4-26b-a4b-it` and `@cf/zai-org/glm-4.7-flash`. Cloudflare's current Workers AI
+When `NVIDIA_API_KEY` is configured as a private Worker secret, NVIDIA API Catalog
+Llama 3.3 is primary and Cloudflare Workers AI is the fallback. Otherwise, the
+Cloudflare Workers AI chain starts with `@cf/meta/llama-3.3-70b-instruct-fp8-fast`,
+then `@cf/google/gemma-4-26b-a4b-it` and `@cf/zai-org/glm-4.7-flash`. Cloudflare's current Workers AI
 pricing includes 10,000 Neurons per account per day at no charge. Usage is shared
 across Workers AI on the account and resets at 00:00 UTC. Exceeding the free
 allocation requires the Workers Paid plan for additional usage. Review the
@@ -49,12 +52,13 @@ The Worker uses an AI binding named `AI` and a server-side secret named
 
 ## Cloudflare Pages frontend
 
-The production frontend is hosted on Cloudflare Pages at `https://atlas-coding-chat.pages.dev/`.
-The Pages project uses server-side `ATLAS_GATEWAY_URL` and `ATLAS_GATEWAY_TOKEN`
-environment variables for Production and Preview. Pages Functions proxy
-same-origin `/api/chat` and `/api/health` requests to the Cloudflare Worker; the
-gateway token is never sent to browser code. Redeploy the Pages project after
-changing environment variables.
+The production frontend and all HTTP API routes are hosted on Cloudflare Pages at
+`https://atlas-coding-chat.pages.dev/`. Pages Functions proxy same-origin `/api/*`
+requests to the `atlas-model-gateway` Cloudflare Worker using the server-side
+`ATLAS_GATEWAY_TOKEN` binding. The matching token is a private Worker secret and
+is never sent to browser code. NVIDIA remains an optional primary inference
+provider inside the Worker; Cloudflare Workers AI is the fallback and the default
+when NVIDIA is not configured. Vercel is not used for ATLAS hosting, APIs, or AI.
 
 ## Local development
 
@@ -76,10 +80,11 @@ a Play Store release build.
 
 ## Security and limitations
 
-The Worker requires bearer authentication and the Vercel proxy keeps the token
-server-side. The in-memory rate limiter is best-effort because isolates do not
-share state; configure durable edge rate limiting and monitor usage before public
-launch. Never commit secrets or expose them through `VITE_*` variables.
+The Worker requires bearer authentication, and Cloudflare Pages Functions keep
+the gateway token server-side. Vercel serverless functions are not part of the
+ATLAS runtime. The in-memory rate limiter is best-effort because isolates do not
+share state; configure durable Cloudflare edge rate limiting and monitor usage
+before public launch. Never commit secrets or expose them through `VITE_*` variables.
 
 The hosted model is a real inference service, but it is not a model trained by
 ATLAS. The separate local quantized Android model, vision, voice, retrieval,
