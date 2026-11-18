@@ -1,4 +1,3 @@
-import { handleAuthRequest, readSession } from "./auth.js";
 import { formatResearchEvidence, needsLiveResearch, searchWeb } from "./knowledge.js";
 import { archiveResearchResults } from "./knowledgeArchive.js";
 import { buildSkillContext, getSkillCatalogStats } from "./skill-orchestrator.js";
@@ -230,20 +229,9 @@ async function runModelWithCapacityRetry(env, model, messages, timeoutMs, system
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-    if (url.pathname.startsWith("/api/auth/")) {
-      if (!authorized(request, env)) return json({ error: "Unauthorized." }, 401);
-      if (url.pathname === "/api/auth/google" && rateLimited(request)) {
-        return json({ error: "Too many sign-in attempts. Please wait and try again." }, 429, { "retry-after": "60" });
-      }
-      const authResponse = await handleAuthRequest(request, env);
-      if (authResponse) return authResponse;
-    }
-    // Every application API requires both the private Pages-to-Worker token
-    // and a valid Google-authenticated user session. Auth endpoints above are
-    // the only routes available before sign-in.
+    // The private Pages-to-Worker token protects the gateway. End users do
+    // not need Google accounts or browser sign-in sessions.
     if (!authorized(request, env)) return json({ error: "Unauthorized." }, 401);
-    const signedInUser = await readSession(request, env.ATLAS_SESSION_SECRET);
-    if (!signedInUser) return json({ error: "Sign-in required." }, 401);
     if (url.pathname === "/api/health") {
       if (request.method !== "GET") return json({ error: "Method not allowed." }, 405, { allow: "GET" });
       if (!authorized(request, env)) return json({ error: "Unauthorized." }, 401);
