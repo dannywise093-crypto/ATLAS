@@ -11,7 +11,9 @@ import { getNeuralRuntimeStatus, checkAtlasBackend, generateAtlasResponse, gener
 import { Activity, Bot, BrainCircuit, Camera, Check, Database, Eye, GraduationCap, Home, Menu, MessageSquare, Mic, Plus, Radio, Send, Settings, ShieldCheck, Sparkles, Trash2, Volume2, X } from "lucide-react";
 
 function atlasStorageKey(key) {
-  const userId = localStorage.getItem(atlasStorageKey("atlas-user-scope"));
+  // The account scope is a global bootstrap key; do not namespace its own lookup.
+  // Calling atlasStorageKey() here caused infinite recursion and crashed the workspace.
+  const userId = localStorage.getItem("atlas-user-scope");
   return "atlas-user:" + (userId || "unavailable") + ":" + key;
 }
 
