@@ -38,5 +38,7 @@ Confirm the database name matches `wrangler.jsonc` before applying.
 - The Worker verifies the RS256 signature against Google's published JWKS, checks issuer, audience, expiry and verified email, then records the stable Google subject in D1.
 - ATLAS issues its own seven-day HMAC-signed, HttpOnly, Secure, SameSite=Lax cookie. The signing secret remains server-side.
 - The browser never receives the ATLAS session signing secret or gateway token.
-- Existing public chat remains unchanged; this account foundation does not yet expose NVIDIA Deep Researcher jobs or enforce research quotas.
+- The React application renders a sign-in screen until `/api/auth/me` confirms a valid session. The workspace is not mounted before sign-in.
+- Every existing Worker application API requires both the private Pages-to-Worker gateway token and a valid ATLAS session cookie. Pages proxies forward the HttpOnly cookie; direct unauthenticated Worker requests are rejected.
+- This change does not yet expose NVIDIA Deep Researcher jobs or enforce research quotas. Do not enable public Deep Researcher access until its API validates ATLAS sessions and enforces job ownership on every job, report, stream, cancellation and artifact route.
 - Do not enable public Deep Researcher access until its API validates ATLAS sessions and enforces job ownership on every job, report, stream, cancellation and artifact route.
