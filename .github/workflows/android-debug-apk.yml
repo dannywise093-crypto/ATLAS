@@ -25,8 +25,8 @@ jobs:
       - name: Check Python gateway syntax
         run: python -m compileall -q server voice-service
 
-      - name: Check Vercel serverless function syntax
-        run: node --check api/_gateway.js && node --check api/chat.js && node --check api/copilot.js && node --check api/health.js && node --check functions/api/_gateway.js && node --check functions/api/tts.js && node --check cloudflare/worker.js && node --check cloudflare/worker.test.js
+      - name: Check Cloudflare Pages Functions and Worker syntax
+        run: node --check functions/api/_gateway.js && node --check functions/api/chat.js && node --check functions/api/copilot.js && node --check functions/api/health.js && node --check functions/api/nvidia.js && node --check functions/api/providers.js && node --check functions/api/transcribe.js && node --check functions/api/tts.js && node --check cloudflare/worker.js && node --check cloudflare/worker.test.js
 
       - name: Install dependencies
         run: npm ci
