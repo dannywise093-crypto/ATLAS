@@ -1,4 +1,4 @@
-import { handleAuthRequest } from "./auth.js";
+import { handleAuthRequest, readSession } from "./auth.js";
 import { formatResearchEvidence, needsLiveResearch, searchWeb } from "./knowledge.js";
 import { archiveResearchResults } from "./knowledgeArchive.js";
 import { buildSkillContext, getSkillCatalogStats } from "./skill-orchestrator.js";
@@ -238,6 +238,12 @@ export default {
       const authResponse = await handleAuthRequest(request, env);
       if (authResponse) return authResponse;
     }
+    // Every application API requires both the private Pages-to-Worker token
+    // and a valid Google-authenticated user session. Auth endpoints above are
+    // the only routes available before sign-in.
+    if (!authorized(request, env)) return json({ error: "Unauthorized." }, 401);
+    const signedInUser = await readSession(request, env.ATLAS_SESSION_SECRET);
+    if (!signedInUser) return json({ error: "Sign-in required." }, 401);
     if (url.pathname === "/api/health") {
       if (request.method !== "GET") return json({ error: "Method not allowed." }, 405, { allow: "GET" });
       if (!authorized(request, env)) return json({ error: "Unauthorized." }, 401);
