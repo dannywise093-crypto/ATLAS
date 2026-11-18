@@ -38,6 +38,20 @@ test("health endpoint advertises the primary and backup models", async () => {
   ]);
 });
 
+test("health and provider discovery preserve NVIDIA as primary when configured", async () => {
+  const env = { ...envWith(async () => ({})), NVIDIA_API_KEY: "test-only-nvidia-key" };
+  const health = await worker.fetch(request("/api/health"), env);
+  const healthBody = await health.json();
+  assert.equal(healthBody.provider, "NVIDIA API Catalog (primary), Cloudflare Workers AI (fallback)");
+  assert.equal(healthBody.model, "meta/llama-3.3-70b-instruct");
+
+  const providers = await worker.fetch(request("/api/providers"), env);
+  const providerBody = await providers.json();
+  assert.equal(providerBody.defaultProvider, "nvidia");
+  assert.equal(providerBody.providers.nvidia.configured, true);
+  assert.equal(providerBody.providers.atlas.role, "fallback");
+});
+
 test("chat uses the primary model and enables capacity-aware rejection", async () => {
   let calledWith;
   const env = envWith(async (model, input, options) => {
