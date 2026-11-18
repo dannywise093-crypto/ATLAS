@@ -3,7 +3,7 @@ import { runAtlasCore } from "./atlasCore.js";
 import { getBluetoothDiscoveryStatus, discoverBluetoothDevice, scanNativeBluetoothDevices } from "./roboticsDiscovery.js";
 import { Capacitor } from "@capacitor/core";
 import { getRoboticsTransportCatalog } from "./roboticsTransports.js";
-import { createSpeechRecognition, getVoiceCapabilities, speakText, stopSpeechPlayback } from "./voiceInterface.js";
+import { speakText, stopSpeechPlayback } from "./voiceInterface.js";
 import { createCloudflareVoice } from "./cloudflareVoice.js";
 import { Code2 } from "lucide-react";
 import { getNeuralRuntimeStatus, checkAtlasBackend, generateAtlasResponse, generateAtlasCopilotResponse, generateProviderResponse } from "./modelRuntime.js";
@@ -65,14 +65,7 @@ export default function App() {
   const [voiceStatus,setVoiceStatus] = useState("Voice assistant is idle.");
   const [voiceTranscript,setVoiceTranscript] = useState("");
   const voiceModeRef = useRef(false);
-  const voicePendingRef = useRef(false);
-  const voiceSpeakingRef = useRef(false);
-  const voiceReplyTextRef = useRef("");
-  const voiceAwaitingCommandRef = useRef(false);
-  const voiceRecognitionRef = useRef(null);
   const cloudVoiceSessionRef = useRef(null);
-  const voiceStartRef = useRef(null);
-  const voiceRestartTimerRef = useRef(null);
   const [robotSimRunning,setRobotSimRunning] = useState(false);
   const [robotSimPosition,setRobotSimPosition] = useState(0);
   const [robotSimSpeed,setRobotSimSpeed] = useState(35);
@@ -175,40 +168,21 @@ export default function App() {
   }
   async function speakVoiceReply(text){
     if(!voiceModeRef.current)return;
-    // Pending means a command is being processed, not that TTS is playing.
-    // Keep it false during playback so Android recognition can restart segments.
-    voicePendingRef.current=false;
-    voiceSpeakingRef.current=true;
-    voiceReplyTextRef.current=String(text||"").toLowerCase().replace(/[^a-z0-9\s]/g," ").replace(/\s+/g," ").trim();
-    clearTimeout(voiceRestartTimerRef.current);
-    setVoiceStatus("Speaking, sir. You can interrupt whenever you need.");
-    // The previous recognition session is stopped when its final command arrives.
-    // Re-open listening during TTS so a new spoken instruction can interrupt it.
-    clearTimeout(voiceRestartTimerRef.current);
-    voiceRestartTimerRef.current=setTimeout(()=>{
-      if(voiceModeRef.current&&!voicePendingRef.current&&!voiceRecognitionRef.current)voiceStartRef.current?.();
-    },350);
+    setVoiceStatus("Speaking. You can stop the conversation at any time.");
     cloudVoiceSessionRef.current?.pause?.();
     try{
       await speakText(text);
     }catch(error){
-      // Cancelling playback because the user started speaking is intentional.
-      if(voiceModeRef.current&&voiceSpeakingRef.current)setVoiceStatus("Spoken response unavailable: "+error.message);
+      if(voiceModeRef.current)setVoiceStatus("Spoken response unavailable: "+error.message);
     }finally{
-      voiceSpeakingRef.current=false;
-      voiceReplyTextRef.current="";
       if(voiceModeRef.current)cloudVoiceSessionRef.current?.resume?.();
     }
-    if(voiceModeRef.current&&!voicePendingRef.current){
-      voiceAwaitingCommandRef.current=false;
+    if(voiceModeRef.current){
       setVoiceTranscript("");
-      setVoiceStatus("Listening. Speak naturally; no wake word is required.");
-      clearTimeout(voiceRestartTimerRef.current);
-      voiceRestartTimerRef.current=setTimeout(()=>{
-        if(voiceModeRef.current&&!voicePendingRef.current&&!voiceSpeakingRef.current)voiceStartRef.current?.();
-      },450);
+      setVoiceStatus("Listening. Speak naturally; ATLAS is ready.");
     }
   }
+
   async function sendMessage(value,{isCopilot=false,speak=false,voiceModeActive=false}={}){
     const messageText=String(value||"").trim();
     // React state updates are asynchronous; use a synchronous lock to prevent
@@ -263,22 +237,15 @@ export default function App() {
   }
   function stopVoiceMode(){
     voiceModeRef.current=false;
-    voicePendingRef.current=false;
-    voiceSpeakingRef.current=false;
-    voiceAwaitingCommandRef.current=false;
     setVoiceMode(false);
-    clearTimeout(voiceRestartTimerRef.current);
-    try{voiceRecognitionRef.current?.stop();}catch{}
-    voiceRecognitionRef.current=null;
     try{cloudVoiceSessionRef.current?.stop();}catch{}
     cloudVoiceSessionRef.current=null;
     stopSpeechPlayback();
-    setVoiceStatus("Voice assistant is idle.");
+    setVoiceStatus("Voice assistant is idle. The microphone is off.");
   }
   async function startVoiceMode(){
     if(voiceModeRef.current)return;
     voiceModeRef.current=true;
-    voicePendingRef.current=false;
     setVoiceMode(true);
     setVoiceTranscript("");
     setVoiceStatus("Starting Cloudflare Voice. Allow microphone access when prompted…");
@@ -318,7 +285,7 @@ export default function App() {
     // Leaving the page ends an active session and releases its audio resources.
     if(page!=="Voice Center"&&voiceModeRef.current)stopVoiceMode();
   },[page]);
-  useEffect(()=>()=>{voiceModeRef.current=false;clearTimeout(voiceRestartTimerRef.current);try{voiceRecognitionRef.current?.stop();}catch{};stopSpeechPlayback();},[]);
+  useEffect(()=>()=>{voiceModeRef.current=false;try{cloudVoiceSessionRef.current?.stop();}catch{};stopSpeechPlayback();},[]);
   async function startRobotDiscovery(){
     if(robotDiscoveryBusy)return;
     setRobotDiscoveryBusy(true);
