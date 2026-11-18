@@ -122,6 +122,24 @@ See NVIDIA's [cuOpt documentation](https://docs.nvidia.com/cuopt/user-guide/late
 and [cuOpt OpenAPI reference](https://docs.nvidia.com/cuopt/user-guide/latest/open-api.html).
 
 
+## NVIDIA Deep Researcher Agent (vendored source)
+
+The complete NVIDIA Deep Researcher Agent source is maintained directly inside
+this repository at `agents/nvidia-deep-researcher/`. It is a normal, ATLAS-owned
+Git directory—not a submodule and not an external dependency fetched during
+setup. **Every normal clone of ATLAS already includes the full source tree.**
+
+The imported source retains its own Python project, `uv.lock`, configurations,
+frontends, deployment assets, tests, documentation, and license notices. Its
+Python runtime is intentionally separate from ATLAS's Node.js frontend and
+Cloudflare Worker. The source is present and versioned; the research backend is
+not automatically installed, deployed, or connected to the live ATLAS gateway.
+
+- [Agent components guide](agents/README.md)
+- [ATLAS integration and runtime boundary](agents/nvidia-deep-researcher/ATLAS-INTEGRATION.md)
+- [Imported upstream revision and license details](agents/nvidia-deep-researcher/UPSTREAM.md)
+- [NVIDIA Deep Researcher source](agents/nvidia-deep-researcher/)
+
 ## NVIDIA skill orchestration
 
 ATLAS includes the complete 451-skill NVIDIA catalog snapshot under `.agents/skills`, including each skill’s supporting references, evaluation material, benchmark report, skill card, and detached signature. The NVIDIA trust anchor is preserved at `.agents/nv-agent-root-cert.pem`. Run `npm run skills:build` after refreshing skills to regenerate `cloudflare/generated-skill-catalog.js` from `.agents/skills`, `.claude/skills`, `agent/skills`, and `agents/skills`. The Cloudflare Worker routes relevant requests to matching skill references and specialist roles; it treats skill instructions as untrusted reference data and does not execute bundled scripts. A skill’s external GPU runtime, hardware, credentials, or service must be provisioned separately. See [the ATLAS agent skills guide](.agents/README.md) and [the NVIDIA multi-agent orchestrator guide](docs/NVIDIA_MULTI_AGENT_ORCHESTRATOR.md).
