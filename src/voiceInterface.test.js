@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { cleanTextForSpeech, createSpeechRecognition, getVoiceCapabilities, speakText, stopSpeechPlayback } from "./voiceInterface.js";
 
 class FakeRecognition {
-  start() { this.started = true; }
+  start() { this.started = true; this.onstart?.({ type: "start" }); }
   stop() { this.stopped = true; }
 }
 
@@ -14,11 +14,16 @@ test("detects browser recognition and cloud audio playback support independently
   assert.deepEqual(getVoiceCapabilities({}), { speechRecognition: false, speechSynthesis: false });
 });
 
-test("creates an English UK continuous recognition session", () => {
+test("creates a one-turn English UK recognition session without starting the microphone", () => {
   let received;
-  const recognition = createSpeechRecognition({ SpeechRecognition: FakeRecognition }, { onResult: event => { received = event; } });
+  let started;
+  const recognition = createSpeechRecognition({ SpeechRecognition: FakeRecognition }, { onStart: event => { started = event; }, onResult: event => { received = event; } });
   assert.equal(recognition.lang, "en-GB");
-  assert.equal(recognition.continuous, true);
+  assert.equal(recognition.continuous, false);
+  assert.equal(recognition.started, undefined);
+  recognition.start();
+  assert.equal(recognition.started, true);
+  assert.deepEqual(started, { type: "start" });
   assert.equal(recognition.interimResults, true);
   const event = { resultIndex: 0, results: [] };
   recognition.onresult(event);
