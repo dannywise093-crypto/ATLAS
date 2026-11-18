@@ -82,19 +82,24 @@ export default function GoogleSignIn({ children }) {
   }, [loading, user]);
 
   async function signOut() {
+    if (busy) return;
     setBusy(true);
+    setStatus("Signing out…");
     try {
       const response = await fetch("/api/auth/logout", {
         method: "POST", credentials: "same-origin", cache: "no-store"
       });
-      if (!response.ok) throw new Error("Sign-out request failed.");
+      if (!response.ok) {
+        const detail = await response.json().catch(() => ({}));
+        throw new Error(detail.error || `Sign-out request failed (HTTP ${response.status}).`);
+      }
       window.google?.accounts?.id?.disableAutoSelect();
       localStorage.removeItem("atlas-user-scope");
       setUser(null);
       setStatus("You have signed out.");
       window.location.replace("/");
-    } catch {
-      setStatus("Could not sign out. Please retry.");
+    } catch (error) {
+      setStatus("Sign-out failed. " + (error?.message || "Please retry."));
     } finally { setBusy(false); }
   }
 
@@ -119,7 +124,13 @@ export default function GoogleSignIn({ children }) {
   return <div className="atlas-authenticated-shell">
     <div className="atlas-session-bar">
       <span>{user.name || user.email}</span>
-      <button type="button" onClick={signOut} disabled={busy}>{busy ? "Signing out…" : "Sign out"}</button>
+      <button
+        type="button"
+        onClick={(event) => { event.preventDefault(); event.stopPropagation(); signOut(); }}
+        disabled={busy}
+        aria-label="Sign out of ATLAS"
+      >{busy ? "Signing out…" : "Sign out"}</button>
+      <span className="atlas-session-status" role="status" aria-live="polite">{status}</span>
     </div>
     {children}
   </div>;
