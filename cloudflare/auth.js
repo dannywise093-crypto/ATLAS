@@ -61,7 +61,7 @@ async function createSession(user, secret) {
   const signature = await crypto.subtle.sign("HMAC", await hmacKey(secret), new TextEncoder().encode(payload));
   return payload + "." + bytesToBase64Url(new Uint8Array(signature));
 }
-async function readSession(request, secret) {
+async function readSessionCookie(request, secret) {
   const cookie = request.headers.get("cookie") || "";
   const raw = cookie.split(";").map((part) => part.trim()).find((part) => part.startsWith(SESSION_COOKIE + "="))?.slice(SESSION_COOKIE.length + 1);
   if (!raw || raw.length > 4096) return null;
@@ -85,6 +85,11 @@ function originAllowed(request, env) {
 function json(body, status = 200, headers = {}) {
   return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", "x-content-type-options": "nosniff", ...headers } });
 }
+export async function readSession(request, secret) {
+  if (!secret) return null;
+  return readSessionCookie(request, secret);
+}
+
 export async function handleAuthRequest(request, env) {
   const url = new URL(request.url);
   if (!env.ATLAS_GOOGLE_CLIENT_ID || !env.ATLAS_SESSION_SECRET || !env.KNOWLEDGE_DB) return json({ error: "Google sign-in is not configured on the ATLAS gateway." }, 503);
