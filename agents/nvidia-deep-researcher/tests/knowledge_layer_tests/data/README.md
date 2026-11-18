@@ -1,17 +1,10 @@
 # Test Data
 
-Test PDF files are distributed as a zip archive to avoid Git LFS dependencies.
+The upstream test-data archive is stored with Git LFS, but its referenced LFS object is currently unavailable (GitHub returns 404). Leaving the pointer in this repository prevents Cloudflare Pages from cloning the repository.
 
-## Setup
+The archive is therefore omitted from this application deployment branch. Knowledge-layer integration tests that require the sample PDFs must first restore the archive from a valid upstream copy; the application build does not depend on this optional test fixture.
 
-Extract the test data before running knowledge layer tests:
-
-```bash
-# From the repository root
-unzip tests/knowledge_layer_tests/data/Knowledge_Layer_Test_Data.zip -d tests/knowledge_layer_tests/data/
-```
-
-This extracts the following files:
+Expected extracted files when the archive is restored:
 
 - `ijms-22-05262.pdf` - Biomedical research paper (cystic fibrosis)
 - `ijms-22-06193.pdf` - Biomedical research paper (cystic fibrosis therapies)
