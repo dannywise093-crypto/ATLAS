@@ -4,10 +4,9 @@ import { getBluetoothDiscoveryStatus, discoverBluetoothDevice, scanNativeBluetoo
 import { Capacitor } from "@capacitor/core";
 import { getRoboticsTransportCatalog } from "./roboticsTransports.js";
 import { createSpeechRecognition, getVoiceCapabilities, speakText, stopSpeechPlayback } from "./voiceInterface.js";
-import { createGeminiLiveVoice } from "./geminiLiveVoice.js";
 import { Code2 } from "lucide-react";
 import { getNeuralRuntimeStatus, checkAtlasBackend, generateAtlasResponse, generateAtlasCopilotResponse, generateProviderResponse } from "./modelRuntime.js";
-import { Activity, Bot, BrainCircuit, Camera, Check, Database, Eye, GraduationCap, Home, Menu, MessageSquare, Mic, Plus, Radio, Send, Settings, ShieldCheck, Sparkles, Trash2, Volume2, X } from "lucide-react";
+import { Activity, Bot, BrainCircuit, Camera, Check, Database, Eye, GraduationCap, Home, Menu, MessageSquare, Mic, MicOff, Plus, Radio, Send, Settings, ShieldCheck, Sparkles, Trash2, Volume2, X } from "lucide-react";
 
 function AtlasLogo({ className = "" }) {
   return <img className={className} src="/atlas-logo.svg" alt="ATLAS logo" />;
@@ -17,7 +16,7 @@ const initial = [
   { role: "atlas", text: "Welcome to ATLAS. I’m your general-purpose AI assistant, connected through the secured Cloudflare model gateway. I can help with research, engineering, software development, reasoning, and the specialist skill library. Ask a question to get started." },
   { role: "atlas", text: "Your conversation is routed through the configured hosted model. Relevant skill references are selected automatically when they match your request." }
 ];
-const nav = [["Overview",Home],["AI Assistant",MessageSquare],["Copilot",Code2],["Vision Center",Eye],["Voice Center",Mic],["Memory",Database],["Learning",GraduationCap],["Robotics",Bot],["Settings",Settings]];
+const nav = [["Overview",Home],["AI Assistant",MessageSquare],["Copilot",Code2],["Vision Center",Eye],["Voice Center",Volume2],["Memory",Database],["Learning",GraduationCap],["Robotics",Bot],["Settings",Settings]];
 
 export default function App() {
   const [page,setPage] = useState("Overview");
@@ -61,18 +60,13 @@ export default function App() {
   const [menu,setMenu] = useState(false);
   const [notice,setNotice] = useState("");
   const [generating,setGenerating] = useState(false);
-  const [voiceMode,setVoiceMode] = useState(false);
-  const [voiceStatus,setVoiceStatus] = useState("Voice assistant is idle.");
-  const [voiceTranscript,setVoiceTranscript] = useState("");
-  const voiceModeRef = useRef(false);
-  const voicePendingRef = useRef(false);
-  const voiceSpeakingRef = useRef(false);
-  const voiceReplyTextRef = useRef("");
-  const voiceAwaitingCommandRef = useRef(false);
+  const [voiceStatus,setVoiceStatus] = useState("Ready. Type a message and ATLAS will speak its reply.");
+  const [isListening,setIsListening] = useState(false);
+  const [voiceInputAvailable] = useState(()=>getVoiceCapabilities().speechRecognition);
   const voiceRecognitionRef = useRef(null);
-  const liveVoiceSessionRef = useRef(null);
-  const voiceStartRef = useRef(null);
-  const voiceRestartTimerRef = useRef(null);
+  const voiceTranscriptRef = useRef("");
+  const voiceCancelledRef = useRef(false);
+  const voiceErrorRef = useRef("");
   const [robotSimRunning,setRobotSimRunning] = useState(false);
   const [robotSimPosition,setRobotSimPosition] = useState(0);
   const [robotSimSpeed,setRobotSimSpeed] = useState(35);
@@ -173,38 +167,96 @@ export default function App() {
       commitCopilotConversations([fresh]);setActiveCopilotConversationId(fresh.id);localStorage.setItem("atlas-active-copilot-conversation",fresh.id);
     }
   }
+  function cancelVoiceInput(){
+    const recognition=voiceRecognitionRef.current;
+    if(!recognition)return;
+    voiceCancelledRef.current=true;
+    voiceTranscriptRef.current="";
+    voiceRecognitionRef.current=null;
+    setIsListening(false);
+    try{recognition.abort();}catch{}
+    setInput("");
+    setVoiceStatus("Voice input cancelled. ATLAS is not listening.");
+  }
+  function stopVoiceInput(){
+    const recognition=voiceRecognitionRef.current;
+    if(!recognition)return;
+    setVoiceStatus("Finishing your voice message…");
+    try{recognition.stop();}catch(error){
+      setIsListening(false);
+      setVoiceStatus("Could not stop voice input: "+(error?.message||"please try again"));
+    }
+  }
+  function startVoiceInput(){
+    if(voiceRecognitionRef.current||isListening||generating)return;
+    if(!voiceInputAvailable){
+      setVoiceStatus("Voice input is not supported in this browser. Try the ATLAS website in a supported browser, or type your message.");
+      return;
+    }
+    stopSpeechPlayback();
+    voiceTranscriptRef.current="";
+    voiceCancelledRef.current=false;
+    voiceErrorRef.current="";
+    setInput("");
+    setVoiceStatus("Requesting microphone access…");
+    try{
+      const recognition=createSpeechRecognition(globalThis,{
+        onStart:()=>{setIsListening(true);setVoiceStatus("Listening for this turn only. Speak, then pause; ATLAS will reply aloud.");},
+        onResult:event=>{
+          let finalText="";
+          let interimText="";
+          for(let index=event.resultIndex||0;index<event.results.length;index++){
+            const result=event.results[index];
+            const transcript=result?.[0]?.transcript||"";
+            if(result?.isFinal)finalText+=transcript+" ";
+            else interimText+=transcript;
+          }
+          if(finalText)voiceTranscriptRef.current=(voiceTranscriptRef.current+" "+finalText).trim();
+          setInput((voiceTranscriptRef.current+" "+interimText).trim());
+        },
+        onError:event=>{
+          if(event?.error==="aborted")return;
+          voiceErrorRef.current=event?.error||"unknown";
+          setVoiceStatus(event?.error==="not-allowed"||event?.error==="service-not-allowed"
+            ?"Microphone permission was not granted. ATLAS has stopped listening."
+            :"Voice input error: "+voiceErrorRef.current+". You can try again or type your message.");
+        },
+        onEnd:()=>{
+          setIsListening(false);
+          if(voiceRecognitionRef.current!==recognition)return;
+          voiceRecognitionRef.current=null;
+          if(voiceCancelledRef.current)return;
+          const spoken=voiceTranscriptRef.current.trim();
+          voiceTranscriptRef.current="";
+          if(spoken){
+            setInput("");
+            setVoiceStatus("You said: "+spoken+" — ATLAS is preparing a reply…");
+            void sendMessage(spoken,{speak:true,voiceModeActive:true});
+          }else if(!voiceErrorRef.current){
+            setVoiceStatus("No speech detected. ATLAS is not listening. Tap the microphone when you are ready.");
+          }
+        }
+      });
+      voiceRecognitionRef.current=recognition;
+      recognition.start();
+      setIsListening(true);
+    }catch(error){
+      voiceRecognitionRef.current=null;
+      setIsListening(false);
+      setVoiceStatus("Could not start voice input: "+(error?.message||"microphone unavailable"));
+    }
+  }
   async function speakVoiceReply(text){
-    if(!voiceModeRef.current)return;
-    // Pending means a command is being processed, not that TTS is playing.
-    // Keep it false during playback so Android recognition can restart segments.
-    voicePendingRef.current=false;
-    voiceSpeakingRef.current=true;
-    voiceReplyTextRef.current=String(text||"").toLowerCase().replace(/[^a-z0-9\s]/g," ").replace(/\s+/g," ").trim();
-    clearTimeout(voiceRestartTimerRef.current);
-    setVoiceStatus("Speaking, sir. You can interrupt whenever you need.");
-    // The previous recognition session is stopped when its final command arrives.
-    // Re-open listening during TTS so a new spoken instruction can interrupt it.
-    clearTimeout(voiceRestartTimerRef.current);
-    voiceRestartTimerRef.current=setTimeout(()=>{
-      if(voiceModeRef.current&&!voicePendingRef.current&&!voiceRecognitionRef.current)voiceStartRef.current?.();
-    },350);
+    setVoiceStatus("ATLAS is speaking…");
     try{
       await speakText(text);
+      setVoiceStatus("Ready. Type another message whenever you like.");
     }catch(error){
-      // Cancelling playback because the user started speaking is intentional.
-      if(voiceModeRef.current&&voiceSpeakingRef.current)setVoiceStatus("Spoken response unavailable: "+error.message);
-    }finally{
-      voiceSpeakingRef.current=false;
-      voiceReplyTextRef.current="";
-    }
-    if(voiceModeRef.current&&!voicePendingRef.current){
-      voiceAwaitingCommandRef.current=false;
-      setVoiceTranscript("");
-      setVoiceStatus("Listening. Speak naturally; no wake word is required.");
-      clearTimeout(voiceRestartTimerRef.current);
-      voiceRestartTimerRef.current=setTimeout(()=>{
-        if(voiceModeRef.current&&!voicePendingRef.current&&!voiceSpeakingRef.current)voiceStartRef.current?.();
-      },450);
+      if(error?.message==="Speech playback interrupted.") {
+        setVoiceStatus("Speech stopped.");
+      } else {
+        setVoiceStatus("Spoken reply unavailable: "+(error?.message||"audio playback failed"));
+      }
     }
   }
   async function sendMessage(value,{isCopilot=false,speak=false,voiceModeActive=false}={}){
@@ -257,59 +309,9 @@ export default function App() {
   }
   async function send(e){
     e.preventDefault();
-    return sendMessage(input,{isCopilot:page==="Copilot"});
+    return sendMessage(input,{isCopilot:page==="Copilot",speak:page==="Voice Center"});
   }
-  function stopVoiceMode(){
-    voiceModeRef.current=false;
-    voicePendingRef.current=false;
-    voiceSpeakingRef.current=false;
-    voiceAwaitingCommandRef.current=false;
-    setVoiceMode(false);
-    clearTimeout(voiceRestartTimerRef.current);
-    try{voiceRecognitionRef.current?.stop();}catch{}
-    voiceRecognitionRef.current=null;
-    try{liveVoiceSessionRef.current?.stop();}catch{}
-    liveVoiceSessionRef.current=null;
-    stopSpeechPlayback();
-    setVoiceStatus("Voice assistant is idle.");
-  }
-  async function startVoiceMode(){
-    if(voiceModeRef.current)return;
-    voiceModeRef.current=true;
-    voicePendingRef.current=false;
-    setVoiceMode(true);
-    setVoiceTranscript("");
-    setVoiceStatus("Starting ATLAS Live Voice. Allow microphone access when prompted…");
-    const session=createGeminiLiveVoice({
-      onStatus:message=>{if(voiceModeRef.current)setVoiceStatus(message);},
-      onInputTranscript:text=>{if(voiceModeRef.current)setVoiceTranscript(text);},
-      onOutputTranscript:text=>{if(voiceModeRef.current){setVoiceTranscript(text);setVoiceStatus("ATLAS is responding…");}},
-      onTurnComplete:({userText,assistantText})=>{
-        if(!voiceModeRef.current)return;
-        const additions=[];
-        if(userText)additions.push({role:"user",text:userText});
-        if(assistantText)additions.push({role:"atlas",text:assistantText});
-        if(additions.length)updateConversationMessages(activeConversation?.id,items=>[...items,...additions]);
-        setVoiceTranscript("");
-      },
-      onError:error=>{if(voiceModeRef.current){setVoiceStatus("Live Voice disconnected: "+(error?.message||"connection lost"));voiceModeRef.current=false;setVoiceMode(false);}}
-    });
-    liveVoiceSessionRef.current=session;
-    try{
-      await session.start();
-      if(!voiceModeRef.current)session.stop();
-    }catch(error){
-      session.stop();
-      if(liveVoiceSessionRef.current===session)liveVoiceSessionRef.current=null;
-      if(voiceModeRef.current){setVoiceStatus("Live Voice unavailable: "+error.message);voiceModeRef.current=false;setVoiceMode(false);}
-    }
-  }
-
-  useEffect(()=>{
-    if(page==="Voice Center")startVoiceMode();
-    else stopVoiceMode();
-  },[page]);
-  useEffect(()=>()=>{voiceModeRef.current=false;clearTimeout(voiceRestartTimerRef.current);try{voiceRecognitionRef.current?.stop();}catch{};stopSpeechPlayback();},[]);
+  useEffect(()=>()=>{try{voiceRecognitionRef.current?.abort();}catch{} voiceRecognitionRef.current=null; stopSpeechPlayback();},[]);
   async function startRobotDiscovery(){
     if(robotDiscoveryBusy)return;
     setRobotDiscoveryBusy(true);
@@ -357,10 +359,10 @@ export default function App() {
   </section> : page==="AI Assistant" ? <section className="stack grok-page"><div className="grok-workspace"><aside className="grok-history"><button className="grok-new-chat" onClick={newConversation}><Plus size={17}/> <span>New chat</span></button><div className="grok-history-label">YOUR CHATS</div><div className="grok-history-list" aria-label="ATLAS conversation history">{conversations.map(item=><div className={item.id===activeConversation?.id?"grok-history-item active":"grok-history-item"} key={item.id}><button className="grok-history-open" onClick={()=>{setActiveConversationId(item.id);setInput("");}} title={item.title}>{item.title}</button><button className="grok-history-delete" onClick={()=>deleteConversation(item.id)} aria-label={"Delete "+item.title} title="Delete conversation"><Trash2 size={14}/></button></div>)}</div><div className="grok-history-foot"><span className="grok-status-dot"/> ATLAS · PRIVATE SESSION</div></aside><div className="grok-chat-main"><div className="grok-topbar"><div className="grok-title"><span className="grok-mark"><AtlasLogo/></span><div><b>ATLAS</b><small>GENERAL INTELLIGENCE</small></div></div><div className="grok-top-actions"><span className="grok-model-tag">AUTO MODEL</span><span className="grok-online"><i/> {gatewayReady?"ONLINE":"CONNECTING"}</span></div></div><div className="grok-messages">{messages.map((m,i)=><div className={"grok-message "+m.role} key={i}>{m.role==="atlas"&&<span className="grok-message-avatar"><AtlasLogo/></span>}<div className="grok-message-body">{m.role==="user"&&<b>YOU</b>}<p>{m.text}</p></div></div>)}</div><div className="grok-compose-area"><div className="grok-model-row"><label htmlFor="atlas-provider">MODEL</label><select id="atlas-provider" value={provider} onChange={e=>setProvider(e.target.value)}><option value="atlas">ATLAS · Auto</option><option value="nvidia" disabled={!providerStates.nvidia?.configured}>NVIDIA API Catalog{providerStates.nvidia?.configured?"":" · unavailable"}</option></select></div><form className="grok-composer" onSubmit={send}><textarea aria-label="Message ATLAS" rows="1" value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();e.currentTarget.form.requestSubmit();}}} placeholder="Ask ATLAS anything…"/><div className="grok-composer-bottom"><span>Enter to send · Shift + Enter for a new line</span><button aria-label="Send message" disabled={!input.trim()||generating}><Send size={17}/></button></div></form><small>{generating?"ATLAS is thinking…":"AI can make mistakes. Verify important information."}</small></div></div></div></section>
   : page==="Copilot" ? <section className="stack grok-page"><div className="grok-workspace"><aside className="grok-history"><button className="grok-new-chat" onClick={newCopilotConversation}><Plus size={17}/> <span>New chat</span></button><div className="grok-history-label">COPILOT CHATS</div><div className="grok-history-list" aria-label="Copilot conversation history">{copilotConversations.map(item=><div className={item.id===activeCopilotConversation?.id?"grok-history-item active":"grok-history-item"} key={item.id}><button className="grok-history-open" onClick={()=>{setActiveCopilotConversationId(item.id);localStorage.setItem("atlas-active-copilot-conversation",item.id);setInput("");}} title={item.title}>{item.title}</button><button className="grok-history-delete" onClick={()=>deleteCopilotConversation(item.id)} aria-label={"Delete "+item.title} title="Delete Copilot conversation"><Trash2 size={14}/></button></div>)}</div><div className="grok-history-foot"><span className="grok-status-dot"/> ATLAS COPILOT · PRIVATE SESSION</div></aside><div className="grok-chat-main"><div className="grok-topbar"><div className="grok-title"><span className="grok-mark"><AtlasLogo/></span><div><b>ATLAS Copilot</b><small>SOFTWARE ENGINEERING</small></div></div><div className="grok-top-actions"><span className="grok-model-tag">CODING MODE</span><span className="grok-online"><i/> {gatewayReady?"ONLINE":"CONNECTING"}</span></div></div><div className="grok-messages">{copilotMessages.map((m,i)=><div className={"grok-message "+m.role} key={i}>{m.role==="atlas"&&<span className="grok-message-avatar"><AtlasLogo/></span>}<div className="grok-message-body">{m.role==="user"&&<b>YOU</b>}<p>{m.text}</p></div></div>)}</div><div className="grok-compose-area"><div className="grok-composer-hint">Ask Copilot to write, explain, debug, or review code.</div><form className="grok-composer" onSubmit={send}><textarea aria-label="Message ATLAS Copilot" rows="1" value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();e.currentTarget.form.requestSubmit();}}} placeholder="Ask ATLAS Copilot about your code…"/><div className="grok-composer-bottom"><span>Enter to send · Shift + Enter for a new line</span><button aria-label="Send message" disabled={!input.trim()||generating}><Send size={17}/></button></div></form><small>{generating?"Copilot is thinking…":"AI can make mistakes. Review generated code before using it."}</small></div></div></div></section>
   : page==="Vision Center" ? <section className="stack">{heading(page,"Prepare image input for future computer-vision features.","NOT CONNECTED")}<div className="panel"><Camera size={30}/><h3>Image input</h3><p>Choose a picture from your phone to preview it here. This prototype does not send images to an AI model.</p><label className="button">Choose image<input hidden type="file" accept="image/*" onChange={e=>{const f=e.target.files?.[0];if(f){setImage(URL.createObjectURL(f));setNotice("Local preview only. AI analysis is not connected.")}}}/></label>{image&&<img className="preview" src={image} alt="Selected preview"/>}{notice&&<p className="notice">{notice}</p>}</div>{card(<ShieldCheck/>,"Planned vision capabilities","Object recognition, camera integration, visual Q&A and privacy controls.")}</section>
-  : page==="Voice Center" ? <section className="voice-session-screen" aria-label="ATLAS voice session"><div className="voice-top-notch" aria-hidden="true"/><header className="voice-selection-header"><h1>Voice Selection</h1><button type="button" className="voice-confirm" onClick={()=>setPage("Overview")} aria-label="Finish voice session"><Check size={24} strokeWidth={1.8}/></button></header><div className={`voice-orb-stage ${voiceMode?"is-listening":""} ${voiceStatus.toLowerCase().includes("speaking")?"is-speaking":""} ${voiceStatus.toLowerCase().includes("processing")?"is-thinking":""}`} role="img" aria-label="Animated cosmic glass orb"><div className="cosmic-orb"><div className="orb-nebula"/><div className="orb-light-ribbons"/><div className="orb-starfield">{Array.from({length:38},(_,index)=><i key={index} style={{"--x":`${(index*37+11)%92+4}%`,"--y":`${(index*53+7)%90+5}%`,"--size":`${index%5===0?2.4:index%3===0?1.7:1.1}px`,"--delay":`${(index%9)*-.37}s`,"--twinkle":`${1.8+(index%5)*.45}s`}}/> )}</div><div className="orb-glass-shine"/></div></div><span className="voice-session-accessible-status" aria-live="polite">{voiceStatus}{voiceTranscript?` ${voiceTranscript}`:""}</span></section>
+  : page==="Voice Center" ? <section className="stack voice-session-screen" aria-label="ATLAS voice center">{heading("ATLAS Voice Center","Speak to ATLAS when you choose, then hear its spoken reply. The microphone is never activated automatically.","OPT-IN VOICE")}<div className="panel voice-tts-panel"><div className="voice-tts-status" role="status" aria-live="polite"><Volume2 size={18}/><span>{voiceStatus}</span></div><div className="grok-messages voice-tts-messages">{messages.map((m,i)=><div className={"grok-message "+m.role} key={i}>{m.role==="atlas"&&<span className="grok-message-avatar"><AtlasLogo/></span>}<div className="grok-message-body">{m.role==="user"&&<b>YOU</b>}<p>{m.text}</p></div></div>)}</div><div className="voice-input-controls"><button type="button" className={isListening?"voice-mic-button listening":"voice-mic-button"} onClick={isListening?stopVoiceInput:startVoiceInput} disabled={generating} aria-pressed={isListening}><Mic size={18}/>{isListening?"Finish & send":"Speak to ATLAS"}</button>{isListening&&<button type="button" className="secondary" onClick={cancelVoiceInput}><MicOff size={16}/> Cancel</button>}</div><small className="voice-privacy-note">Microphone is used only after you tap “Speak to ATLAS”. Each turn ends after you finish speaking; ATLAS never listens in the background.</small><form className="grok-composer voice-tts-composer" onSubmit={send}><textarea aria-label="Message ATLAS Voice Center" rows="2" value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();e.currentTarget.form.requestSubmit();}}} placeholder="Or type a message for ATLAS…"/><div className="grok-composer-bottom"><span>Type instead · ATLAS speaks the reply</span><button aria-label="Send message" disabled={!input.trim()||generating||isListening}><Send size={17}/></button></div></form><button type="button" className="secondary" onClick={()=>{stopSpeechPlayback();setVoiceStatus("Spoken reply stopped.");}}><Volume2 size={16}/> Stop spoken reply</button><small>{generating?"ATLAS is thinking…":isListening?"Listening only for this turn…":voiceInputAvailable?"Ready. Microphone is off until you tap Speak to ATLAS.":"Voice input is unavailable in this browser; typed chat and spoken replies remain available."}</small></div></section>
   : page==="Memory" ? <section className="stack">{heading("Project Memory","Notes are stored in this browser on this device.")}<div className="toolbar"><span>{memory.length} saved notes</span><button onClick={addMemory}>+ Add memory</button></div>{memory.map((m,i)=><div className="memory" key={i}><Database/><p>{m}</p><button className="delete" onClick={()=>setMemory(a=>a.filter((_,n)=>n!==i))}>Delete</button></div>)}<p className="notice">Notes are stored locally. They are not synced to a server or shared across devices.</p></section>
   : page==="Learning" ? <section className="stack">{heading("Learning Lab","Plan skills and training experiments for ATLAS.","PLANNING")}<div className="grid two">{card(<Sparkles/>,"Demonstration learning","Record human demonstrations and turn them into reviewed task examples.")}{card(<Activity/>,"Feedback & evaluation","Track outcomes in simulation and compare test runs.")}{card(<BrainCircuit/>,"Skill library","Store versioned, reviewed skills with clear permissions.")}{card(<ShieldCheck/>,"Safe testing","Require simulation, supervised trials and an emergency stop.","Required")}</div></section>
   : page==="Robotics" ? <section className="stack robotics-page">{heading("Robotics Center","Universal hardware integration · vendor-neutral adapter architecture.","MULTI-TRANSPORT HUB")}<div className="robotics-status"><div className="robotics-status-icon"><Bot size={27}/></div><div><b>ATLAS Integrated Robotics Bridge</b><p>The connection manager lives inside ATLAS. It is designed to connect to compatible robots, vehicles, sensors and industrial equipment across Bluetooth, Wi-Fi, USB, Ethernet, CAN adapters and network protocols. Each transport is shown with its real implementation status; a planned adapter is not presented as a working connection.</p></div><span className="badge">SIMULATION READY</span></div><div className="robotics-section-head"><div><h2>UNIVERSAL CONNECTION HUB</h2><p>One connection manager for phone radios, wired adapters, vehicle buses, industrial networks and robotics middleware.</p></div><span className="badge">{roboticsTransportCatalog.length} TRANSPORTS</span></div><div className="robotics-transport-grid">{roboticsTransportCatalog.map(item=><article className="card robotics-adapter" key={item.id}><div className="cardtop"><span className="cardicon"><Radio size={18}/></span><span className={"badge transport-state "+item.state}>{item.state==="available"?"Available":item.state==="implemented"?"Implemented":"Planned"}</span></div><h3>{item.name}</h3><small className="transport-group">{item.group}</small><p>{item.scope}</p><div className="transport-route">Connection path: {item.route}</div></article>)}</div><div className="robot-discovery-panel"><div className="robot-discovery-copy"><b>LIVE BLUETOOTH LE DISCOVERY</b><p>{robotDiscoveryCapability.reason}</p><small>{robotBluetoothDevice?`${robotBluetoothDevice.name} · ${robotBluetoothDevice.connection}`:robotDiscoveredDevices.length?`${robotDiscoveredDevices.length} nearby device(s) discovered`:"No device selected"}</small><small className="robot-discovery-feedback">{robotDiscoveryMessage}</small>{robotDiscoveredDevices.length>0&&<ul className="robot-discovered-list">{robotDiscoveredDevices.map(device=><li key={device.id}><b>{device.name}</b><span>{device.transport} · {device.rssi===null||device.rssi===undefined?"signal unavailable":`${device.rssi} dBm`} · {device.connection}</span></li>)}</ul>}</div><div className="robot-discovery-actions"><span className="badge">{robotBluetoothDevice?.connected?"CONNECTED":robotDiscoveryCapability.supported?"READY TO SCAN":"API UNAVAILABLE"}</span><button onClick={startRobotDiscovery} disabled={!robotDiscoveryCapability.supported||robotDiscoveryBusy}>{robotDiscoveryBusy?"Searching…":"Discover Bluetooth devices"}</button>{robotBluetoothDevice&&<button className="secondary" onClick={disconnectRobotDevice}>Disconnect</button>}</div></div><div className="robotics-section-head"><div><h2>INTEGRATION LAYERS</h2><p>Discovery and telemetry first; actuation remains locked out.</p></div></div><div className="grid two">{card(<Activity/>,"Device discovery",robotBluetoothDevice?`Selected ${robotBluetoothDevice.name}; ${robotBluetoothDevice.connection}.`:"Live Bluetooth discovery is available when this browser exposes Web Bluetooth. USB, Wi-Fi and native Android adapters remain pending.",robotBluetoothDevice?.connected?"Connected":robotDiscoveryCapability.supported?"Ready":"Unavailable")}{card(<Database/>,"Sensor telemetry","Read-only, timestamped and unit-labelled sensor data with stale-data detection.","Not connected")}{card(<ShieldCheck/>,"Safety supervisor","Independent hardware emergency stop, watchdog, interlocks and operator authorization.","Required")}{card(<BrainCircuit/>,"Simulation first","Validate adapter contracts and sensor streams against mock devices before hardware trials.","Planned")}</div><div className="robotics-section-head"><div><h2>MOTION LAB · SIMULATION</h2><p>Motion is enabled in the virtual robot simulator. This does not move connected physical hardware.</p></div><span className="badge">SIMULATION ACTIVE</span></div><div className="robot-motion-lab"><div className="robot-motion-stage"><div className="robot-motion-track"><div className="robot-motion-unit" style={{left:`calc(${robotSimPosition}% - 24px)`}}><Bot size={28}/></div></div><div className="robot-motion-scale"><span>0%</span><span>Virtual travel</span><span>100%</span></div><div className="robot-motion-readout"><span>POSITION <b>{robotSimPosition.toFixed(0)}%</b></span><span>SIMULATED SPEED <b>{robotSimSpeed}%</b></span><span>STATE <b>{robotSimRunning?"MOVING":"PAUSED"}</b></span></div></div><div className="robot-motion-controls"><label htmlFor="robot-sim-speed">Simulation speed</label><input id="robot-sim-speed" type="range" min="5" max="100" value={robotSimSpeed} onChange={event=>setRobotSimSpeed(Number(event.target.value))}/><div className="robot-motion-buttons"><button onClick={()=>setRobotSimRunning(value=>!value)}>{robotSimRunning?"Pause motion":"Start motion"}</button><button className="secondary" onClick={()=>{setRobotSimRunning(false);setRobotSimPosition(0);setRobotSimDirection(1);}}>Reset simulation</button></div></div></div><div className="safety"><ShieldCheck/><div><b>Physical hardware motion remains locked</b><p>Only virtual motion is enabled here. ATLAS does not send motor, actuator, servo or gripper commands to real equipment. Physical motion requires a separately reviewed safety design, independent emergency stop and verified hardware safeguards.</p></div></div><p className="notice">Plugin architecture specification: <code>docs/ROBOTICS_PLUGIN_ARCHITECTURE.md</code>. No robot is paired. Bluetooth discovery uses the browser device picker where supported. Native Android BLE scanning is integrated in the APK. USB OTG, Wi-Fi peer discovery and sensor-specific read-only adapters remain pending. No control or movement commands are sent.</p></section>
   : <section className="stack">{heading("Settings","Prototype configuration and system information.")}<div className="panel settings">{[["Application","ATLAS AI v1.0 prototype"],["Architecture","Hybrid cloud + edge (planned)"],["AI engine","Cloudflare Workers AI · Llama 3.3 + fallbacks"],["Memory storage","This device / browser"],["Robot connection","Integrated bridge · hardware adapters planned"],["Motion mode","Simulation enabled · physical actuation locked"]].map(([a,b])=><div className="setting" key={a}><span>{a}</span><b>{b}</b></div>)}</div><p className="notice">Never paste API keys or passwords into chat messages or public code. Store model-provider credentials only in private server-side environment variables.</p></section>;
-  return <div className={page==="Voice Center"?"app voice-session-active":"app"}><aside className={menu?"sidebar open":"sidebar"}><div className="brand"><AtlasLogo className="logo-brand"/><div><b>ATLAS<span>AI</span></b><small>PHYSICAL INTELLIGENCE</small></div><button className="x" onClick={()=>setMenu(false)}><X/></button></div><label>WORKSPACE</label><nav>{nav.map(([n,I])=><button className={page===n?"active":""} key={n} onClick={()=>{setPage(n);setMenu(false)}}><I size={18}/>{n}</button>)}</nav><div className="sidefoot"><b>● Cloud AI gateway</b><p>General chat uses the hosted Llama 3.3 primary model and fallbacks. Local memory remains on this device.</p><small>ATLAS BUILD 0.5.0 · CLOUD MODEL</small></div></aside><main><header className="top"><button className="hamb" onClick={()=>setMenu(true)}><Menu/></button><span>ATLAS　›　<b>{page}</b></span><small>● Prototype</small></header><div className="content">{content}</div></main>{menu&&<button className="scrim" onClick={()=>setMenu(false)} aria-label="Close navigation"/>}</div>;
+  return <div className="app"><aside className={menu?"sidebar open":"sidebar"}><div className="brand"><AtlasLogo className="logo-brand"/><div><b>ATLAS<span>AI</span></b><small>PHYSICAL INTELLIGENCE</small></div><button className="x" onClick={()=>setMenu(false)}><X/></button></div><label>WORKSPACE</label><nav>{nav.map(([n,I])=><button className={page===n?"active":""} key={n} onClick={()=>{setPage(n);setMenu(false)}}><I size={18}/>{n}</button>)}</nav><div className="sidefoot"><b>● Cloud AI gateway</b><p>General chat uses the hosted Llama 3.3 primary model and fallbacks. Local memory remains on this device.</p><small>ATLAS BUILD 0.5.0 · CLOUD MODEL</small></div></aside><main><header className="top"><button className="hamb" onClick={()=>setMenu(true)}><Menu/></button><span>ATLAS　›　<b>{page}</b></span><small>● Prototype</small></header><div className="content">{content}</div></main>{menu&&<button className="scrim" onClick={()=>setMenu(false)} aria-label="Close navigation"/>}</div>;
 }

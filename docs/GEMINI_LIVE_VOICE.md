@@ -1,33 +1,31 @@
-# ATLAS Gemini Live Voice
+# ATLAS Voice Center
 
-ATLAS Voice Center uses Google's Gemini Live API for real-time audio-to-audio conversation. This integration is limited to the Voice Center; normal ATLAS text chat, Copilot, memory, and other modules continue using their existing services.
+ATLAS Voice Center supports optional, user-initiated voice-to-voice turns.
 
-## Provider and free tier
+## How it works
 
-- Model: `gemini-3.8-live`.
-- Google currently lists a free tier for this Live model. Free-tier availability is subject to Google's quotas, rate limits, account eligibility, and policy changes.
-- Google states that content submitted on the free tier may be used to improve its products. In this ATLAS integration, only live Voice Center audio is sent to Google. Normal text-chat messages are not routed to Gemini Live.
-- Do not speak passwords, financial details, private identifiers, or other sensitive information into the free-tier voice session.
+1. The microphone remains off by default.
+2. The user taps **Speak to ATLAS** to start one speech-recognition turn.
+3. The browser captures speech only for that active turn and produces a text transcript.
+4. ATLAS sends the transcript through its normal chat gateway using voice-response style.
+5. ATLAS speaks the reply through the authenticated `/api/tts` endpoint.
+6. Recognition ends after the utterance or when the user taps **Finish & send**. The user can cancel the active turn.
 
-## Required server secret
+Typed messages remain available in Voice Center and also receive spoken replies. The user can stop spoken playback at any time.
 
-Add `GEMINI_API_KEY` as a **Worker secret** on the `atlas-model-gateway` Cloudflare Worker. Never add this key to Vite variables, browser code, Pages public variables, or the Git repository.
+## Privacy and interaction rules
 
-Using Wrangler from a trusted development environment:
+- Never start speech recognition automatically on page load, navigation, or after an AI response.
+- Never keep the microphone open between turns or in the background.
+- Request microphone access only after the user explicitly taps **Speak to ATLAS**.
+- Do not record or persist raw microphone audio. Only the recognized text is added to the conversation.
+- If speech recognition is unavailable or permission is denied, explain the issue and keep typed chat plus spoken replies available.
+- Do not use Gemini Live or any always-on listening session for this experience.
 
-```sh
-wrangler secret put GEMINI_API_KEY
-```
+## Browser compatibility
 
-Paste the Gemini API key when prompted. The Worker uses it only to request a one-use, short-lived Live API token. The browser receives that temporary token, not the permanent API key.
+Speech input depends on the browser's `SpeechRecognition` or `webkitSpeechRecognition` implementation. Some Android WebViews do not expose this API; in those environments, the UI must report that voice input is unavailable rather than pretending the microphone works. Cloud TTS remains a separate `/api/tts` request and may be unavailable while the account's free Workers AI allocation is exhausted.
 
-The Pages Functions deployment must retain its existing `ATLAS_GATEWAY_TOKEN` secret so `POST /api/voice-token` can authenticate to the Worker.
+## Verification
 
-## Deployment
-
-1. Deploy the updated Worker after merging the change.
-2. Confirm `GEMINI_API_KEY` exists as a Worker secret.
-3. Deploy the updated Cloudflare Pages application so the new `/api/voice-token` Pages Function is available.
-4. Open ATLAS over HTTPS, enter Voice Center, and allow microphone access.
-
-If the free quota is exhausted or the model is unavailable, Voice Center reports an error; it does not silently switch to a paid provider. The normal text-chat service remains unchanged.
+Unit tests cover capability detection, explicit one-turn recognition setup, cloud TTS request handling, playback, and stop behavior. End-to-end microphone permission and spoken conversation must still be verified on a real supported browser/device.
