@@ -16,15 +16,16 @@ test("detects browser recognition and cloud audio playback support independently
 
 test("creates a one-turn English UK recognition session without starting the microphone", () => {
   let received;
-  const recognition = createSpeechRecognition({ SpeechRecognition: FakeRecognition }, { onResult: event => { received = event; } });
+  let started;
+  const recognition = createSpeechRecognition({ SpeechRecognition: FakeRecognition }, { onStart: event => { started = event; }, onResult: event => { received = event; } });
   assert.equal(recognition.lang, "en-GB");
   assert.equal(recognition.continuous, false);
   assert.equal(recognition.started, undefined);
-  let startedEvent;
-  recognition.onstart({ type: "start" });
+  const startEvent = { type: "start" };
+  recognition.onstart(startEvent);
   recognition.start();
   assert.equal(recognition.started, true);
-  assert.equal(startedEvent, undefined);
+  assert.equal(started, startEvent);
   assert.equal(recognition.interimResults, true);
   const event = { resultIndex: 0, results: [] };
   recognition.onresult(event);
