@@ -56,3 +56,15 @@ test("research proxy keeps the backend token server-side and streams upstream bo
     globalThis.fetch = originalFetch;
   }
 });
+
+test("research proxy refuses insecure remote backend URLs", async () => {
+  const request = new Request("https://nexora.example/api/research/agents");
+  const response = await onRequest({
+    request,
+    env: {
+      DEEP_RESEARCHER_URL: "http://research.example",
+      NEXORA_RESEARCH_API_TOKEN: "x".repeat(48)
+    }
+  });
+  assert.equal(response.status, 503);
+});
