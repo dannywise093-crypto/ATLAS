@@ -156,3 +156,22 @@ test("uses a visible BLE identifier instead of the misleading Unknown/Unnamed la
   });
   assert.equal(found[0].name, "BLE device · B2C3D4");
 });
+
+
+test("labels devices without an advertised name honestly instead of Unknown or Unsupported Device", async () => {
+  const found = [];
+  const fakeBle = {
+    async initialize() {},
+    async isEnabled() { return true; },
+    async requestLEScan(options, callback) { callback({ device: { deviceId: "68:C1:22:33:44:55", name: null }, rssi: -58 }); },
+    async stopLEScan() {}
+  };
+  await scanNativeBluetoothDevices({
+    environment: { Capacitor: { isNativePlatform: () => true } },
+    durationMs: 1000,
+    loadBleClient: async () => ({ BleClient: fakeBle }),
+    onDevice: device => found.push(device)
+  });
+  assert.equal(found[0].name, "Unnamed BLE device · 334455");
+  assert.match(found[0].nameSource, /no name advertised/);
+});
