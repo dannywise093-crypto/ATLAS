@@ -9,11 +9,11 @@ export function getBluetoothDiscoveryStatus(environment = globalThis) {
 export async function discoverBluetoothDevice(environment = globalThis) {
   const status = getBluetoothDiscoveryStatus(environment);
   if (!status.supported || status.native) throw new Error(status.reason);
-  const device = await environment.navigator.bluetooth.requestDevice({ acceptAllDevices: true, optionalServices: [] });
+  const device = await environment.navigator.bluetooth.requestDevice({ acceptAllDevices: true, optionalServices: [0x1800, 0x181a] });
   if (!device) throw new Error('No Bluetooth device was selected.');
   let connected = false;
   if (device.gatt) { try { await device.gatt.connect(); connected = Boolean(device.gatt.connected); } catch { connected = false; } }
-  return Object.freeze({ id: String(device.id || ''), name: String(device.name || 'Unnamed Bluetooth device'), transport: 'Bluetooth LE', connection: connected ? 'connected' : 'selected', connected, device });
+  return Object.freeze({ id: String(device.id || ''), name: String(device.name || ('BLE device · ' + String(device.id || '').replace(/[^a-z0-9]/gi, '').slice(-6))), transport: 'Bluetooth LE', connection: connected ? 'connected' : 'selected', connected, device });
 }
 
 export async function scanNativeBluetoothDevices({ environment = globalThis, onDevice = () => {}, durationMs = 12000, loadBleClient = () => import('@capacitor-community/bluetooth-le') } = {}) {
@@ -24,7 +24,7 @@ export async function scanNativeBluetoothDevices({ environment = globalThis, onD
   let found = 0;
   await BleClient.requestLEScan({ allowDuplicates: false }, result => {
     const device = result?.device || {};
-    const item = Object.freeze({ id: String(device.deviceId || ''), name: String(result.localName || device.name || 'Unnamed BLE device'), transport: 'Bluetooth LE', rssi: Number.isFinite(result.rssi) ? result.rssi : null, services: Array.isArray(result.uuids) ? result.uuids : [], connection: 'discovered', connected: false });
+    const item = Object.freeze({ id: String(device.deviceId || ''), name: String(result.localName || device.name || ('BLE device · ' + String(device.deviceId || '').replace(/[^a-z0-9]/gi, '').slice(-6))), transport: 'Bluetooth LE', rssi: Number.isFinite(result.rssi) ? result.rssi : null, services: Array.isArray(result.uuids) ? result.uuids : [], connection: 'discovered', connected: false });
     if (!item.id) return;
     found += 1;
     onDevice(item);
