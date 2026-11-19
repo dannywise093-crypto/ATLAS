@@ -27,7 +27,7 @@ test("requests an explicitly selected BLE device and reports connection health",
     async requestDevice(value) { options = value; return device; }
   }}};
   const result = await discoverBluetoothDevice(environment);
-  assert.deepEqual(options, { acceptAllDevices: true, optionalServices: [] });
+  assert.deepEqual(options, { acceptAllDevices: true, optionalServices: [0x1800, 0x181a] });
   assert.equal(result.id, "ble-123");
   assert.equal(result.name, "Test sensor");
   assert.equal(result.connected, true);
