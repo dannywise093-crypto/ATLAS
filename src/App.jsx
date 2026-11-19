@@ -7,7 +7,7 @@ import { speakText, stopSpeechPlayback } from "./voiceInterface.js";
 import { createCloudflareVoice } from "./cloudflareVoice.js";
 import { Code2 } from "lucide-react";
 import { getNeuralRuntimeStatus, checkAtlasBackend, generateAtlasResponse, generateAtlasCopilotResponse, generateProviderResponse } from "./modelRuntime.js";
-import { Activity, Bot, BrainCircuit, Camera, Check, Database, Eye, GraduationCap, Home, Menu, MessageSquare, Mic, Plus, Radio, Send, Settings, ShieldCheck, Sparkles, Trash2, Volume2, X } from "lucide-react";
+import { Activity, Bot, BrainCircuit, Camera, Check, Database, Eye, GraduationCap, Home, Menu, MessageSquare, Mic, Plus, Radio, Search, Send, Settings, ShieldCheck, Sparkles, Trash2, Volume2, X } from "lucide-react";
 
 function atlasStorageKey(key) {
   // NEXORA AI is now an open workspace: chat and settings use device-local keys,
@@ -41,7 +41,7 @@ const initial = [
   { role: "atlas", text: "Welcome to NEXORA AI. I’m your general-purpose AI assistant, connected through the secured Cloudflare model gateway. I can help with research, engineering, software development, reasoning, and the specialist skill library. Ask a question to get started." },
   { role: "atlas", text: "Your conversation is routed through the configured hosted model. Relevant skill references are selected automatically when they match your request." }
 ];
-const nav = [["Overview",Home],["AI Assistant",MessageSquare],["Copilot",Code2],["Vision Center",Eye],["Voice Center",Mic],["Memory",Database],["Learning",GraduationCap],["Robotics",Bot],["Settings",Settings]];
+const nav = [["Overview",Home],["AI Assistant",MessageSquare],["Research Center",Search],["Copilot",Code2],["Vision Center",Eye],["Voice Center",Mic],["Memory",Database],["Learning",GraduationCap],["Robotics",Bot],["Settings",Settings]];
 
 function AtlasWorkspace() {
   const [page,setPage] = useState("Overview");
@@ -85,6 +85,28 @@ function AtlasWorkspace() {
   const [menu,setMenu] = useState(false);
   const [notice,setNotice] = useState("");
   const [generating,setGenerating] = useState(false);
+  const [researchQuery,setResearchQuery] = useState("");
+  const [researchAgentType,setResearchAgentType] = useState("deep_researcher");
+  const [researchAvailable,setResearchAvailable] = useState(false);
+  const [researchStatus,setResearchStatus] = useState("Research backend has not been checked.");
+  const [researchBusy,setResearchBusy] = useState(false);
+  const [researchJobId,setResearchJobId] = useState(()=>{try{return localStorage.getItem(atlasStorageKey("research-job-id"))||"";}catch{return "";}});
+  const [researchProgress,setResearchProgress] = useState([]);
+  const [researchReport,setResearchReport] = useState(null);
+  const [researchError,setResearchError] = useState("");
+  useEffect(()=>{try{if(researchJobId)localStorage.setItem(atlasStorageKey("research-job-id"),researchJobId);else localStorage.removeItem(atlasStorageKey("research-job-id"));}catch{}},[researchJobId]);
+  useEffect(()=>{
+    if(page!=="Research Center")return;
+    const controller=new AbortController();
+    fetch("/api/research/agents",{signal:controller.signal}).then(async response=>{
+      const data=await response.json().catch(()=>({}));
+      if(!response.ok)throw new Error(data.error||"Research backend is unavailable.");
+      const agents=Array.isArray(data.agents)?data.agents:[];
+      setResearchAvailable(agents.some(agent=>agent.agent_type==="deep_researcher"));
+      setResearchStatus(agents.length?"NVIDIA Deep Researcher API is reachable.":"Backend reachable, but no research agent is configured.");
+    }).catch(error=>{if(error.name!=="AbortError"){setResearchAvailable(false);setResearchStatus(error.message);}});
+    return()=>controller.abort();
+  },[page]);
   const [voiceMode,setVoiceMode] = useState(false);
   const [voiceStatus,setVoiceStatus] = useState("Voice assistant is idle.");
   const [voiceTranscript,setVoiceTranscript] = useState("");
@@ -259,6 +281,95 @@ function AtlasWorkspace() {
       sendInProgressRef.current=false;
     }
   }
+  async function loadResearchReport(jobId=researchJobId){
+    if(!jobId)return;
+    setResearchError("");
+    try{
+      const response=await fetch("/api/research/job/"+encodeURIComponent(jobId)+"/report");
+      const data=await response.json().catch(()=>({}));
+      if(!response.ok)throw new Error(data.detail?.message||data.error||"The report is not available yet.");
+      setResearchReport(data);
+      setResearchStatus("Research report loaded.");
+    }catch(error){setResearchError(error.message);}
+  }
+  async function runDeepResearch(event){
+    event.preventDefault();
+    const question=researchQuery.trim();
+    if(!question||researchBusy)return;
+    setResearchBusy(true);
+    setResearchError("");
+    setResearchReport(null);
+    setResearchProgress(["Submitting research request…"]);
+    setResearchStatus("Submitting to NVIDIA Deep Researcher…");
+    try{
+      const submit=await fetch("/api/research/submit",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({agent_type:researchAgentType,input:question})
+      });
+      const submitted=await submit.json().catch(()=>({}));
+      if(!submit.ok)throw new Error(submitted.detail?.message||submitted.error||"Research submission failed.");
+      const jobId=submitted.job_id;
+      if(typeof jobId!=="string"||!jobId)throw new Error("The research service did not return a job ID.");
+      setResearchJobId(jobId);
+      setResearchProgress(items=>[...items,"Research job created: "+jobId]);
+      setResearchStatus("Research is running. Receiving live progress…");
+
+      try{
+        const stream=await fetch("/api/research/job/"+encodeURIComponent(jobId)+"/stream");
+        if(stream.ok&&stream.body){
+          const reader=stream.body.getReader();
+          const decoder=new TextDecoder();
+          let buffer="";
+          while(true){
+            const part=await reader.read();
+            if(part.done)break;
+            buffer+=decoder.decode(part.value,{stream:true});
+            const frames=buffer.split(/\r?\n\r?\n/);
+            buffer=frames.pop()||"";
+            for(const frame of frames){
+              const eventName=(frame.match(/^event:\s*(.+)$/m)||[])[1]||"research";
+              const dataLine=(frame.match(/^data:\s*(.*)$/m)||[])[1];
+              if(!dataLine)continue;
+              let payload;
+              try{payload=JSON.parse(dataLine);}catch{payload={message:dataLine};}
+              const detail=payload.status||payload.message||payload.agent_type||payload.title||JSON.stringify(payload);
+              setResearchProgress(items=>[...items.slice(-29),eventName+": "+String(detail).slice(0,240)]);
+            }
+          }
+        }else{
+          setResearchProgress(items=>[...items,"Live progress stream unavailable; checking job status instead."]);
+        }
+      }catch(streamError){
+        setResearchProgress(items=>[...items,"Live stream interrupted; checking job status."]);
+      }
+
+      let completed=false;
+      for(let attempt=0;attempt<90;attempt++){
+        const statusResponse=await fetch("/api/research/job/"+encodeURIComponent(jobId));
+        const statusData=await statusResponse.json().catch(()=>({}));
+        if(statusResponse.ok){
+          const status=String(statusData.status||statusData.job?.status||statusData.job_info?.status||"").toLowerCase();
+          if(["success","completed","complete"].includes(status)){
+            completed=true;
+            break;
+          }
+          if(["failure","failed","error","cancelled","interrupted"].includes(status)){
+            throw new Error(statusData.error||statusData.detail?.message||"The research job ended with status: "+status);
+          }
+        }
+        await new Promise(resolve=>setTimeout(resolve,2000));
+      }
+      if(!completed)throw new Error("The research job is still running. Its ID has been saved; use Refresh report to check again.");
+      await loadResearchReport(jobId);
+      setResearchStatus("Deep research completed.");
+    }catch(error){
+      setResearchError(error.message);
+      setResearchStatus("Research did not complete.");
+    }finally{
+      setResearchBusy(false);
+    }
+  }
   async function send(e){
     e.preventDefault();
     return sendMessage(input,{isCopilot:page==="Copilot"});
@@ -379,6 +490,33 @@ function AtlasWorkspace() {
     <h2>DEVELOPMENT MODULES</h2><div className="grid two">{card(<MessageSquare/>,"Conversational intelligence","NVIDIA when configured, with Cloudflare Workers AI model fallbacks; otherwise Cloudflare Workers AI is primary.","Interface ready")}{card(<Eye/>,"Perception & vision","Prepare image inputs for future computer vision.","Preview ready")}{card(<GraduationCap/>,"Learning system","Plan supervised demonstrations and evaluation.","Planned")}{card(<Bot/>,"Robotics integration","A safe bridge to controllers after simulation and testing.","Not connected")}</div>
     <div className="safety"><ShieldCheck/><div><b>Safety-first development</b><p>This is a software prototype. It does not control physical devices. Real robot movement must use independent safety limits and supervised testing.</p></div></div>
   </section> : page==="AI Assistant" ? <section className="stack grok-page"><div className="grok-workspace"><aside className="grok-history"><button className="grok-new-chat" onClick={newConversation}><Plus size={17}/> <span>New chat</span></button><div className="grok-history-label">YOUR CHATS</div><div className="grok-history-list" aria-label="NEXORA AI conversation history">{conversations.map(item=><div className={item.id===activeConversation?.id?"grok-history-item active":"grok-history-item"} key={item.id}><button className="grok-history-open" onClick={()=>{setActiveConversationId(item.id);setInput("");}} title={item.title}>{item.title}</button><button className="grok-history-delete" onClick={()=>deleteConversation(item.id)} aria-label={"Delete "+item.title} title="Delete conversation"><Trash2 size={14}/></button></div>)}</div><div className="grok-history-foot"><span className="grok-status-dot"/> NEXORA AI · PRIVATE SESSION</div></aside><div className="grok-chat-main"><div className="grok-topbar"><div className="grok-title"><span className="grok-mark"><AtlasLogo/></span><div><b>NEXORA AI</b><small>GENERAL INTELLIGENCE</small></div></div><div className="grok-top-actions"><span className="grok-model-tag">AUTO MODEL</span><span className="grok-online"><i/> {gatewayReady?"ONLINE":"CONNECTING"}</span></div></div><div className="grok-messages">{messages.map((m,i)=><div className={"grok-message "+m.role} key={i}>{m.role==="atlas"&&<span className="grok-message-avatar"><AtlasLogo/></span>}<div className="grok-message-body">{m.role==="user"&&<b>YOU</b>}<p>{m.text}</p></div></div>)}</div><div className="grok-compose-area"><div className="grok-model-row"><label htmlFor="atlas-provider">MODEL</label><select id="atlas-provider" value={provider} onChange={e=>setProvider(e.target.value)}><option value="atlas">NEXORA AI · Auto</option><option value="nvidia" disabled={!providerStates.nvidia?.configured}>NVIDIA API Catalog{providerStates.nvidia?.configured?"":" · unavailable"}</option></select></div><form className="grok-composer" onSubmit={send}><textarea aria-label="Message NEXORA AI" rows="1" value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();e.currentTarget.form.requestSubmit();}}} placeholder="Ask NEXORA AI anything…"/><div className="grok-composer-bottom"><span>Enter to send · Shift + Enter for a new line</span><button aria-label="Send message" disabled={!input.trim()||generating}><Send size={17}/></button></div></form><small>{generating?"NEXORA AI is thinking…":"AI can make mistakes. Verify important information."}</small></div></div></div></section>
+  : page==="Research Center" ? <section className="stack">
+    {heading("NVIDIA Deep Research Center","Run structured, multi-step research and receive a source-backed report.",researchAvailable?"BACKEND ONLINE":"BACKEND CHECK")}
+    <article className="card">
+      <div className="cardtop"><span className="cardicon"><Search/></span><span className="badge">{researchAvailable?"Connected":"Not connected"}</span></div>
+      <p>{researchStatus}</p>
+      <form onSubmit={runDeepResearch} className="stack">
+        <label htmlFor="nexora-research-query">Research question</label>
+        <textarea id="nexora-research-query" rows="5" maxLength="32768" value={researchQuery} onChange={event=>setResearchQuery(event.target.value)} placeholder="Describe the topic, scope, questions, and evidence you want NEXORA to investigate…" />
+        <div className="grid two">
+          <label>Research depth
+            <select value={researchAgentType} onChange={event=>setResearchAgentType(event.target.value)}>
+              <option value="deep_researcher">Deep research · comprehensive report</option>
+              <option value="shallow_researcher">Quick research · concise answer</option>
+            </select>
+          </label>
+          <div className="stack">
+            <button type="submit" disabled={!researchQuery.trim()||researchBusy||!researchAvailable}>{researchBusy?"Research running…":"Start research"}</button>
+            {researchJobId&&<button type="button" onClick={()=>loadResearchReport()} disabled={researchBusy}>Refresh report</button>}
+          </div>
+        </div>
+      </form>
+      {researchJobId&&<p>Current job: <code>{researchJobId}</code></p>}
+      {researchError&&<p role="alert">{researchError}</p>}
+    </article>
+    {researchProgress.length>0&&<article className="card"><h2>Research activity</h2><ol>{researchProgress.map((item,index)=><li key={index}>{item}</li>)}</ol></article>}
+    {researchReport&&<article className="card"><h2>Research report</h2><pre style={{whiteSpace:"pre-wrap",overflowWrap:"anywhere"}}>{typeof researchReport==="string"?researchReport:JSON.stringify(researchReport,null,2)}</pre></article>}
+  </section>
   : page==="Copilot" ? <section className="stack grok-page"><div className="grok-workspace"><aside className="grok-history"><button className="grok-new-chat" onClick={newCopilotConversation}><Plus size={17}/> <span>New chat</span></button><div className="grok-history-label">COPILOT CHATS</div><div className="grok-history-list" aria-label="Copilot conversation history">{copilotConversations.map(item=><div className={item.id===activeCopilotConversation?.id?"grok-history-item active":"grok-history-item"} key={item.id}><button className="grok-history-open" onClick={()=>{setActiveCopilotConversationId(item.id);localStorage.setItem(atlasStorageKey("atlas-active-copilot-conversation"),item.id);setInput("");}} title={item.title}>{item.title}</button><button className="grok-history-delete" onClick={()=>deleteCopilotConversation(item.id)} aria-label={"Delete "+item.title} title="Delete Copilot conversation"><Trash2 size={14}/></button></div>)}</div><div className="grok-history-foot"><span className="grok-status-dot"/> ATLAS COPILOT · PRIVATE SESSION</div></aside><div className="grok-chat-main"><div className="grok-topbar"><div className="grok-title"><span className="grok-mark"><AtlasLogo/></span><div><b>NEXORA Copilot</b><small>SOFTWARE ENGINEERING</small></div></div><div className="grok-top-actions"><span className="grok-model-tag">CODING MODE</span><span className="grok-online"><i/> {gatewayReady?"ONLINE":"CONNECTING"}</span></div></div><div className="grok-messages">{copilotMessages.map((m,i)=><div className={"grok-message "+m.role} key={i}>{m.role==="atlas"&&<span className="grok-message-avatar"><AtlasLogo/></span>}<div className="grok-message-body">{m.role==="user"&&<b>YOU</b>}<p>{m.text}</p></div></div>)}</div><div className="grok-compose-area"><div className="grok-composer-hint">Ask Copilot to write, explain, debug, or review code.</div><form className="grok-composer" onSubmit={send}><textarea aria-label="Message NEXORA Copilot" rows="1" value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();e.currentTarget.form.requestSubmit();}}} placeholder="Ask NEXORA Copilot about your code…"/><div className="grok-composer-bottom"><span>Enter to send · Shift + Enter for a new line</span><button aria-label="Send message" disabled={!input.trim()||generating}><Send size={17}/></button></div></form><small>{generating?"Copilot is thinking…":"AI can make mistakes. Review generated code before using it."}</small></div></div></div></section>
   : page==="Vision Center" ? <section className="stack">{heading(page,"Prepare image input for future computer-vision features.","NOT CONNECTED")}<div className="panel"><Camera size={30}/><h3>Image input</h3><p>Choose a picture from your phone to preview it here. This prototype does not send images to an AI model.</p><label className="button">Choose image<input hidden type="file" accept="image/*" onChange={e=>{const f=e.target.files?.[0];if(f){setImage(URL.createObjectURL(f));setNotice("Local preview only. AI analysis is not connected.")}}}/></label>{image&&<img className="preview" src={image} alt="Selected preview"/>}{notice&&<p className="notice">{notice}</p>}</div>{card(<ShieldCheck/>,"Planned vision capabilities","Object recognition, camera integration, visual Q&A and privacy controls.")}</section>
   : page==="Voice Center" ? <section className="voice-session-screen" aria-label="NEXORA AI voice session"><div className="voice-top-notch" aria-hidden="true"/><header className="voice-selection-header"><h1>NEXORA Voice</h1><button type="button" className="voice-confirm" onClick={()=>setPage("Overview")} aria-label="Leave Voice Center"><Check size={24} strokeWidth={1.8}/></button></header><div className={`voice-orb-stage ${voiceMode?"is-listening":""} ${voiceStatus.toLowerCase().includes("speaking")?"is-speaking":""} ${voiceStatus.toLowerCase().includes("processing")?"is-thinking":""}`} role="img" aria-label="Animated cosmic glass orb"><div className="cosmic-orb"><div className="orb-nebula"/><div className="orb-light-ribbons"/><div className="orb-starfield">{Array.from({length:38},(_,index)=><i key={index} style={{"--x":`${(index*37+11)%92+4}%`,"--y":`${(index*53+7)%90+5}%`,"--size":`${index%5===0?2.4:index%3===0?1.7:1.1}px`,"--delay":`${(index%9)*-.37}s`,"--twinkle":`${1.8+(index%5)*.45}s`}}/> )}</div><div className="orb-glass-shine"/></div></div><div className="voice-controls"><p className="voice-session-status" role="status" aria-live="polite">{voiceStatus}{voiceTranscript?` · ${voiceTranscript}`:""}</p>{voiceMode?<button type="button" className="voice-action-button voice-stop-button" onClick={stopVoiceMode}><X size={19}/> Stop voice conversation</button>:<button type="button" className="voice-action-button" onClick={startVoiceMode}><Mic size={19}/> Start voice conversation</button>}<p className="voice-privacy-note">Your microphone stays off until you start a conversation. You can stop at any time.</p></div></section>
