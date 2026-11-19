@@ -100,3 +100,59 @@ test("native scanner reports Bluetooth disabled and does not start scanning", as
   );
   assert.equal(scanStarted, false);
 });
+
+
+import { decodeStandardBleSensors, connectNativeBleSensorDevice } from "./roboticsDiscovery.js";
+
+test("decodes standard BLE temperature and humidity characteristics into real unit-labelled readings", () => {
+  const temperature = new DataView(new Uint8Array([0x92, 0x09]).buffer); // 24.50 C
+  const humidity = new DataView(new Uint8Array([0x10, 0x27]).buffer); // 100.00 %RH
+  const readings = decodeStandardBleSensors({ deviceId: "ble-sensor-1", deviceName: "Env Sensor", temperature, humidity, now: 1000 });
+  assert.equal(readings.length, 2);
+  assert.equal(readings[0].value, 24.5);
+  assert.equal(readings[0].unit, "°C");
+  assert.equal(readings[1].value, 100);
+  assert.equal(readings[1].unit, "%RH");
+  assert.equal(readings[0].timestamp, new Date(1000).toISOString());
+});
+
+test("connects to a native BLE peripheral, resolves its GAP name and reads standard environmental sensors", async () => {
+  const calls = [];
+  const bytes = value => new DataView(new Uint8Array(value).buffer);
+  const fakeBle = {
+    async initialize() {},
+    async isEnabled() { return true; },
+    async connect(id) { calls.push(["connect", id]); },
+    async getServices() { return [{ uuid: "00001800-0000-1000-8000-00805f9b34fb" }, { uuid: "0000181a-0000-1000-8000-00805f9b34fb" }]; },
+    async read(id, service, characteristic) {
+      calls.push(["read", service, characteristic]);
+      if (characteristic === "2a00") return bytes([69, 110, 118, 32, 78, 111, 100, 101]);
+      if (characteristic === "2a6e") return bytes([0x92, 0x09]);
+      if (characteristic === "2a6f") return bytes([0x10, 0x27]);
+      throw new Error("missing");
+    }
+  };
+  const result = await connectNativeBleSensorDevice({ deviceId: "ble-sensor-1", loadBleClient: async () => ({ BleClient: fakeBle }), now: 1000 });
+  assert.equal(result.name, "Env Node");
+  assert.equal(result.nameAvailable, true);
+  assert.equal(result.connected, true);
+  assert.deepEqual(result.sensors.map(sensor => sensor.sensorId), ["temperature", "humidity"]);
+  assert.deepEqual(calls[0], ["connect", "ble-sensor-1"]);
+});
+
+test("uses a visible BLE identifier instead of the misleading Unknown/Unnamed label", async () => {
+  const found = [];
+  const fakeBle = {
+    async initialize() {},
+    async isEnabled() { return true; },
+    async requestLEScan(options, callback) { callback({ device: { deviceId: "A1B2C3D4", name: null }, rssi: -60 }); },
+    async stopLEScan() {}
+  };
+  await scanNativeBluetoothDevices({
+    environment: { Capacitor: { isNativePlatform: () => true } },
+    durationMs: 1000,
+    loadBleClient: async () => ({ BleClient: fakeBle }),
+    onDevice: device => found.push(device)
+  });
+  assert.equal(found[0].name, "BLE device · C3D4");
+});
