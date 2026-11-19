@@ -120,6 +120,6 @@ export async function readWebBleEnvironmentalSensors(device, now = Date.now()) {
     connection: "connected",
     connected: Boolean(device.gatt.connected),
     sensors,
-    sensorStatus: sensors.length ? "Live standard BLE sensor readings received." : "Connected, but this device does not expose the standard BLE temperature or humidity characteristics."
+    sensorStatus: sensors.length ? "Read-only standard BLE sensor snapshot received." : "Connected, but this device does not expose the standard BLE temperature or humidity characteristics."
   });
 }
