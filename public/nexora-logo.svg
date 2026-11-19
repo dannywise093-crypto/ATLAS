@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+<title id="title">NEXORA Technologies</title><desc id="desc">Geometric N monogram in silver and electric blue.</desc>
+<defs>
+ <linearGradient id="silver" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#ffffff"/><stop offset=".52" stop-color="#aebed2"/><stop offset="1" stop-color="#eef7ff"/></linearGradient>
+ <linearGradient id="blue" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#a8e8ff"/><stop offset=".5" stop-color="#168bff"/><stop offset="1" stop-color="#06419c"/></linearGradient>
+ <filter id="glow"><feGaussianBlur stdDeviation="7" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+</defs>
+<rect x="22" y="22" width="468" height="468" rx="112" fill="#07101f" stroke="url(#silver)" stroke-width="10"/>
+<path d="M126 374V138h48l164 190V138h48v236h-46L174 182v192z" fill="none" stroke="url(#blue)" stroke-width="20" stroke-linejoin="round" filter="url(#glow)"/>
+<path d="M126 374V138h48l164 190V138h48" fill="none" stroke="url(#silver)" stroke-width="7" stroke-linejoin="round"/>
+<circle cx="126" cy="138" r="11" fill="#d9f3ff"/><circle cx="386" cy="374" r="11" fill="#168bff"/>
+</svg>
