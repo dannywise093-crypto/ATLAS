@@ -86,7 +86,6 @@ function AtlasWorkspace() {
   const [notice,setNotice] = useState("");
   const [generating,setGenerating] = useState(false);
   const [researchQuery,setResearchQuery] = useState("");
-  const [researchAgentType,setResearchAgentType] = useState("deep_researcher");
   const [researchAvailable,setResearchAvailable] = useState(false);
   const [researchStatus,setResearchStatus] = useState("Research backend has not been checked.");
   const [researchBusy,setResearchBusy] = useState(false);
@@ -290,7 +289,8 @@ function AtlasWorkspace() {
       if(!response.ok)throw new Error(data.detail?.message||data.error||"The report is not available yet.");
       setResearchReport(data);
       setResearchStatus("Research report loaded.");
-    }catch(error){setResearchError(error.message);}
+      return data;
+    }catch(error){setResearchError(error.message);return null;}
   }
   async function runDeepResearch(event){
     event.preventDefault();
@@ -305,7 +305,7 @@ function AtlasWorkspace() {
       const submit=await fetch("/api/research/submit",{
         method:"POST",
         headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({agent_type:researchAgentType,input:question})
+        body:JSON.stringify({agent_type:"deep_researcher",input:question})
       });
       const submitted=await submit.json().catch(()=>({}));
       if(!submit.ok)throw new Error(submitted.detail?.message||submitted.error||"Research submission failed.");
@@ -361,7 +361,8 @@ function AtlasWorkspace() {
         await new Promise(resolve=>setTimeout(resolve,2000));
       }
       if(!completed)throw new Error("The research job is still running. Its ID has been saved; use Refresh report to check again.");
-      await loadResearchReport(jobId);
+      const finalReport=await loadResearchReport(jobId);
+      if(!finalReport)throw new Error("The research job finished, but its final report could not be loaded. Use Refresh report to try again.");
       setResearchStatus("Deep research completed.");
     }catch(error){
       setResearchError(error.message);
@@ -498,17 +499,10 @@ function AtlasWorkspace() {
       <form onSubmit={runDeepResearch} className="stack">
         <label htmlFor="nexora-research-query">Research question</label>
         <textarea id="nexora-research-query" rows="5" maxLength="32768" value={researchQuery} onChange={event=>setResearchQuery(event.target.value)} placeholder="Describe the topic, scope, questions, and evidence you want NEXORA to investigate…" />
-        <div className="grid two">
-          <label>Research depth
-            <select value={researchAgentType} onChange={event=>setResearchAgentType(event.target.value)}>
-              <option value="deep_researcher">Deep research · comprehensive report</option>
-              <option value="shallow_researcher">Quick research · concise answer</option>
-            </select>
-          </label>
-          <div className="stack">
-            <button type="submit" disabled={!researchQuery.trim()||researchBusy||!researchAvailable}>{researchBusy?"Research running…":"Start research"}</button>
-            {researchJobId&&<button type="button" onClick={()=>loadResearchReport()} disabled={researchBusy}>Refresh report</button>}
-          </div>
+        <p>Mode: <b>Deep research · comprehensive, multi-step report</b></p>
+        <div className="stack">
+          <button type="submit" disabled={!researchQuery.trim()||researchBusy||!researchAvailable}>{researchBusy?"Research running…":"Start deep research"}</button>
+          {researchJobId&&<button type="button" onClick={()=>loadResearchReport()} disabled={researchBusy}>Refresh report</button>}
         </div>
       </form>
       {researchJobId&&<p>Current job: <code>{researchJobId}</code></p>}
