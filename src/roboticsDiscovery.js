@@ -13,7 +13,7 @@ export async function discoverBluetoothDevice(environment = globalThis) {
   if (!device) throw new Error('No Bluetooth device was selected.');
   let connected = false;
   if (device.gatt) { try { await device.gatt.connect(); connected = Boolean(device.gatt.connected); } catch { connected = false; } }
-  return Object.freeze({ id: String(device.id || ''), name: String(device.name || ('BLE device · ' + String(device.id || '').replace(/[^a-z0-9]/gi, '').slice(-6))), transport: 'Bluetooth LE', connection: connected ? 'connected' : 'selected', connected, device });
+  return Object.freeze({ id: String(device.id || ''), name: String(device.name || ('Unnamed BLE device · ' + String(device.id || '').replace(/[^a-z0-9]/gi, '').slice(-6))), nameSource: device.name ? "advertised local name" : "Bluetooth identifier (no name advertised)", transport: 'Bluetooth LE', connection: connected ? 'connected' : 'selected', connected, device });
 }
 
 export async function scanNativeBluetoothDevices({ environment = globalThis, onDevice = () => {}, durationMs = 12000, loadBleClient = () => import('@capacitor-community/bluetooth-le') } = {}) {
@@ -24,7 +24,7 @@ export async function scanNativeBluetoothDevices({ environment = globalThis, onD
   let found = 0;
   await BleClient.requestLEScan({ allowDuplicates: false }, result => {
     const device = result?.device || {};
-    const item = Object.freeze({ id: String(device.deviceId || ''), name: String(result.localName || device.name || ('BLE device · ' + String(device.deviceId || '').replace(/[^a-z0-9]/gi, '').slice(-6))), transport: 'Bluetooth LE', rssi: Number.isFinite(result.rssi) ? result.rssi : null, services: Array.isArray(result.uuids) ? result.uuids : [], connection: 'discovered', connected: false });
+    const item = Object.freeze({ id: String(device.deviceId || ''), name: String(result.localName || device.name || ('Unnamed BLE device · ' + String(device.deviceId || '').replace(/[^a-z0-9]/gi, '').slice(-6))), nameSource: result.localName ? "advertised local name" : device.name ? "Android device name" : "Bluetooth identifier (no name advertised)", transport: 'Bluetooth LE', rssi: Number.isFinite(result.rssi) ? result.rssi : null, services: Array.isArray(result.uuids) ? result.uuids : [], connection: 'discovered', connected: false });
     if (!item.id) return;
     found += 1;
     onDevice(item);
@@ -57,14 +57,15 @@ export async function connectNativeBleSensorDevice({ deviceId, loadBleClient = (
   await BleClient.connect(deviceId);
   const services = await BleClient.getServices(deviceId);
   const has = (uuid) => services.some(service => String(service.uuid || "").toLowerCase().endsWith(uuid));
-  let deviceName = bleFallbackName(deviceId);
+  let deviceName = "Unnamed BLE device · " + String(deviceId).replace(/[^a-z0-9]/gi, "").slice(-6);
   let nameAvailable = false;
+  let nameSource = "Bluetooth identifier (device does not expose a readable GAP name)";
   if (has("1800")) {
     try {
       const value = await BleClient.read(deviceId, "1800", "2a00");
       const bytes = new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
       const decoded = new TextDecoder().decode(bytes).replace(/\0/g, "").trim();
-      if (decoded) { deviceName = decoded; nameAvailable = true; }
+      if (decoded) { deviceName = decoded; nameAvailable = true; nameSource = "GAP Device Name characteristic"; }
     } catch {}
   }
   let temperature;
@@ -78,6 +79,7 @@ export async function connectNativeBleSensorDevice({ deviceId, loadBleClient = (
     id: deviceId,
     name: deviceName,
     nameAvailable,
+    nameSource,
     transport: "Bluetooth LE",
     connection: "connected",
     connected: true,
@@ -95,14 +97,15 @@ export async function disconnectNativeBleDevice(deviceId, loadBleClient = () => 
 export async function readWebBleEnvironmentalSensors(device, now = Date.now()) {
   if (!device?.gatt) throw new Error("The selected BLE device does not support GATT.");
   const server = device.gatt.connected ? device.gatt : await device.gatt.connect();
-  let deviceName = device.name || bleFallbackName(device.id);
+  let deviceName = device.name || ("Unnamed BLE device · " + String(device.id || "").replace(/[^a-z0-9]/gi, "").slice(-6));
   let nameAvailable = Boolean(device.name);
+  let nameSource = device.name ? "advertised local name" : "Bluetooth identifier (device does not expose a readable GAP name)";
   try {
     const gap = await server.getPrimaryService(0x1800);
     const nameCharacteristic = await gap.getCharacteristic(0x2a00);
     const value = await nameCharacteristic.readValue();
     const decoded = new TextDecoder().decode(new Uint8Array(value.buffer, value.byteOffset, value.byteLength)).replace(/\0/g, "").trim();
-    if (decoded) { deviceName = decoded; nameAvailable = true; }
+    if (decoded) { deviceName = decoded; nameAvailable = true; nameSource = "GAP Device Name characteristic"; }
   } catch {}
   let temperature;
   let humidity;
@@ -116,6 +119,7 @@ export async function readWebBleEnvironmentalSensors(device, now = Date.now()) {
     id: String(device.id || ""),
     name: deviceName,
     nameAvailable,
+    nameSource,
     transport: "Bluetooth LE",
     connection: "connected",
     connected: Boolean(device.gatt.connected),
