@@ -74,11 +74,17 @@ export function runAtlasCore(message, memories = [], history = []) {
     return { action: "save_memory", memory: note, text: `Saved to ATLAS memory on this device: “${note}”` };
   }
 
-  if (hasAny(text, ["hello", "hi atlas", "hey atlas", "good morning", "good afternoon"])) {
-    return { text: "Hello. I'm ATLAS Core v0.3, running locally. I can manage project notes, find relevant saved notes, handle a few contextual follow-ups and explain the development plan. I'm not yet a general-purpose language model." };
+  if (hasAny(text, ["hello", "hi atlas", "hey atlas", "hello nexora", "hi nexora", "hey nexora", "good morning", "good afternoon"])) {
+    return { text: "Hello. My name is NEXORA. I’m your AI assistant." };
   }
-  if (hasAny(text, ["who are you", "what are you", "introduce yourself"])) {
-    return { text: "I'm ATLAS, the local software foundation for your personal AI project. This version uses transparent, hand-written logic rather than a trained neural language model. I do not call an external AI service." };
+  if (hasAny(text, ["what does nexora mean", "meaning of nexora", "what is the meaning of nexora", "expand nexora"])) {
+    return { text: "NEXORA means Next-Generation Engineering, Research & Advanced Artificial Intelligence." };
+  }
+  if (hasAny(text, ["who developed you", "who is your developer", "who created you", "who made you", "your developer"])) {
+    return { text: "NEXORA TECHNOLOGIES." };
+  }
+  if (hasAny(text, ["what is your name", "whats your name", "your name", "who are you", "what are you", "introduce yourself"])) {
+    return { text: "My name is NEXORA." };
   }
   if (hasAny(text, ["what do you remember", "show memory", "list memories", "my memories"])) {
     return { text: memories.length
