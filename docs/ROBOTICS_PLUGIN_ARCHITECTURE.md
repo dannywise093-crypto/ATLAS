@@ -10,9 +10,11 @@ The connection manager is transport-neutral: each transport is implemented by an
 
 - Native Android Bluetooth LE scanning is integrated in the APK and starts only after the user taps the scan button.
 - Browser Web Bluetooth uses the browser's explicit device picker where supported.
+- BLE device labels use the advertised name when present, resolve the standard GAP Device Name characteristic after connection when available, and otherwise display a stable device-ID suffix instead of a misleading “Unknown” label.
+- A read-only BLE Environmental Sensing profile reads standard temperature (0x2A6E) and humidity (0x2A6F) characteristics when the peripheral exposes them; unsupported devices are reported honestly.
 - The UI now catalogs Bluetooth Classic, Wi-Fi/LAN, Wi-Fi Direct, Ethernet, USB OTG, USB serial, CAN/CAN FD adapters, ROS 2/DDS, micro-ROS, MQTT, Modbus, OPC UA, HTTP/WebSocket, manufacturer SDKs, cameras and sensors.
 - All transports other than BLE remain planned adapter integrations. They must not be displayed as connected or operational until their native driver/gateway and tests exist.
-- The app currently does not connect to a robot controller or consume live physical sensor telemetry.
+- The app currently supports BLE discovery and read-only snapshots from standard BLE Environmental Sensing temperature/humidity characteristics. It does not yet support continuous notifications for every sensor profile, proprietary sensor protocols, or robot-controller telemetry.
 
 ## Architecture
 
@@ -53,7 +55,7 @@ Cloudflare Workers cannot directly access a phone's USB, Bluetooth, CAN, GPIO, c
 
 | Transport | Expected integration path | Current status |
 |---|---|---|
-| Bluetooth LE | Native Android BLE | Implemented; physical device testing pending |
+| Bluetooth LE | Native Android BLE + standard GAP/Environmental Sensing GATT reads | Implemented for discovery, name resolution and read-only temperature/humidity snapshots; physical-device validation pending |
 | Bluetooth Classic | Native Android Bluetooth profiles | Planned |
 | Wi-Fi / LAN | mDNS/SSDP or known authenticated endpoint | Planned |
 | Wi-Fi Direct | Native Android Wi-Fi P2P | Planned |
@@ -99,8 +101,8 @@ Normalized telemetry includes device ID, sensor ID, numeric value, unit, timesta
 ## Roadmap
 
 1. **Transport catalog and adapter contract:** implemented in the ATLAS UI and registry.
-2. **Native BLE discovery:** integrated; needs testing against real supported BLE devices.
-3. **Wi-Fi/LAN discovery and authenticated read-only endpoint:** next adapter.
+2. **Native BLE discovery and standard environmental reads:** implemented; needs testing against real supported BLE devices.
+3. **BLE notifications and additional sensor profiles:** next adapter milestone, with explicit per-profile support.
 4. **USB OTG/serial:** native permission and device-driver integration.
 5. **Edge gateway:** ROS 2/DDS, micro-ROS, CAN and industrial protocols.
 6. **Telemetry normalization:** hardware-in-the-loop tests for each adapter.
