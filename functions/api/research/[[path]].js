@@ -65,7 +65,11 @@ export async function onRequest({ request, env }) {
 
   const baseUrl = String(env.DEEP_RESEARCHER_URL || "").replace(/\/+$/, "");
   const token = env.NEXORA_RESEARCH_API_TOKEN;
-  if (!baseUrl || !token) {
+  let backend;
+  try { backend = new URL(baseUrl); } catch { backend = null; }
+  const secureTransport = backend && (backend.protocol === "https:" ||
+    (["localhost", "127.0.0.1"].includes(backend.hostname) && backend.protocol === "http:"));
+  if (!baseUrl || !token || token.length < 32 || !secureTransport || backend.username || backend.password) {
     return json({
       error: "NVIDIA Deep Researcher is not configured yet.",
       code: "research_backend_not_configured"
