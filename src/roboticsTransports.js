@@ -17,10 +17,22 @@ export const ROBOTICS_TRANSPORTS = Object.freeze([
   { id: "camera-sensors", name: "Cameras & sensors", group: "Perception", state: "planned", route: "USB, network or vendor camera adapter", scope: "Metadata and approved sensor streams; hardware and driver dependent." }
 ]);
 
-export function getRoboticsTransportCatalog({ nativeAndroid = false } = {}) {
+export function getRoboticsTransportCatalog({ nativeAndroid = false, environment = globalThis } = {}) {
+  const nav = environment.navigator || {};
+  const implemented = new Set(["http-ws"]);
+  if (nav.serial?.requestPort) implemented.add("usb-serial");
+  if (nav.usb?.requestDevice) implemented.add("usb-otg");
+  if (nav.mediaDevices?.getUserMedia) implemented.add("camera-sensors");
   return ROBOTICS_TRANSPORTS.map(item => ({
     ...item,
-    state: item.id === "bluetooth-le" && nativeAndroid ? "available" : item.state
+    state: item.id === "bluetooth-le" && nativeAndroid
+      ? "available"
+      : implemented.has(item.id) ? "implemented" : item.state,
+    runtimeNote: implemented.has(item.id)
+      ? "Browser API present; device permission and compatible hardware/endpoint still required."
+      : item.id === "wifi-lan" || item.id === "ethernet"
+        ? "Can use the HTTP/WebSocket telemetry gateway when a documented endpoint is supplied; direct discovery is not implemented."
+        : item.state === "planned" ? "Requires a compatible native driver, edge gateway, vendor SDK, or device-specific protocol." : item.scope
   }));
 }
 
