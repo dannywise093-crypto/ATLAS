@@ -154,5 +154,5 @@ test("uses a visible BLE identifier instead of the misleading Unknown/Unnamed la
     loadBleClient: async () => ({ BleClient: fakeBle }),
     onDevice: device => found.push(device)
   });
-  assert.equal(found[0].name, "BLE device · C3D4");
+  assert.equal(found[0].name, "BLE device · B2C3D4");
 });
