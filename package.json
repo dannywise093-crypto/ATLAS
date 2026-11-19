@@ -7,7 +7,7 @@
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0",
-    "test": "node --test src/atlasCore.test.js cloudflare/worker.test.js cloudflare/skill-orchestrator.test.js cloudflare/knowledge.test.js cloudflare/knowledgeArchive.test.js src/roboticsBridge.test.js src/roboticsDiscovery.test.js src/roboticsTransports.test.js src/voiceInterface.test.js src/cloudflareVoice.test.js",
+    "test": "node --test src/atlasCore.test.js cloudflare/worker.test.js cloudflare/skill-orchestrator.test.js cloudflare/knowledge.test.js cloudflare/knowledgeArchive.test.js src/roboticsBridge.test.js src/roboticsDiscovery.test.js src/roboticsTransports.test.js src/voiceInterface.test.js src/cloudflareVoice.test.js src/roboticsLiveAdapters.test.js",
     "skills:build": "node scripts/build-skill-catalog.js",
     "deploy:worker": "npm run skills:build && npx wrangler deploy"
   },
