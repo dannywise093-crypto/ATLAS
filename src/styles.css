@@ -280,3 +280,17 @@ body{background:radial-gradient(ellipse at 82% 0%,rgba(38,103,207,.17),transpare
 .atlas-session-bar button{border:1px solid #3a5f8d;border-radius:18px;padding:6px 10px;background:#173252;color:#dceaff;font-size:10px}
 .atlas-session-bar button:disabled{opacity:.55;cursor:wait}
 @media(max-width:700px){.atlas-login-card{padding:34px 20px}.atlas-session-bar{top:74px;right:10px}.atlas-session-bar span{max-width:105px}}
+
+
+/* Real BLE sensor telemetry */
+.robot-discovered-list li{align-items:center;flex-wrap:wrap}
+.robot-discovered-list li button{border:1px solid #45698f;border-radius:8px;padding:7px 10px;background:#142b47;color:#cfe5ff;font-size:10px;font-weight:600;white-space:nowrap}
+.robot-discovered-list li button:disabled{opacity:.55;cursor:default}
+.robot-sensor-readings{display:grid;gap:8px;margin-top:10px;padding:12px;border:1px solid #2c6b5b;border-radius:10px;background:#0b2825}
+.robot-sensor-readings>b{font-size:9px;letter-spacing:1.2px;color:#8be0c3}
+.robot-sensor-reading{display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:12px;padding:7px 0;border-bottom:1px solid #285047}
+.robot-sensor-reading:last-child{border-bottom:0}
+.robot-sensor-reading span{font-size:11px;color:#b7d7d0;text-transform:capitalize}
+.robot-sensor-reading strong{font-size:13px;color:#a6f0d6}
+.robot-sensor-reading small{font-size:9px;color:#7eaaa0}
+@media(max-width:700px){.robot-sensor-reading{grid-template-columns:1fr auto}.robot-sensor-reading small{grid-column:1/-1}}
