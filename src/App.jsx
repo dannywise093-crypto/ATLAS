@@ -10,7 +10,7 @@ import { getNeuralRuntimeStatus, checkAtlasBackend, generateAtlasResponse, gener
 import { Activity, Bot, BrainCircuit, Camera, Check, Database, Eye, GraduationCap, Home, Menu, MessageSquare, Mic, Plus, Radio, Send, Settings, ShieldCheck, Sparkles, Trash2, Volume2, X } from "lucide-react";
 
 function atlasStorageKey(key) {
-  // ATLAS is now an open workspace: chat and settings use device-local keys,
+  // NEXORA AI is now an open workspace: chat and settings use device-local keys,
   // not an authenticated Google account. Migrate existing conversations once.
   const storageKey = "atlas:" + key;
   try {
@@ -282,7 +282,7 @@ function AtlasWorkspace() {
       onTranscript:async text=>{
         if(!voiceModeRef.current)return;
         setVoiceTranscript(text);
-        setVoiceStatus("Processing your request with ATLAS…");
+        setVoiceStatus("Processing your request with NEXORA AI…");
         await sendMessage(text,{speak:true,voiceModeActive:true});
         if(voiceModeRef.current){
           setVoiceTranscript("");
