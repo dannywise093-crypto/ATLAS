@@ -65,6 +65,7 @@ COPY frontends/deep_researcher_api/ ./frontends/deep_researcher_api/
 COPY frontends/cli/ ./frontends/cli/
 COPY frontends/debug/ ./frontends/debug/
 COPY configs/ ./configs/
+COPY integrations/nexora_research_auth/ ./integrations/nexora_research_auth/
 # Only copy runtime scripts from deploy/ — never copy the full directory
 # to avoid leaking .env, Helm charts, compose files, or other dev artifacts.
 COPY deploy/entrypoint.py deploy/start_web.py ./deploy/
@@ -88,6 +89,7 @@ RUN uv pip install --no-sources --no-deps -e . \
     && uv pip install --no-deps -e ./sources/nimble_web_search \
     && uv pip install --no-deps -e "./sources/knowledge_layer[all]" \
     && uv pip install --no-deps -e ./frontends/deep_researcher_api \
+    && uv pip install --no-deps -e ./integrations/nexora_research_auth \
     && uv pip install "psycopg[binary]>=3.0.0"
 
 RUN /app/.venv/bin/python -c \
