@@ -43,6 +43,8 @@ Set these as private environment variables in the backend hosting service:
 - `PORT=8000`
 - `APP_ENV=production`
 - `REQUIRE_AUTH=true`
+- `DEEP_RESEARCHER_EXTERNAL_HOSTNAMES`: the backend service hostname only (for example, `your-service.onrender.com`, without scheme or port); this makes the API enforce its external path allowlist and token validation.
+- `DEEP_RESEARCHER_ENABLE_DEBUG=false`
 - `NEXORA_RESEARCH_API_TOKEN`: generate a unique random value of at least 32 characters.
 - `NVIDIA_API_KEY`: NVIDIA API Catalog credential for the models in the selected workflow.
 - `TAVILY_API_KEY`: web-search provider credential (the default profile uses Tavily).
