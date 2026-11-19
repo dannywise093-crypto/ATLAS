@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { getBluetoothDiscoveryStatus, discoverBluetoothDevice, scanNativeBluetoothDevices } from "./roboticsDiscovery.js";
+import { getBluetoothDiscoveryStatus, discoverBluetoothDevice, scanNativeBluetoothDevices, decodeStandardBleSensors, connectNativeBleSensorDevice } from "./roboticsDiscovery.js";
 
 test("reports Web Bluetooth unavailable in embedded environments without the API", () => {
   const status = getBluetoothDiscoveryStatus({ isSecureContext: true, navigator: {} });
