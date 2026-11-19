@@ -82,7 +82,7 @@ export async function connectNativeBleSensorDevice({ deviceId, loadBleClient = (
     connection: "connected",
     connected: true,
     sensors,
-    sensorStatus: sensors.length ? "Live standard BLE sensor readings received." : "Connected, but this device does not expose the standard BLE temperature or humidity characteristics."
+    sensorStatus: sensors.length ? "Read-only standard BLE sensor snapshot received." : "Connected, but this device does not expose the standard BLE temperature or humidity characteristics."
   });
 }
 
@@ -96,12 +96,13 @@ export async function readWebBleEnvironmentalSensors(device, now = Date.now()) {
   if (!device?.gatt) throw new Error("The selected BLE device does not support GATT.");
   const server = device.gatt.connected ? device.gatt : await device.gatt.connect();
   let deviceName = device.name || bleFallbackName(device.id);
+  let nameAvailable = Boolean(device.name);
   try {
     const gap = await server.getPrimaryService(0x1800);
     const nameCharacteristic = await gap.getCharacteristic(0x2a00);
     const value = await nameCharacteristic.readValue();
     const decoded = new TextDecoder().decode(new Uint8Array(value.buffer, value.byteOffset, value.byteLength)).replace(/\0/g, "").trim();
-    if (decoded) deviceName = decoded;
+    if (decoded) { deviceName = decoded; nameAvailable = true; }
   } catch {}
   let temperature;
   let humidity;
@@ -114,7 +115,7 @@ export async function readWebBleEnvironmentalSensors(device, now = Date.now()) {
   return Object.freeze({
     id: String(device.id || ""),
     name: deviceName,
-    nameAvailable: Boolean(device.name),
+    nameAvailable,
     transport: "Bluetooth LE",
     connection: "connected",
     connected: Boolean(device.gatt.connected),
