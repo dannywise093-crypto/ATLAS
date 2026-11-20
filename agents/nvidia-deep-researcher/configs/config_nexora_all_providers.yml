@@ -1,0 +1,196 @@
+# NEXORA all-provider profile for NVIDIA Deep Researcher.
+# This profile intentionally omits the optional knowledge layer: the vendored
+# Foundational RAG profile requires separate RAG/ingest services, while the
+# LlamaIndex profile writes local Chroma/summary files. Neither is provisioned
+# in the current Cloudflare-only runtime.
+#
+# Required runtime secrets:
+# NVIDIA_API_KEY, TAVILY_API_KEY, EXA_API_KEY, NIMBLE_API_KEY,
+# YDC_API_KEY, SERPER_API_KEY.
+#
+# Production MUST override NAT_JOB_STORE_DB_URL and DEEP_RESEARCHER_CHECKPOINT_DB
+# with durable storage. The SQLite defaults below are for local development only.
+
+general:
+  use_uvloop: true
+  telemetry:
+    logging:
+      console:
+        _type: console
+        level: INFO
+
+  front_end:
+    _type: deep_researcher_api
+    runner_class: deep_researcher_api.plugin.DeepResearcherAPIWorker
+    db_url: ${NAT_JOB_STORE_DB_URL:-sqlite+aiosqlite:///./jobs.db}
+    expiry_seconds: 86400
+    cors:
+      allow_origin_regex: 'http://localhost(:\\d+)?|http://127.0.0.1(:\\d+)?'
+      allow_methods:
+        - GET
+        - POST
+        - DELETE
+        - OPTIONS
+      allow_headers:
+        - "*"
+      allow_credentials: true
+      expose_headers:
+        - "*"
+
+llms:
+  nemotron_lightning_intent_llm:
+    _type: nim
+    model_name: nvidia/nemotron-3.5-lightning-30b-a3b
+    base_url: "https://integrate.api.nvidia.com/v1"
+    api_key: ${NVIDIA_API_KEY}
+    temperature: 0.1
+    top_p: 0.9
+    max_tokens: 1024
+    num_retries: 5
+    parallel_tool_calls: false
+    chat_template_kwargs:
+      enable_thinking: false
+
+  nemotron_lightning_agent_llm:
+    _type: nim
+    model_name: nvidia/nemotron-3.5-lightning-30b-a3b
+    base_url: "https://integrate.api.nvidia.com/v1"
+    api_key: ${NVIDIA_API_KEY}
+    temperature: 0.2
+    top_p: 0.7
+    max_tokens: 32768
+    num_retries: 5
+    parallel_tool_calls: false
+    chat_template_kwargs:
+      enable_thinking: true
+
+  nemotron_ultra_llm:
+    _type: nim
+    model_name: nvidia/nemotron-3-ultra-550b-a55b
+    base_url: "https://integrate.api.nvidia.com/v1"
+    api_key: ${NVIDIA_API_KEY}
+    temperature: 0.2
+    top_p: 0.7
+    max_tokens: 16384
+    num_retries: 5
+    chat_template_kwargs:
+      enable_thinking: false
+
+  nemotron_ultra_writer_llm:
+    _type: nim
+    model_name: nvidia/nemotron-3-ultra-550b-a55b
+    base_url: "https://integrate.api.nvidia.com/v1"
+    api_key: ${NVIDIA_API_KEY}
+    temperature: 0.2
+    top_p: 0.7
+    max_tokens: 32768
+    num_retries: 5
+    chat_template_kwargs:
+      enable_thinking: false
+
+functions:
+  data_sources:
+    _type: data_source_registry
+    sources:
+      - id: web_search
+        name: "Web Search"
+        description: "Search and retrieve current web evidence using NEXORA's enabled providers."
+        tools:
+          - tavily_web_search_tool
+          - exa_web_search_tool
+          - nimble_web_search_tool
+          - you_web_search_tool
+          - you_research_tool
+          - you_contents_tool
+          - you_finance_research_tool
+      - id: academic_papers
+        name: "Academic Papers"
+        description: "Search Google Scholar for academic and scientific publications through Serper."
+        tools:
+          - paper_search_tool
+
+  tavily_web_search_tool:
+    _type: tavily_web_search
+    max_results: 5
+    advanced_search: true
+    max_content_length: 12000
+
+  exa_web_search_tool:
+    _type: exa_web_search
+    max_results: 5
+    search_type: auto
+    full_text: true
+    max_content_length: 12000
+
+  nimble_web_search_tool:
+    _type: nimble_web_search
+    max_results: 5
+    search_depth: lite
+    focus: general
+    country: US
+    locale: en
+    max_content_length: 12000
+
+  you_web_search_tool:
+    _type: you_web_search
+    max_results: 8
+    safesearch: moderate
+    livecrawl_mode: web
+    livecrawl_format: markdown
+    freshness: off
+    max_content_length: 12000
+
+  you_research_tool:
+    _type: you_research
+    research_effort: deep
+    timeout: 240
+
+  you_contents_tool:
+    _type: you_contents
+    formats:
+      - markdown
+      - metadata
+    crawl_timeout: 45
+
+  you_finance_research_tool:
+    _type: you_finance_research
+    research_effort: deep
+    timeout: 240
+
+  paper_search_tool:
+    _type: paper_search
+    provider: serper
+    max_results: 5
+    timeout: 30
+
+  intent_classifier:
+    _type: intent_classifier
+    llm: nemotron_lightning_intent_llm
+
+  clarifier_agent:
+    _type: clarifier_agent
+    llm: nemotron_ultra_llm
+    max_turns: 3
+    log_response_max_chars: 2000
+
+  shallow_research_agent:
+    _type: shallow_research_agent
+    llm: nemotron_lightning_agent_llm
+    max_llm_turns: 10
+    max_tool_iterations: 8
+
+  deep_research_agent:
+    _type: deep_research_agent
+    enable_citation_verification: true
+    orchestrator_llm: nemotron_ultra_llm
+    source_router_llm: nemotron_ultra_llm
+    researcher_llm: nemotron_ultra_llm
+    planner_llm: nemotron_ultra_llm
+    writer_llm: nemotron_ultra_writer_llm
+
+workflow:
+  _type: chat_deepresearcher_agent
+  enable_escalation: true
+  enable_clarifier: true
+  use_async_deep_research: true
+  checkpoint_db: ${DEEP_RESEARCHER_CHECKPOINT_DB:-./checkpoints.db}
