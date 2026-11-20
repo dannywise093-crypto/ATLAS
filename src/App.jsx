@@ -94,6 +94,14 @@ function AtlasWorkspace() {
   const [researchProgress,setResearchProgress] = useState([]);
   const [researchReport,setResearchReport] = useState(null);
   const [researchError,setResearchError] = useState("");
+  const [researchVisualQuery,setResearchVisualQuery] = useState("");
+  const [researchImages,setResearchImages] = useState([]);
+  const [researchVisualBusy,setResearchVisualBusy] = useState(false);
+  const [researchVisualError,setResearchVisualError] = useState("");
+  const [researchImagePrompt,setResearchImagePrompt] = useState("");
+  const [generatedResearchImage,setGeneratedResearchImage] = useState(null);
+  const [imageGenerating,setImageGenerating] = useState(false);
+
   useEffect(()=>{try{if(researchJobId)localStorage.setItem(atlasStorageKey("research-job-id"),researchJobId);else localStorage.removeItem(atlasStorageKey("research-job-id"));}catch{}},[researchJobId]);
   useEffect(()=>{
     if(page!=="Research Center")return;
@@ -281,6 +289,40 @@ function AtlasWorkspace() {
       sendInProgressRef.current=false;
     }
   }
+  async function searchResearchImages(query=researchVisualQuery||researchQuery){
+    const topic=String(query||"").trim();
+    if(!topic)return;
+    setResearchVisualBusy(true);
+    setResearchVisualError("");
+    setResearchVisualQuery(topic);
+    try{
+      const response=await fetch("/api/visuals/search?q="+encodeURIComponent(topic));
+      const data=await response.json().catch(()=>({}));
+      if(!response.ok)throw new Error(data.error||"Image search failed.");
+      setResearchImages(Array.isArray(data.images)?data.images:[]);
+      if(!data.images?.length)setResearchVisualError("No appropriately licensed images with usable attribution were found for this topic.");
+    }catch(error){setResearchVisualError(error.message||"Could not retrieve research images.");}
+    finally{setResearchVisualBusy(false);}
+  }
+  async function generateResearchIllustration(){
+    const prompt=(researchImagePrompt.trim()||researchQuery.trim());
+    if(!prompt||imageGenerating)return;
+    setImageGenerating(true);
+    setResearchVisualError("");
+    setGeneratedResearchImage(null);
+    try{
+      const response=await fetch("/api/visuals/generate",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({prompt:"Create a clear, accurate-looking educational research illustration about: "+prompt+". Use a clean scientific editorial style, uncluttered composition, neutral background, and visual labels only where legible. Do not invent numerical data, citations, or claim to depict a real measurement."})
+      });
+      const data=await response.json().catch(()=>({}));
+      if(!response.ok)throw new Error(data.error||"Image generation failed.");
+      if(!data.generated||typeof data.image!=="string"||!data.image.startsWith("data:image/"))throw new Error("The image service did not return a valid generated image.");
+      setGeneratedResearchImage(data);
+    }catch(error){setResearchVisualError(error.message||"Could not generate the research illustration.");}
+    finally{setImageGenerating(false);}
+  }
   async function loadResearchReport(jobId=researchJobId){
     if(!jobId)return;
     setResearchError("");
@@ -289,6 +331,8 @@ function AtlasWorkspace() {
       const data=await response.json().catch(()=>({}));
       if(!response.ok)throw new Error(data.detail?.message||data.error||"The report is not available yet.");
       setResearchReport(data);
+      setResearchStatus("Research report loaded. Finding real source images…");
+      searchResearchImages(researchQuery);
       setResearchStatus("Research report loaded.");
       return data;
     }catch(error){setResearchError(error.message);return null;}
@@ -511,6 +555,29 @@ function AtlasWorkspace() {
     </article>
     {researchProgress.length>0&&<article className="card"><h2>Research activity</h2><ol>{researchProgress.map((item,index)=><li key={index}>{item}</li>)}</ol></article>}
     {researchReport&&<article className="card"><h2>Research report</h2><pre style={{whiteSpace:"pre-wrap",overflowWrap:"anywhere"}}>{typeof researchReport==="string"?researchReport:JSON.stringify(researchReport,null,2)}</pre></article>}
+    {researchReport&&<article className="card research-visual-card">
+      <div className="cardtop"><span className="cardicon"><Eye/></span><span className="badge">VISUAL RESEARCH</span></div>
+      <h2>Research images & illustrations</h2>
+      <p>Real images are retrieved from Wikimedia Commons with creator and license details. AI illustrations are labelled separately and are not evidence or measured results.</p>
+      <form className="research-visual-search" onSubmit={event=>{event.preventDefault();searchResearchImages();}}>
+        <label htmlFor="research-visual-query">Find real source images</label>
+        <input id="research-visual-query" value={researchVisualQuery||researchQuery} onChange={event=>setResearchVisualQuery(event.target.value)} maxLength={240} placeholder="Search photos, diagrams, maps or charts"/>
+        <button type="submit" disabled={researchVisualBusy||!(researchVisualQuery||researchQuery).trim()}>{researchVisualBusy?"Searching…":"Search real images"}</button>
+      </form>
+      {researchVisualError&&<p className="research-visual-error" role="alert">{researchVisualError}</p>}
+      {researchImages.length>0&&<div className="research-image-grid">{researchImages.map((item,index)=><figure className="research-image-result" key={item.sourceUrl||index}>
+        <a href={item.sourceUrl} target="_blank" rel="noopener noreferrer"><img src={item.imageUrl} alt={item.title||"Research image"} loading="lazy"/></a>
+        <figcaption><b>{item.title||"Untitled image"}</b><span>Creator: {item.author}</span><span>License: {item.license}{item.licenseUrl?" · ":""}{item.licenseUrl&&<a href={item.licenseUrl} target="_blank" rel="noopener noreferrer">license details</a>}</span><a href={item.sourceUrl} target="_blank" rel="noopener noreferrer">View original source ↗</a></figcaption>
+      </figure>)}</div>}
+      <div className="research-image-generator">
+        <h3>Generate an original research illustration</h3>
+        <label htmlFor="research-image-prompt">Image prompt (optional)</label>
+        <textarea id="research-image-prompt" rows="3" maxLength={1600} value={researchImagePrompt} onChange={event=>setResearchImagePrompt(event.target.value)} placeholder="Describe the scientific concept or visual explanation to illustrate…"/>
+        <button type="button" onClick={generateResearchIllustration} disabled={imageGenerating||!(researchImagePrompt.trim()||researchQuery.trim())}>{imageGenerating?"Generating image…":"Generate AI illustration"}</button>
+        {generatedResearchImage&&<figure className="research-generated-image"><img src={generatedResearchImage.image} alt="AI-generated conceptual research illustration"/><figcaption><b>AI-generated conceptual illustration</b><span>Model: {generatedResearchImage.model}</span><span>{generatedResearchImage.note}</span></figcaption></figure>}
+        <small>Image generation uses Cloudflare Workers AI and is subject to your account's available usage quota and pricing.</small>
+      </div>
+    </article>}
   </section>
   : page==="Copilot" ? <section className="stack grok-page"><div className="grok-workspace"><aside className="grok-history"><button className="grok-new-chat" onClick={newCopilotConversation}><Plus size={17}/> <span>New chat</span></button><div className="grok-history-label">COPILOT CHATS</div><div className="grok-history-list" aria-label="Copilot conversation history">{copilotConversations.map(item=><div className={item.id===activeCopilotConversation?.id?"grok-history-item active":"grok-history-item"} key={item.id}><button className="grok-history-open" onClick={()=>{setActiveCopilotConversationId(item.id);localStorage.setItem(atlasStorageKey("atlas-active-copilot-conversation"),item.id);setInput("");}} title={item.title}>{item.title}</button><button className="grok-history-delete" onClick={()=>deleteCopilotConversation(item.id)} aria-label={"Delete "+item.title} title="Delete Copilot conversation"><Trash2 size={14}/></button></div>)}</div><div className="grok-history-foot"><span className="grok-status-dot"/> ATLAS COPILOT · PRIVATE SESSION</div></aside><div className="grok-chat-main"><div className="grok-topbar"><div className="grok-title"><span className="grok-mark"><AtlasLogo/></span><div><b>NEXORA Copilot</b><small>SOFTWARE ENGINEERING</small></div></div><div className="grok-top-actions"><span className="grok-model-tag">CODING MODE</span><span className="grok-online"><i/> {gatewayReady?"ONLINE":"CONNECTING"}</span></div></div><div className="grok-messages">{copilotMessages.map((m,i)=><div className={"grok-message "+m.role} key={i}>{m.role==="atlas"&&<span className="grok-message-avatar"><AtlasLogo/></span>}<div className="grok-message-body">{m.role==="user"&&<b>YOU</b>}<p>{m.text}</p></div></div>)}</div><div className="grok-compose-area"><div className="grok-composer-hint">Ask Copilot to write, explain, debug, or review code.</div><form className="grok-composer" onSubmit={send}><textarea aria-label="Message NEXORA Copilot" rows="1" value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();e.currentTarget.form.requestSubmit();}}} placeholder="Ask NEXORA Copilot about your code…"/><div className="grok-composer-bottom"><span>Enter to send · Shift + Enter for a new line</span><button aria-label="Send message" disabled={!input.trim()||generating}><Send size={17}/></button></div></form><small>{generating?"Copilot is thinking…":"AI can make mistakes. Review generated code before using it."}</small></div></div></div></section>
   : page==="Vision Center" ? <section className="stack">{heading(page,"Prepare image input for future computer-vision features.","NOT CONNECTED")}<div className="panel"><Camera size={30}/><h3>Image input</h3><p>Choose a picture from your phone to preview it here. This prototype does not send images to an AI model.</p><label className="button">Choose image<input hidden type="file" accept="image/*" onChange={e=>{const f=e.target.files?.[0];if(f){setImage(URL.createObjectURL(f));setNotice("Local preview only. AI analysis is not connected.")}}}/></label>{image&&<img className="preview" src={image} alt="Selected preview"/>}{notice&&<p className="notice">{notice}</p>}</div>{card(<ShieldCheck/>,"Planned vision capabilities","Object recognition, camera integration, visual Q&A and privacy controls.")}</section>
