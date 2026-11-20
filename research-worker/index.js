@@ -1,4 +1,5 @@
 import { DurableObject } from "cloudflare:workers";
+import { ResearchStorage } from "./storage.js";
 import { constantTimeEqual, isAllowedResearchRoute, missingRuntimeConfig } from "./policy.js";
 
 const CONTAINER_PORT = 8000;
@@ -98,9 +99,11 @@ export class ResearchContainer extends DurableObject {
   }
 }
 
+export class ResearchStorageObject extends ResearchStorage {}
+
 export default {
   async fetch(request, env) {
-    const supplied = (request.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
+    const supplied = (request.headers.get("authorization") || "").replace(/^Bearer\\s+/i, "");
     const expected = env.NEXORA_RESEARCH_API_TOKEN;
     if (!expected || expected.length < 32 || !constantTimeEqual(supplied, expected)) {
       return json({ error: "Unauthorized." }, 401);
