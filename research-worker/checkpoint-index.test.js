@@ -133,3 +133,42 @@ test("constructor fails closed without a D1 binding", () => {
   assert.throws(() => new D1CheckpointIndex(null),
     (error) => error instanceof CheckpointIndexError && error.code === "missing_binding");
 });
+
+test("thread deletion tombstones first, queues R2 objects, then deletes child and parent rows", async () => {
+  const sql = [];
+  const db = {
+    prepare(statement) {
+      return {
+        statement,
+        args: [],
+        bind(...args) { this.args = args; return this; },
+      };
+    },
+    async batch(statements) {
+      sql.push(...statements.map((statement) => statement.statement.replace(/\\s+/g, " ").trim()));
+      return [
+        { success: true, meta: { changes: 1 } }, // tombstone
+        { success: true, meta: { changes: 1 } }, // checkpoint objects queued
+        { success: true, meta: { changes: 1 } }, // metadata objects queued
+        { success: true, meta: { changes: 1 } }, // pending write objects queued
+        { success: true, meta: { changes: 2 } }, // pending writes deleted
+        { success: true, meta: { changes: 3 } }, // checkpoints deleted
+        { success: true, meta: { changes: 1 } }, // thread scopes deleted
+      ];
+    },
+  };
+  const index = new D1CheckpointIndex(db);
+  const result = await index.deleteThread({ tenantId: "acme", threadId: "thread-1", deletedAt: 100 });
+  assert.equal(result.tombstoned, true);
+  assert.equal(result.deletedWrites, 2);
+  assert.equal(result.deletedCheckpoints, 3);
+  assert.equal(result.deletedScopes, 1);
+  assert.equal(result.objectsQueued, 3);
+  assert.match(sql[0], /research_checkpoint_thread_tombstones/);
+  assert.match(sql[1], /checkpoint_r2_key/);
+  assert.match(sql[2], /metadata_r2_key/);
+  assert.match(sql[3], /value_r2_key/);
+  assert.match(sql[4], /DELETE FROM research_checkpoint_writes/);
+  assert.match(sql[5], /DELETE FROM research_checkpoints/);
+  assert.match(sql[6], /DELETE FROM research_checkpoint_threads/);
+});
