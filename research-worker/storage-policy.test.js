@@ -4,7 +4,7 @@ import { extractBearerToken, isSafeStorageSegment, validStorageRequest } from ".
 
 test("storage bearer parser accepts the Bearer scheme and rejects other schemes", () => {
   assert.equal(extractBearerToken("Bearer token-value"), "token-value");
-  assert.equal(extractBearerToken("bearer\\t token-value"), "token-value");
+  assert.equal(extractBearerToken("bearer\t token-value"), "token-value");
   assert.equal(extractBearerToken("Basic token-value"), "");
   assert.equal(extractBearerToken(null), "");
 });
