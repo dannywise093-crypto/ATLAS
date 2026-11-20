@@ -178,6 +178,31 @@ The pinned NVIDIA/NeMo implementation has no existing Cloudflare D1 or Durable O
 
 Cloudflare outbound HTTP intercepts provide a viable transport from a Container to a WorkerEntrypoint with access to Durable Object bindings. They do not supply a SQLAlchemy dialect, a JobStore implementation, an EventStore implementation, or a LangGraph checkpointer. A Cloudflare-native design must therefore implement and contract-test each persistence adapter and define recovery semantics for Dask jobs before the runtime can be considered durable. Do not substitute a remote HTTP wrapper around only the EventStore and call the whole system persistent.
 
+### Python-to-Cloudflare transport milestone
+
+A Python transport client now exists at
+`frontends/deep_researcher_api/src/deep_researcher_api/jobs/cloudflare_storage.py`.
+It uses the authenticated Worker routes to read/write tenant-scoped records and
+append/read paginated job events. It includes synchronous and async wrappers,
+optimistic revision support, strict identifier validation, bounded response
+reads, and typed conflict/not-found errors.
+
+The Python client expects these private runtime settings:
+- `NEXORA_RESEARCH_STORAGE_URL`: the HTTPS origin of the research Worker
+  (origin only; no path, query, or fragment).
+- `NEXORA_RESEARCH_API_TOKEN`: the same secret used by the research Worker.
+
+The client is a transport layer only. It is **not wired into NAT's JobStore**,
+the API routes, EventStore, admission/access SQL, LangGraph checkpoint saver,
+or Dask recovery. Do not remove the existing SQLAlchemy configuration or
+enable the research Container on the strength of this client alone. The next
+adapter task must preserve NAT's required Dask future lifecycle while replacing
+the `job_info` ORM contract and the direct SQL consumers atomically.
+
+Focused tests are in
+`frontends/deep_researcher_api/tests/test_cloudflare_storage.py`. They have
+been added but have not yet been executed in this environment.
+
 ### Required implementation sequence
 
 - Define a versioned Durable Object storage API for jobs, events, admission, ownership, report references, and checkpoints, with atomic per-job writes, pagination, expiry, and tenant scoping.
