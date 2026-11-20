@@ -4,7 +4,7 @@ import { constantTimeEqual, extractBearerToken, isAllowedResearchRoute, missingR
 
 test("research Worker parses bearer tokens using whitespace and case-insensitive scheme matching", () => {
   assert.equal(extractBearerToken("Bearer secret-value"), "secret-value");
-  assert.equal(extractBearerToken("bearer\tsecret-value"), "secret-value");
+  assert.equal(extractBearerToken("bearer\\tsecret-value"), "secret-value");
   assert.equal(extractBearerToken("Basic secret-value"), "");
   assert.equal(extractBearerToken(null), "");
 });
@@ -56,7 +56,28 @@ test("research readiness reports configuration booleans without exposing secret 
   assert.equal(result.providersConfigured, true);
   assert.equal(result.serviceTokenConfigured, true);
   assert.equal(result.eventStoreBackend, "cloudflare");
+  assert.equal(result.checkpointBackend, "postgres");
+  assert.equal(result.checkpointReady, true);
   assert.equal(JSON.stringify(result).includes("configured-placeholder-secret-value-123456"), false);
+});
+
+test("Cloudflare checkpoint mode stays blocked until D1, R2, coordinator, and saver conformance exist", () => {
+  const names = ["NVIDIA_API_KEY", "TAVILY_API_KEY", "EXA_API_KEY", "NIMBLE_API_KEY", "YDC_API_KEY", "SERPER_API_KEY", "NEXORA_RESEARCH_API_TOKEN", "NAT_JOB_STORE_DB_URL", "DEEP_RESEARCHER_CHECKPOINT_DB"];
+  const env = Object.fromEntries(names.map((name) => [name, "configured-placeholder-secret-value-123456"]));
+  env.RESEARCH_STORAGE = {};
+  env.RESEARCH_CONTAINER = {};
+  env.NEXORA_RESEARCH_CHECKPOINT_BACKEND = "cloudflare";
+  const result = researchReadiness(env);
+  assert.equal(result.ready, false);
+  assert.equal(result.status, "blocked");
+  assert.equal(result.checkpointBackend, "cloudflare");
+  assert.equal(result.checkpointReady, false);
+  assert.deepEqual(result.checkpointMigrationMissing, [
+    "RESEARCH_CHECKPOINTS_DB (D1)",
+    "RESEARCH_CHECKPOINTS_BUCKET (R2)",
+    "RESEARCH_CHECKPOINT_COORDINATOR (Durable Object)",
+    "Cloudflare LangGraph checkpoint saver implementation and conformance tests",
+  ]);
 });
 
 test("research readiness blocks when provider or durable bindings are absent", () => {
@@ -66,4 +87,10 @@ test("research readiness blocks when provider or durable bindings are absent", (
   assert.equal(result.providersConfigured, false);
   assert.equal(result.storageBindingConfigured, false);
   assert.equal(result.containerBindingConfigured, false);
+});
+
+test("unsupported checkpoint backend is never reported ready", () => {
+  const result = researchReadiness({ NEXORA_RESEARCH_CHECKPOINT_BACKEND: "sqlite" });
+  assert.equal(result.ready, false);
+  assert.equal(result.checkpointBackendSupported, false);
 });
