@@ -1,6 +1,6 @@
 # LangGraph Checkpoint Migration Design
 
-Status: Implementation contract; initial D1 metadata schema and SQLite conformance tests are committed. The LangGraph saver and runtime wiring are not implemented.  
+Status: Implementation contract; D1 schema/index adapter, R2 object API, and a Durable Object coordinator implementation are committed. The LangGraph saver and runtime binding/configuration are not implemented.  
 Target dependency lock: `langgraph==1.2.11`, `langgraph-checkpoint==4.1.1`, `langchain-core==1.5.6`  
 Target branch: `feat/engineering-design-development`  
 Production changes: None
@@ -125,7 +125,11 @@ The initial D1 schema is in `agents/nvidia-deep-researcher/deploy/checkpoint_sch
 
 The private research Worker also has an initial R2 payload API in `research-worker/checkpoint-objects.js`, routed through `research-worker/index.js`. It generates opaque object IDs server-side, scopes keys by tenant, bounds payload size, stores SHA-256/size metadata, verifies integrity on reads, and prevents cross-tenant reads/deletes. Node tests cover upload, binary round-trip, tamper detection, tenant isolation, deletion, and missing-bucket behavior. The API remains dormant until `RESEARCH_CHECKPOINTS_BUCKET` is provisioned; it is not yet called by a LangGraph saver.
 
-The schema is not yet bound to the research Worker. No D1 database ID, R2 bucket, or checkpoint coordinator binding has been configured. There is no Python LangGraph saver implementation yet.
+The D1 runtime adapter is in `research-worker/checkpoint-index.js`. It provides scoped checkpoint/thread reads, ordered history, pending-write persistence, delayed-GC queue operations, monotonic thread fencing claims, and a D1 batch publication protocol that compares expected revision, parent head, and fencing token before publishing the checkpoint descriptor. R2 descriptors are validated against the tenant key prefix. Node tests cover atomic publication behavior, stale revision/fence rejection, namespace isolation, and malformed/cross-tenant descriptors.
+
+The coordinator logic is in `research-worker/checkpoint-coordinator-core.js`; it serializes lease operations, issues monotonically increasing fencing tokens, enforces bounded leases, rejects stale holders, and runs checkpoint publication while holding the active lease. The Durable Object wrapper is `research-worker/checkpoint-coordinator.js`, exported from the research Worker entrypoint. It persists its scope, token counter, and active lease in DO SQLite and authenticates its internal requests. Node tests cover competing runners, expiry/takeover, stale publish, scope binding, D1 claim failures, and concurrent acquisition.
+
+These are implementation slices, not a live Cloudflare deployment. The D1 database, R2 bucket, and Durable Object namespace/migration are not provisioned or bound in Wrangler configuration. The DO wrapper is not yet routed through the parent Worker. There is no Python LangGraph saver implementation yet, and the production checkpoint backend remains PostgreSQL.
 
 ## 9. Integration gate
 
