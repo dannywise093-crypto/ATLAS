@@ -24,6 +24,12 @@ The existing `ResearchStorage` DO record/event API remains a transport primitive
 4. Artifact storage factory currently builds SQL metadata storage; S3 support is available in the vendored implementation, but must be verified for R2 compatibility and credential/signature requirements before use.
 5. Current readiness policy still requires `NAT_JOB_STORE_DB_URL` and `DEEP_RESEARCHER_CHECKPOINT_DB`. Those requirements must not be removed until their replacement adapters are wired and tested.
 
+## Implementation progress
+
+- A bounded Cloudflare job-metadata prototype now includes revision-checked runner claims, runner-owned heartbeats, runner-fenced terminal writes, and stale-lease interruption.
+- Unit coverage exercises competing claims, wrong-runner rejection, terminal-state fencing, and stale-versus-fresh lease handling.
+- This prototype is **not** wired into the MCP JobManager or NAT FastAPI job store. It does not yet provide durable queue scheduling, cancellation signalling, idempotent submission, checkpoint cleanup, or complete expiry cleanup. It is not a production runtime replacement.
+
 ## Required implementation sequence
 
 ### A. Job lifecycle adapter
