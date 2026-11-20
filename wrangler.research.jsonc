@@ -21,11 +21,19 @@
       {
         "name": "RESEARCH_CONTAINER",
         "class_name": "ResearchContainer"
+      },
+      {
+        "name": "RESEARCH_STORAGE",
+        "class_name": "ResearchStorageObject"
       }
     ]
   },
   "exports": {
     "ResearchContainer": {
+      "type": "durable-object",
+      "storage": "sqlite"
+    },
+    "ResearchStorageObject": {
       "type": "durable-object",
       "storage": "sqlite"
     }
