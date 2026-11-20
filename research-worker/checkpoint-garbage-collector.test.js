@@ -8,6 +8,8 @@ class GarbageDb {
     this.referenced = new Set(referenced);
   }
 
+  async batch() { return []; }
+
   prepare(sql) {
     const db = this;
     return {
