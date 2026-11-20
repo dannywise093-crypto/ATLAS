@@ -336,6 +336,14 @@ export class D1CheckpointIndex {
         SELECT value_r2_key, tenant_id, ?, ? FROM research_checkpoint_writes
         WHERE tenant_id = ? AND thread_id = ?
       `).bind(now, notBefore, tenantId, threadId),
+      // Delete child rows explicitly rather than depending on per-connection
+      // SQLite foreign_keys settings in the D1 runtime.
+      this.db.prepare(`
+        DELETE FROM research_checkpoint_writes WHERE tenant_id = ? AND thread_id = ?
+      `).bind(tenantId, threadId),
+      this.db.prepare(`
+        DELETE FROM research_checkpoints WHERE tenant_id = ? AND thread_id = ?
+      `).bind(tenantId, threadId),
       this.db.prepare(`
         DELETE FROM research_checkpoint_threads WHERE tenant_id = ? AND thread_id = ?
       `).bind(tenantId, threadId),
@@ -345,7 +353,9 @@ export class D1CheckpointIndex {
       tenantId,
       threadId,
       tombstoned: true,
-      deletedScopes: changes(results[4]),
+      deletedScopes: changes(results[6]),
+      deletedCheckpoints: changes(results[5]),
+      deletedWrites: changes(results[4]),
       objectsQueued: results.slice(1, 4).reduce((sum, result) => sum + changes(result), 0),
       notBefore,
     };
