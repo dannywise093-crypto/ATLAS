@@ -13,5 +13,11 @@
       "migrations_dir": "migrations"
     }
   ],
+  "services": [
+    {
+      "binding": "NEXORA_RESEARCH",
+      "service": "nexora-deep-researcher"
+    }
+  ],
   "name": "atlas-coding-chat"
 }
