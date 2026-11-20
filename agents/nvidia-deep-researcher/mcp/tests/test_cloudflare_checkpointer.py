@@ -207,17 +207,17 @@ async def test_alist_paginates_all_checkpoints_when_no_limit_is_given(monkeypatc
 
     saver = _saver()
     calls = []
+    first_page = [{"checkpoint_id": f"cp-{index:03d}"} for index in range(100, 0, -1)]
     pages = {
-        None: [{"checkpoint_id": "cp-4"}, {"checkpoint_id": "cp-3"}],
-        "cp-3": [{"checkpoint_id": "cp-2"}],
-        "cp-2": [],
+        None: first_page,
+        "cp-001": [{"checkpoint_id": "cp-000"}],
     }
 
     async def coordinator(config, action, payload=None):
         assert action == "list"
         cursor = (payload or {}).get("beforeCheckpointId")
         calls.append(cursor)
-        return {"checkpoints": pages[cursor]}
+        return {"checkpoints": pages.get(cursor, [])}
 
     async def get_tuple(config):
         checkpoint_id = config["configurable"]["checkpoint_id"]
