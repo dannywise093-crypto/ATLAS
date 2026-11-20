@@ -1,3 +1,9 @@
+export function extractBearerToken(header) {
+  if (typeof header !== "string") return "";
+  const match = header.match(/^Bearer\\s+(.+)$/i);
+  return match ? match[1].trim() : "";
+}
+
 const SAFE_SEGMENT = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 
 export function isSafeStorageSegment(value) {
