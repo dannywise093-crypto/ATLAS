@@ -63,6 +63,27 @@ export class ResearchStorage extends DurableObject {
     const tenant = parts[2];
 
     try {
+      if (parts[3] === "records" && parts.length === 5) {
+        const namespace = parts[4];
+        if (!isSafeStorageSegment(namespace)) return response({ error: "Invalid storage namespace." }, 400);
+        if (request.method !== "GET") return response({ error: "Method not allowed." }, 405);
+        const afterKey = url.searchParams.get("after") || "";
+        const rawLimit = Number(url.searchParams.get("limit") || "100");
+        if ((afterKey && !isSafeStorageSegment(afterKey)) || !Number.isSafeInteger(rawLimit) || rawLimit < 1) {
+          return response({ error: "Invalid record pagination parameters." }, 400);
+        }
+        const limit = Math.min(MAX_PAGE_SIZE, rawLimit);
+        const rows = this.sql.exec(
+          "SELECT record_key,value_json,revision,updated_at FROM records WHERE tenant=? AND namespace=? AND record_key>? ORDER BY record_key LIMIT ?",
+          tenant, namespace, afterKey, limit + 1
+        ).toArray();
+        const hasMore = rows.length > limit;
+        const page = hasMore ? rows.slice(0, limit) : rows;
+        return response({
+          records: page.map((row) => ({ key: row.record_key, value: JSON.parse(row.value_json), revision: row.revision, updatedAt: row.updated_at })),
+          nextAfter: hasMore ? page[page.length - 1].record_key : null,
+        });
+      }
       if (parts[3] === "records" && parts.length === 6) {
         const [, , , , namespace, key] = parts;
         if (!isSafeStorageSegment(namespace) || !isSafeStorageSegment(key)) {
