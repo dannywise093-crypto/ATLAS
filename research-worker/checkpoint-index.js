@@ -17,10 +17,10 @@ function requiredId(value, label) {
   return value;
 }
 
-function descriptor(value, label) {
+function descriptor(value, label, tenantId) {
   if (!value || typeof value !== "object") throw new CheckpointIndexError("Missing " + label + ".", "invalid_input");
   const type = requiredId(value.type, label + " type");
-  const key = typeof value.key === "string" && value.key.startsWith("nexora-checkpoints/") ? value.key : "";
+  const key = typeof value.key === "string" && value.key.startsWith("nexora-checkpoints/" + tenantId + "/") ? value.key : "";
   if (!key || !SHA256.test(value.sha256 || "") || !Number.isSafeInteger(value.bytes) || value.bytes < 0) {
     throw new CheckpointIndexError("Invalid " + label + " descriptor.", "invalid_input");
   }
@@ -64,8 +64,8 @@ export class D1CheckpointIndex {
     const s = scope(input);
     const checkpointId = requiredId(input.checkpointId, "checkpoint ID");
     const parentId = input.parentCheckpointId == null ? null : requiredId(input.parentCheckpointId, "parent checkpoint ID");
-    const checkpoint = descriptor(input.checkpoint, "checkpoint");
-    const metadata = descriptor(input.metadata, "metadata");
+    const checkpoint = descriptor(input.checkpoint, "checkpoint", s.tenantId);
+    const metadata = descriptor(input.metadata, "metadata", s.tenantId);
     const expectedRevision = input.expectedRevision;
     const fencingToken = input.fencingToken;
     const createdAt = Number.isSafeInteger(input.createdAt) ? input.createdAt : Date.now();
@@ -168,7 +168,7 @@ export class D1CheckpointIndex {
       throw new CheckpointIndexError("Writes must contain between 1 and 128 entries.", "invalid_input");
     }
     const statements = input.writes.map((write) => {
-      const payload = descriptor(write.value, "write value");
+      const payload = descriptor(write.value, "write value", s.tenantId);
       const taskId = requiredId(write.taskId, "task ID");
       const channel = requiredId(write.channel, "write channel");
       const taskPath = typeof write.taskPath === "string" ? write.taskPath.slice(0, 1024) : "";
