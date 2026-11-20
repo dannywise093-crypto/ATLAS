@@ -50,7 +50,8 @@ export function researchReadiness(env) {
         ...(!env.RESEARCH_CHECKPOINTS_DB ? ["RESEARCH_CHECKPOINTS_DB (D1)"] : []),
         ...(!env.RESEARCH_CHECKPOINTS_BUCKET ? ["RESEARCH_CHECKPOINTS_BUCKET (R2)"] : []),
         ...(!env.RESEARCH_CHECKPOINT_COORDINATOR ? ["RESEARCH_CHECKPOINT_COORDINATOR (Durable Object)"] : []),
-        "Cloudflare LangGraph checkpoint saver implementation and conformance tests",
+        ...(!env.NEXORA_RESEARCH_PUBLIC_URL ? ["NEXORA_RESEARCH_PUBLIC_URL"] : []),
+        ...(!env.NEXORA_RESEARCH_TENANT ? ["NEXORA_RESEARCH_TENANT"] : []),
       ]
     : [];
   const checkpointBackendReady = checkpointBackend === "postgres" && checkpointStoreConfigured;
