@@ -10,11 +10,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from deep_researcher_mcp.cloudflare_job_store import CloudflareMCPJobStore
-
-
-class CloudflareStorageConflict(Exception):
-    pass
+from deep_researcher_mcp.cloudflare_job_store import CloudflareMCPJobStore, CloudflareStorageConflict
 
 
 class _MemoryStorage:
