@@ -127,7 +127,7 @@ export default {
       if (parts.length !== 5 ||
           !/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(tenant || "") ||
           !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$/.test(threadId || "") ||
-          !["acquire", "renew", "release", "publish", "get", "list", "put-writes", "list-writes"].includes(action) ||
+          !["acquire", "renew", "release", "publish", "get", "list", "get-thread", "put-writes", "list-writes"].includes(action) ||
           checkpointNs.length > 256 || /[\\u0000-\\u001f]/.test(checkpointNs)) {
         return json({ error: "Invalid checkpoint coordinator route or namespace." }, 400);
       }
