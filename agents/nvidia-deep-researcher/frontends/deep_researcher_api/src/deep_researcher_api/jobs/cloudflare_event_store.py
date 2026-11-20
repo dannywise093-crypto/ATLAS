@@ -6,7 +6,6 @@ used by SSE clients. It is not wired into the existing FastAPI routes yet.
 
 from __future__ import annotations
 
-import asyncio
 import copy
 import logging
 from typing import Any
@@ -14,7 +13,6 @@ from typing import Any
 from deep_researcher_agent.common.logging_utils import log_content_metadata
 
 from .cloudflare_storage import CloudflareStorageClient
-from .crypto import ContentEncryptionError
 
 logger = logging.getLogger(__name__)
 
@@ -124,6 +122,15 @@ class CloudflareEventStore:
         limit: int = 100,
         content_cipher: Any | None = None,
     ) -> list[dict]:
-        return asyncio.run(
-            CloudflareEventStore.get_events_async(storage, job_id, after_id, limit, content_cipher)
-        )
+        adapter = CloudflareEventStore(storage, job_id, content_cipher)
+        if isinstance(after_id, bool) or not isinstance(after_id, int) or after_id < 0:
+            raise ValueError("after_id must be a non-negative integer")
+        if isinstance(limit, bool) or not isinstance(limit, int) or limit < 1:
+            raise ValueError("limit must be a positive integer")
+        page = storage.get_events(job_id, after=after_id, limit=min(limit, 200))
+        events = []
+        for item in page.get("events", []):
+            event = adapter._prepare_event_for_return(item["event"])
+            event["_id"] = item["sequence"]
+            events.append(event)
+        return events
