@@ -12,7 +12,7 @@ import json
 import os
 from typing import Any
 from urllib.error import HTTPError, URLError
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 from urllib.request import Request, urlopen
 
 
@@ -45,8 +45,12 @@ class CloudflareStorageClient:
         self.timeout = timeout
         if not self.base_url:
             raise ValueError("NEXORA_RESEARCH_STORAGE_URL is required")
-        if not self.base_url.startswith(("https://", "http://127.0.0.1", "http://localhost")):
+        parsed = urlsplit(self.base_url)
+        local_http = parsed.scheme == "http" and parsed.hostname in {"localhost", "127.0.0.1", "::1"}
+        if parsed.scheme != "https" and not local_http:
             raise ValueError("Research storage URL must use HTTPS (HTTP is allowed only for localhost tests)")
+        if not parsed.hostname or parsed.username or parsed.password or parsed.query or parsed.fragment:
+            raise ValueError("Research storage URL must be an origin without credentials, query, or fragment")
         if len(self.token) < 32:
             raise ValueError("NEXORA_RESEARCH_API_TOKEN must contain at least 32 characters")
 
@@ -85,7 +89,6 @@ class CloudflareStorageClient:
                     raise CloudflareStorageError("Storage response exceeded the 1 MiB client limit")
                 return json.loads(raw.decode("utf-8")) if raw else {}
         except HTTPError as exc:
-            detail = exc.read(4096).decode("utf-8", errors="replace")
             if exc.code == 409:
                 raise CloudflareStorageConflict("Storage revision conflict") from exc
             if exc.code == 404:
