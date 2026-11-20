@@ -49,7 +49,7 @@ class CloudflareStorageClient:
         local_http = parsed.scheme == "http" and parsed.hostname in {"localhost", "127.0.0.1", "::1"}
         if parsed.scheme != "https" and not local_http:
             raise ValueError("Research storage URL must use HTTPS (HTTP is allowed only for localhost tests)")
-        if not parsed.hostname or parsed.username or parsed.password or parsed.query or parsed.fragment:
+        if not parsed.hostname or parsed.path not in {"", "/"} or parsed.username or parsed.password or parsed.query or parsed.fragment:
             raise ValueError("Research storage URL must be an origin without credentials, query, or fragment")
         if len(self.token) < 32:
             raise ValueError("NEXORA_RESEARCH_API_TOKEN must contain at least 32 characters")
