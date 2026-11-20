@@ -1,7 +1,7 @@
 import { DurableObject } from "cloudflare:workers";
 import { ResearchStorage } from "./storage.js";
 import { validStorageRequest } from "./storage-policy.js";
-import { constantTimeEqual, isAllowedResearchRoute, missingRuntimeConfig } from "./policy.js";
+import { constantTimeEqual, extractBearerToken, isAllowedResearchRoute, missingRuntimeConfig } from "./policy.js";
 
 const CONTAINER_PORT = 8000;
 const START_TIMEOUT_MS = 120_000;
