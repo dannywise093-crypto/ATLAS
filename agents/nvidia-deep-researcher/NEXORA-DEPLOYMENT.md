@@ -102,14 +102,44 @@ Local development may use:
 `NAT_JOB_STORE_DB_URL=sqlite+aiosqlite:///./jobs.db`
 and a local checkpoint file. Those defaults are not production settings.
 
-## Existing Pages proxy
+## Cloudflare Worker and Pages service binding
 
-The current `functions/api/research/[[path]].js` proxy validates requests,
-keeps the service token server-side, and streams the NVIDIA SSE response. It
-currently expects `DEEP_RESEARCHER_URL` as an HTTPS origin. The Cloudflare-only
-Container integration still needs a private service-binding route and the
-matching Pages binding; do not point it at Render, Vercel, or an unprotected
-public backend URL.
+The repository now includes:
+- `research-worker/index.js`: private research Worker, bearer-token validation,
+  approved-route allowlist, Container startup, health polling, and runtime
+  secret forwarding.
+- `wrangler.research.jsonc`: separate Worker/Container configuration using the
+  NVIDIA Dockerfile and its correct build context.
+- `wrangler.jsonc`: Pages service binding named `NEXORA_RESEARCH`, targeting
+  `nexora-deep-researcher`.
+- `functions/api/research/[[path]].js`: Pages proxy that sends requests through
+  that private service binding and streams SSE responses without exposing the
+  service token to the browser.
+
+The research Worker requires these secrets to be configured on the
+`nexora-deep-researcher` Worker itself:
+- `NVIDIA_API_KEY`
+- `TAVILY_API_KEY`
+- `EXA_API_KEY`
+- `NIMBLE_API_KEY`
+- `YDC_API_KEY`
+- `SERPER_API_KEY`
+- `NEXORA_RESEARCH_API_TOKEN`
+
+The same `NEXORA_RESEARCH_API_TOKEN` value must be configured privately on
+the Pages project. The six provider secrets currently stored on
+`atlas-model-gateway` are not automatically shared with this new Worker.
+Do not copy values into source code, GitHub, or browser configuration.
+
+The research Worker also requires `NAT_JOB_STORE_DB_URL` and
+`DEEP_RESEARCHER_CHECKPOINT_DB` as private runtime settings. They are
+intentionally not set to SQLite defaults in the Container Worker: production
+job/event and workflow checkpoint state must not live on ephemeral Container
+disk. Until the Cloudflare-native persistence adapter is implemented and
+these durable storage settings are supported, the Worker returns a safe
+`research_runtime_not_configured` response and does not start the Container.
+
+No Worker deployment or production routing change has been performed.
 
 The approved API surface is the upstream async job API:
 - `POST /v1/jobs/async/submit`
