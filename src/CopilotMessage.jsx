@@ -43,7 +43,8 @@ function PythonRunner({ code }) {
     let active;
     try { active = createPythonWorker(); setWorker(active); }
     catch (error) { setStatus("error"); setOutput("Could not start Python worker: " + error.message); return; }
-    const timer = window.setTimeout(() => { active.terminate(); setWorker(null); setStatus("timeout"); setOutput("Stopped after 45 seconds to protect this device."); }, 45000);\n    active.__timeoutId = timer;
+    const timer = window.setTimeout(() => { active.terminate(); setWorker(null); setStatus("timeout"); setOutput("Stopped after 45 seconds to protect this device."); }, 45000);
+    active.__timeoutId = timer;
     active.onmessage = event => {
       window.clearTimeout(timer); active.terminate(); setWorker(null);
       const raw = String(event.data?.output || "");
