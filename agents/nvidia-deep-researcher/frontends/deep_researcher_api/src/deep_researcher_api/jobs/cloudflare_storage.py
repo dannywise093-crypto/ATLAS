@@ -12,7 +12,7 @@ import json
 import os
 from typing import Any
 from urllib.error import HTTPError, URLError
-from urllib.parse import quote, urlsplit
+from urllib.parse import quote, urlencode, urlsplit
 from urllib.request import Request, urlopen
 
 
@@ -147,6 +147,21 @@ class CloudflareStorageClient:
             self._url(f"records/{quote(namespace, safe='')}/{quote(key, safe='')}"),
         )
 
+    def list_records(self, namespace: str, *, after: str | None = None, limit: int = 100) -> dict[str, Any]:
+        """List records in key order, using the Durable Object cursor contract."""
+        namespace = self._segment(namespace, "namespace")
+        if after is not None:
+            after = self._segment(after, "record cursor")
+        if isinstance(limit, bool) or not isinstance(limit, int) or limit < 1:
+            raise ValueError("limit must be a positive integer")
+        query = {"limit": min(limit, 200)}
+        if after is not None:
+            query["after"] = after
+        return self._request(
+            "GET",
+            self._url(f"records/{quote(namespace, safe='')}?{urlencode(query)}"),
+        )
+
     def append_event(self, job_id: str, event: dict[str, Any]) -> dict[str, Any]:
         job_id = self._segment(job_id, "job ID")
         if not isinstance(event, dict):
@@ -163,6 +178,11 @@ class CloudflareStorageClient:
             "GET",
             self._url(f"events/{quote(job_id, safe='')}?after={after}&limit={min(limit, 200)}"),
         )
+
+    async def alist_records(
+        self, namespace: str, *, after: str | None = None, limit: int = 100
+    ) -> dict[str, Any]:
+        return await asyncio.to_thread(self.list_records, namespace, after=after, limit=limit)
 
     async def aget_record(self, namespace: str, key: str) -> dict[str, Any] | None:
         return await asyncio.to_thread(self.get_record, namespace, key)
