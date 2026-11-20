@@ -270,6 +270,40 @@ export default {
         nvidia: { configured: Boolean(env.NVIDIA_API_KEY), label: "NVIDIA API Catalog", model: "nvidia/nemotron-3-ultra-550b-a55b", role: env.NVIDIA_API_KEY ? "primary" : "not_configured" }
       }, skills: getSkillCatalogStats() });
     }
+    if (url.pathname === "/api/engineering/visual") {
+      if (request.method !== "POST") return json({ error: "Method not allowed." }, 405, { allow: "POST" });
+      if (!authorized(request, env)) return json({ error: "Unauthorized." }, 401);
+      if (rateLimited(request)) return json({ error: "Engineering image-generation limit reached. Please wait before trying again." }, 429, { "retry-after": "60" });
+      if (!env.AI) return json({ error: "Cloudflare Workers AI is not configured for image generation." }, 503);
+      const length = Number(request.headers.get("content-length") || 0);
+      if (length > 8 * 1024) return json({ error: "The image prompt is too large." }, 413);
+      let body;
+      try { body = await request.json(); } catch { return json({ error: "A valid JSON body is required." }, 400); }
+      if (!body || typeof body.prompt !== "string" || !body.prompt.trim() || body.prompt.length > 1800) {
+        return json({ error: "Provide a visual prompt between 1 and 1,800 characters." }, 400);
+      }
+      try {
+        const generated = await env.AI.run("@cf/black-forest-labs/flux-1-schnell", {
+          prompt: body.prompt.trim().slice(0, 1800),
+          steps: 4
+        });
+        if (generated instanceof Response) {
+          if (!generated.ok) return json({ error: "The image model could not complete this request." }, 502);
+          return new Response(generated.body, { status: 200, headers: { "Content-Type": generated.headers.get("Content-Type") || "image/png", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" } });
+        }
+        if (generated instanceof ReadableStream) {
+          return new Response(generated, { status: 200, headers: { "Content-Type": "image/png", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" } });
+        }
+        if (generated instanceof Uint8Array || generated instanceof ArrayBuffer) {
+          return new Response(generated, { status: 200, headers: { "Content-Type": "image/png", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" } });
+        }
+        return json({ error: "The image model returned an unsupported response format." }, 502);
+      } catch (error) {
+        console.error("NEXORA engineering visual generation failed:", classifyAIError(error).status);
+        return json({ error: "The image model is temporarily unavailable. Please retry later." }, 503, { "retry-after": "5" });
+      }
+    }
+
     if (url.pathname === "/api/skills") {
       if (request.method !== "GET") return json({ error: "Method not allowed." }, 405, { allow: "GET" });
       if (!authorized(request, env)) return json({ error: "Unauthorized." }, 401);
