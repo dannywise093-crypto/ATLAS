@@ -43,14 +43,22 @@ test("research proxy keeps the backend token server-side and streams upstream bo
     const response = await onRequest({
       request,
       env: {
-        DEEP_RESEARCHER_URL: "https://research.example/",
-        NEXORA_RESEARCH_API_TOKEN: "server-only-test-token-0123456789-abcdefghij"
+        NEXORA_RESEARCH_API_TOKEN: "server-only-test-token-0123456789-abcdefghij",
+        NEXORA_RESEARCH: {
+          fetch: async (upstreamRequest) => {
+            captured = { url: upstreamRequest.url, init: { headers: Object.fromEntries(upstreamRequest.headers.entries()) } };
+            return new Response("event: stream.mode\\ndata: {\\"mode\\":\\"live\\"}\\n\\n", {
+              status: 200,
+              headers: { "Content-Type": "text/event-stream" }
+            });
+          }
+        }
       }
     });
     assert.equal(response.status, 200);
     assert.equal(response.headers.get("Content-Type"), "text/event-stream");
-    assert.equal(captured.url, "https://research.example/v1/jobs/async/job/job-123/stream");
-    assert.equal(captured.init.headers.Authorization, "Bearer server-only-test-token-0123456789-abcdefghij");
+    assert.equal(captured.url, "https://nexora-deep-researcher.internal/v1/jobs/async/job/job-123/stream");
+    assert.equal(captured.init.headers.authorization, "Bearer server-only-test-token-0123456789-abcdefghij");
     assert.equal(await response.text(), "event: stream.mode\ndata: {\"mode\":\"live\"}\n\n");
   } finally {
     globalThis.fetch = originalFetch;
@@ -62,8 +70,8 @@ test("research proxy refuses insecure remote backend URLs", async () => {
   const response = await onRequest({
     request,
     env: {
-      DEEP_RESEARCHER_URL: "http://research.example",
-      NEXORA_RESEARCH_API_TOKEN: "x".repeat(48)
+      NEXORA_RESEARCH_API_TOKEN: "x".repeat(48),
+      NEXORA_RESEARCH: { fetch: async () => new Response("ok") }
     }
   });
   assert.equal(response.status, 503);
