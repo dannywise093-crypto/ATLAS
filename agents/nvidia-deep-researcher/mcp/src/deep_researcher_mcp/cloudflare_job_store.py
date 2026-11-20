@@ -16,13 +16,13 @@ import json
 import os
 import re
 import uuid
+from datetime import UTC, datetime, timedelta
+from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlencode, urlsplit
 from urllib.request import Request, urlopen
 
 import asyncpg
-from datetime import UTC, datetime, timedelta
-from typing import Any
 
 from .job_store import Job, JobDepth, JobState
 
@@ -30,6 +30,11 @@ _DEFAULT_TTL_SECONDS = 24 * 60 * 60
 _NAMESPACE = "mcp-jobs"
 _TERMINAL_STATES = frozenset({"complete", "failed"})
 _IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+
+def _parse_timestamp(value: str) -> datetime:
+    parsed = datetime.fromisoformat(value)
+    return parsed.replace(tzinfo=UTC) if parsed.tzinfo is None else parsed
 
 
 class CloudflareStorageConflict(RuntimeError):
@@ -205,9 +210,7 @@ class CloudflareMCPJobStore:
             expires_at=timestamp("expires_at"),
             runner_id=value.get("runner_id"),
             heartbeat_at=(
-                datetime.fromisoformat(heartbeat).replace(tzinfo=UTC)
-                if heartbeat and datetime.fromisoformat(heartbeat).tzinfo is None
-                else datetime.fromisoformat(heartbeat) if heartbeat else None
+                _parse_timestamp(heartbeat) if heartbeat else None
             ),
         )
 
@@ -330,8 +333,8 @@ class CloudflareMCPJobStore:
             try:
                 await self._write(job_id, self._serialize(job), record["revision"])
                 return
-            except Exception as exc:
-                if type(exc).__name__ != "CloudflareStorageConflict" or attempt + 1 == self._conflict_retries:
+            except CloudflareStorageConflict:
+                if attempt + 1 == self._conflict_retries:
                     raise
 
     async def update(
@@ -419,8 +422,8 @@ class CloudflareMCPJobStore:
                         await self._write(job_id, self._serialize(current), current_record["revision"])
                         marked += 1
                         break
-                    except Exception as exc:
-                        if type(exc).__name__ != "CloudflareStorageConflict" or attempt + 1 == self._conflict_retries:
+                    except CloudflareStorageConflict:
+                        if attempt + 1 == self._conflict_retries:
                             raise
             cursor = page.get("nextAfter")
             if cursor is None:
