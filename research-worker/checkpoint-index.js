@@ -235,6 +235,21 @@ export class D1CheckpointIndex {
       const payload = descriptor(write.value, "write value", s.tenantId);
       const taskId = requiredId(write.taskId, "task ID");
       const channel = requiredId(write.channel, "write channel");
+      if (write.writeIndex < 0) {
+        const previous = await this.db.prepare(`
+          SELECT value_r2_key FROM research_checkpoint_writes
+          WHERE tenant_id = ? AND thread_id = ? AND checkpoint_ns = ? AND checkpoint_id = ?
+            AND task_id = ? AND write_index = ?
+        `).bind(s.tenantId, s.threadId, s.checkpointNs, checkpointId, taskId, write.writeIndex).first();
+        if (previous?.value_r2_key && previous.value_r2_key !== payload.key) {
+          await this.enqueueGarbage({
+            tenantId: s.tenantId,
+            objectKey: previous.value_r2_key,
+            queuedAt: Date.now(),
+            notBefore: Date.now() + 24 * 60 * 60 * 1000,
+          });
+        }
+      }
       const taskPath = typeof write.taskPath === "string" ? write.taskPath.slice(0, 1024) : "";
       if (!Number.isSafeInteger(write.writeIndex) || write.writeIndex < -16 || write.writeIndex > 4096) {
         throw new CheckpointIndexError("Invalid write index.", "invalid_input");
@@ -360,6 +375,23 @@ export class D1CheckpointIndex {
       ORDER BY not_before, queued_at LIMIT ?
     `).bind(now, limit).all();
     return result.results || [];
+  }
+
+  async isObjectReferenced(input) {
+    const tenantId = requiredId(input.tenantId, "tenant");
+    const objectKey = input.objectKey;
+    if (typeof objectKey !== "string" || !objectKey.startsWith("nexora-checkpoints/" + tenantId + "/")) {
+      throw new CheckpointIndexError("Object key is outside the tenant prefix.", "invalid_input");
+    }
+    const row = await this.db.prepare(`
+      SELECT 1 AS referenced FROM research_checkpoints
+      WHERE tenant_id = ? AND (checkpoint_r2_key = ? OR metadata_r2_key = ?)
+      UNION ALL
+      SELECT 1 AS referenced FROM research_checkpoint_writes
+      WHERE tenant_id = ? AND value_r2_key = ?
+      LIMIT 1
+    `).bind(tenantId, objectKey, objectKey, tenantId, objectKey).first();
+    return Boolean(row);
   }
 
   async removeGarbage(input) {
