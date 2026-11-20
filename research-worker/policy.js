@@ -27,6 +27,29 @@ export function isAllowedResearchRoute(pathname, method) {
   return method === "GET";
 }
 
+export function researchReadiness(env) {
+  const missing = missingRuntimeConfig(env);
+  const providerNames = [
+    "NVIDIA_API_KEY", "TAVILY_API_KEY", "EXA_API_KEY",
+    "NIMBLE_API_KEY", "YDC_API_KEY", "SERPER_API_KEY",
+  ];
+  const providersConfigured = providerNames.every((name) =>
+    typeof env[name] === "string" && env[name].trim().length > 0
+  );
+  const serviceTokenConfigured = typeof env.NEXORA_RESEARCH_API_TOKEN === "string" && env.NEXORA_RESEARCH_API_TOKEN.trim().length >= 32;
+  const sqlJobStoreConfigured = typeof env.NAT_JOB_STORE_DB_URL === "string" && env.NAT_JOB_STORE_DB_URL.trim().length > 0;
+  const checkpointStoreConfigured = typeof env.DEEP_RESEARCHER_CHECKPOINT_DB === "string" && env.DEEP_RESEARCHER_CHECKPOINT_DB.trim().length > 0;
+  const storageBindingConfigured = Boolean(env.RESEARCH_STORAGE);
+  const containerBindingConfigured = Boolean(env.RESEARCH_CONTAINER);
+  return {
+    ready: missing.length === 0 && storageBindingConfigured && containerBindingConfigured,
+    status: missing.length || !storageBindingConfigured || !containerBindingConfigured ? "blocked" : "configured",
+    providersConfigured, serviceTokenConfigured, sqlJobStoreConfigured, checkpointStoreConfigured,
+    storageBindingConfigured, containerBindingConfigured,
+    eventStoreBackend: env.NEXORA_RESEARCH_EVENT_STORE === "cloudflare" ? "cloudflare" : "sql",
+    missingConfiguration: missing,
+  };
+}
 export function missingRuntimeConfig(env) {
   const missing = [];
   for (const name of [
