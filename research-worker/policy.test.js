@@ -4,7 +4,7 @@ import { constantTimeEqual, extractBearerToken, isAllowedResearchRoute, missingR
 
 test("research Worker parses bearer tokens using whitespace and case-insensitive scheme matching", () => {
   assert.equal(extractBearerToken("Bearer secret-value"), "secret-value");
-  assert.equal(extractBearerToken("bearer\\tsecret-value"), "secret-value");
+  assert.equal(extractBearerToken("bearer\tsecret-value"), "secret-value");
   assert.equal(extractBearerToken("Basic secret-value"), "");
   assert.equal(extractBearerToken(null), "");
 });
