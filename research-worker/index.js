@@ -1,7 +1,6 @@
 import { DurableObject } from "cloudflare:workers";
 import { constantTimeEqual, isAllowedResearchRoute, missingRuntimeConfig } from "./policy.js";
 
-const API_PREFIX = "/v1/jobs/async/";
 const CONTAINER_PORT = 8000;
 const START_TIMEOUT_MS = 120_000;
 const HEALTH_RETRY_MS = 1_000;
