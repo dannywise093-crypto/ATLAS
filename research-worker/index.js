@@ -72,6 +72,9 @@ export class ResearchContainer extends DurableObject {
           NEXORA_RESEARCH_API_TOKEN: this.env.NEXORA_RESEARCH_API_TOKEN,
           NAT_JOB_STORE_DB_URL: this.env.NAT_JOB_STORE_DB_URL,
           DEEP_RESEARCHER_CHECKPOINT_DB: this.env.DEEP_RESEARCHER_CHECKPOINT_DB,
+          NEXORA_RESEARCH_CHECKPOINT_BACKEND: this.env.NEXORA_RESEARCH_CHECKPOINT_BACKEND || "postgres",
+          NEXORA_RESEARCH_STORAGE_URL: this.env.NEXORA_RESEARCH_PUBLIC_URL,
+          NEXORA_RESEARCH_TENANT: this.env.NEXORA_RESEARCH_TENANT,
         },
       });
     }
