@@ -261,3 +261,27 @@ The NEXORA API additionally depends on transactional admission and ownership
 records, SQL joins, event-store behavior, and LangGraph checkpoints. Those
 contracts still require explicit adapters and integration tests before the
 NVIDIA API can be switched to Cloudflare-native persistence.
+
+
+### Cloudflare job metadata repository milestone
+
+The Python backend now contains a separate
+`CloudflareJobMetadataRepository` prototype over the Durable Object record
+transport. It provides tenant-scoped create/read/update, revision-checked
+updates with bounded conflict retries, paginated enumeration, status filtering,
+and expiry-time calculation. Its tests use an in-memory storage fake and do not
+contact Cloudflare.
+
+This repository is intentionally **not wired into NVIDIA's FastAPI routes or
+NAT's `JobStore`**. It does not implement Dask submission, scheduler
+`Variable` future tracking, cancellation, worker restart recovery, Dask future
+cleanup, NAT's SQLAlchemy `JobInfo` ORM/session contract, or the existing
+admission/access SQL transactions. Its metadata dataclass is not a SQLAlchemy
+`JobInfo` instance. It is a focused adapter prototype for validating the
+Durable Object record model, not production-ready job lifecycle persistence.
+
+Next integration work must preserve the actual NAT lifecycle and NEXORA's
+ownership/admission invariants. In particular, the current SQL-based
+readiness probe and route startup must not be bypassed until the API, runner,
+cancellation monitor, admission/access helpers, EventStore, and checkpoint
+saver have coordinated Cloudflare-native replacements and integration tests.
