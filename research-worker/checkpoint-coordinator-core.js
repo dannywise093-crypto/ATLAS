@@ -148,6 +148,22 @@ export class CheckpointCoordinatorCore {
     });
   }
 
+  async putWrites(input) {
+    return this.exclusive(async () => {
+      const state = await this.loadState();
+      const scope = await this.bindScope(state, input);
+      const lease = this.requireLease(state, input);
+      if (!input.checkpointId || !Array.isArray(input.writes)) {
+        throw new CheckpointLeaseError("Checkpoint ID and writes are required.", "invalid_writes", 400);
+      }
+      const result = await this.checkpointIndex.putWrites({
+        ...input,
+        ...scope,
+      });
+      return { ...result, fencingToken: lease.fencingToken };
+    });
+  }
+
   requireLease(state, input) {
     const lease = state.lease;
     if (!lease || lease.expiresAt <= this.now() ||
