@@ -3,10 +3,12 @@ import assert from "node:assert/strict";
 import worker from "./worker.js";
 
 const token = "test-only-atlas-token";
+let requestSequence = 0;
 function request(path, { method = "GET", body, auth = true } = {}) {
   return new Request(`https://atlas.test${path}`, {
     method,
     headers: {
+      "cf-connecting-ip": `192.0.2.${(requestSequence++ % 250) + 1}`,
       ...(body === undefined ? {} : { "content-type": "application/json" }),
       ...(auth ? { authorization: `Bearer ${token}` } : {}),
     },
@@ -103,7 +105,7 @@ test("main ATLAS chat routes NVIDIA skills and specialist context", async () => 
   assert.equal(response.status, 200);
   assert.match(systemPrompt, /ATLAS SPECIALIST ROUTER/);
   assert.match(systemPrompt, /CUDA & GPU Computing specialist/);
-  assert.match(systemPrompt, /Do not invent an expansion for the name ATLAS/);
+  assert.match(systemPrompt, /If asked what NEXORA means, answer/);
   assert.match(systemPrompt, /Numerical Optimization & Operations Research/);
   assert.match(systemPrompt, /Computer Vision & Imaging/);
   assert.match(systemPrompt, /lexical overlap across skill names, tags, and descriptions/);
@@ -273,7 +275,7 @@ test("dedicated Copilot route uses the ATLAS coding-agent instructions", async (
   const body = await response.json();
   assert.equal(response.status, 200);
   assert.equal(body.answer, "Copilot mode response");
-  assert.match(modelInput.messages[0].content, /ATLAS Copilot, the software engineering assistant/);
+  assert.match(modelInput.messages[0].content, /NEXORA Copilot, the software engineering assistant/);
   assert.match(modelInput.messages[0].content, /complete, runnable source code/);
   assert.match(modelInput.messages[0].content, /If the user asks you to fix code, fix the code they supplied/);
   assert.match(modelInput.messages[0].content, /Never invent test output/);
@@ -515,3 +517,32 @@ test("cloud TTS does not silently use the default voice when clone backend token
   assert.equal(response.status, 503);
   assert.equal(workersAiCalled, false);
 });
+
+test("engineering visual endpoint returns generated image bytes", async () => {
+  let model;
+  const env = envWith(async (id, input) => {
+    model = { id, input };
+    return new Uint8Array([137, 80, 78, 71]);
+  });
+  const response = await worker.fetch(request("/api/engineering/visual", {
+    method: "POST",
+    body: { prompt: "A conceptual electric motor assembly, studio render" }
+  }), env);
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("content-type"), "image/png");
+  assert.equal(model.id, "@cf/black-forest-labs/flux-1-schnell");
+  assert.equal(model.input.steps, 4);
+  assert.deepEqual([...new Uint8Array(await response.arrayBuffer())], [137, 80, 78, 71]);
+});
+
+test("engineering visual endpoint validates prompts and requires configured AI", async () => {
+  const invalid = await worker.fetch(request("/api/engineering/visual", {
+    method: "POST", body: { prompt: " " }
+  }), envWith(async () => new Uint8Array()));
+  assert.equal(invalid.status, 400);
+  const unavailable = await worker.fetch(request("/api/engineering/visual", {
+    method: "POST", body: { prompt: "A concept drawing" }
+  }), { ATLAS_GATEWAY_TOKEN: token });
+  assert.equal(unavailable.status, 503);
+});
+

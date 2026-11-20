@@ -306,3 +306,81 @@ body{background:radial-gradient(ellipse at 82% 0%,rgba(38,103,207,.17),transpare
 .copilot-output-heading{display:flex;justify-content:space-between;padding:9px 11px;background:#101b2b;color:#9cb8df;font-size:9px;font-weight:800;letter-spacing:1px}.copilot-run-output.complete .copilot-output-heading{color:#75d7ad}.copilot-run-output.error .copilot-output-heading,.copilot-run-output.timeout .copilot-output-heading{color:#f19ba5}
 .copilot-run-output pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:300px;overflow:auto;margin:0;padding:12px;color:#d5e2f4;font:11px/1.6 ui-monospace,SFMono-Regular,Consolas,monospace}
 .copilot-runtime-note,.copilot-code-unsupported{display:block;margin-top:9px;color:#8293ad;font-size:9px;line-height:1.5}.copilot-code-unsupported{padding:9px;border-radius:7px;background:#101b2b}
+
+
+/* NEXORA Engineering Studio */
+.engineering-studio{gap:18px}
+.engineering-hero{padding:26px;border:1px solid var(--line);border-radius:18px;background:linear-gradient(130deg,rgba(35,82,150,.28),rgba(13,23,43,.8));}
+.engineering-eyebrow{font-size:11px;letter-spacing:.16em;color:#91baff;font-weight:800}
+.engineering-hero h1{font-size:clamp(28px,5vw,44px);line-height:1.08;margin:12px 0}
+.engineering-hero p{max-width:760px;color:var(--muted);line-height:1.65}
+.engineering-steps{display:flex;flex-wrap:wrap;gap:9px;margin-top:20px}
+.engineering-steps span{font-size:11px;font-weight:700;padding:8px 11px;border:1px solid var(--line);border-radius:30px;background:rgba(6,12,24,.45)}
+.engineering-grid{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(280px,.9fr);gap:16px;align-items:stretch}
+.engineering-input form{gap:11px}
+.engineering-input textarea,.engineering-input select{width:100%;max-width:100%;border:1px solid var(--line);border-radius:10px;background:#0b1425;color:inherit;padding:12px;font:inherit}
+.engineering-input textarea{resize:vertical;line-height:1.5}
+.engineering-stage{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:9px;margin:14px 0 0}
+.engineering-dot{width:8px;height:8px;border-radius:50%;background:#5ca7ff;display:inline-block;flex:0 0 auto}
+.engineering-error{color:#ff9a9a;font-size:13px}
+.engineering-visual-card{display:flex;flex-direction:column;gap:12px}
+.engineering-visual-card>p{color:var(--muted);line-height:1.55}
+.engineering-visual-placeholder{min-height:240px;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;border:1px dashed var(--line);border-radius:14px;color:var(--muted);background:rgba(4,10,20,.35);font-size:13px}
+.engineering-visual{display:grid;gap:10px}
+.engineering-visual img{width:100%;height:auto;max-height:480px;object-fit:contain;border-radius:12px;background:#080d18}
+.engineering-report-text{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.7;font-size:14px}
+.engineering-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:18px}
+.engineering-actions button,.engineering-visual button{display:inline-flex;align-items:center;gap:8px}
+.engineering-disclaimer{display:flex;gap:10px;align-items:flex-start;margin-top:18px;padding:12px;border-radius:10px;background:rgba(226,167,74,.08);color:#d9c49c;font-size:12px;line-height:1.55}
+.engineering-disclaimer svg{flex:0 0 auto}
+@media(max-width:760px){.engineering-grid{grid-template-columns:1fr}.engineering-hero{padding:20px}.engineering-visual-placeholder{min-height:190px}}
+
+
+/* Dedicated NVIDIA Deep Research conversation workspace */
+.nvidia-research-page{min-height:0}
+.nvidia-research-shell{height:calc(100dvh - 150px);min-height:560px;display:grid;grid-template-columns:245px minmax(0,1fr);overflow:hidden;border:1px solid #29364b;border-radius:18px;background:#080f1b;color:#e8eef9}
+.nvidia-research-history{min-width:0;padding:16px 12px;border-right:1px solid #263348;background:#0d1727;display:flex;flex-direction:column;gap:12px}
+.nvidia-research-new{display:flex;align-items:center;justify-content:center;gap:8px;padding:12px;border:1px solid #426b9e;border-radius:10px;background:#17365b;color:#e3f0ff;font-weight:700}
+.nvidia-research-label{padding:12px 4px 0;color:#8195b3;font-size:9px;letter-spacing:1.4px;font-weight:700}
+.nvidia-research-sessions{display:grid;gap:6px;overflow:auto;min-height:0}
+.nvidia-research-session{display:flex;align-items:center;gap:5px;padding:5px;border:1px solid transparent;border-radius:9px}
+.nvidia-research-session.active{background:#172941;border-color:#365579}
+.nvidia-research-session>button:first-child{min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left;background:none;border:0;color:#cbd8ea;padding:7px;font-size:11px}
+.nvidia-research-session>button:last-child{display:grid;place-items:center;padding:7px;border:0;background:transparent;color:#8195b3}
+.nvidia-research-history>small{margin-top:auto;color:#71839c;font-size:9px;line-height:1.5}
+.nvidia-research-main{min-width:0;display:flex;flex-direction:column;min-height:0}
+.nvidia-research-header{height:66px;flex:none;display:flex;align-items:center;gap:12px;padding:0 22px;border-bottom:1px solid #263348;background:#0d1727}
+.nvidia-research-header>span{width:38px;height:38px;display:grid;place-items:center;border:1px solid #3a6696;border-radius:11px;background:#142d4b;color:#8dc5ff}
+.nvidia-research-header>div{display:grid;gap:4px;min-width:0}
+.nvidia-research-header b{font:600 14px 'Space Grotesk';color:#eff6ff}
+.nvidia-research-header small{font-size:8px;letter-spacing:1.2px;color:#8da4c2}
+.nvidia-research-header i{margin-left:auto;color:#8fd8b4;font-size:8px;font-style:normal;letter-spacing:1px}
+.nvidia-research-body{flex:1;min-height:0;overflow:auto;padding:26px clamp(14px,4vw,48px);display:flex;flex-direction:column;gap:17px}
+.nvidia-research-intro{max-width:780px;margin:5px auto 12px;text-align:center}
+.nvidia-research-intro h1{margin:0 0 10px;color:#eaf3ff;font:600 clamp(21px,3vw,30px) 'Space Grotesk';letter-spacing:-.6px}
+.nvidia-research-intro p{margin:0;color:#9eafc8;font-size:12px;line-height:1.75}
+.nvidia-research-capabilities{display:flex;justify-content:center;gap:9px;flex-wrap:wrap;margin-top:15px}
+.nvidia-research-capabilities span{display:flex;align-items:center;gap:6px;padding:7px 10px;border:1px solid #293e59;border-radius:20px;color:#a9c9ee;font-size:9px}
+.nvidia-research-message{max-width:900px;width:100%;margin:0 auto;padding:15px 17px;border:1px solid #29384e;border-radius:13px;background:#101d2e}
+.nvidia-research-message.user{max-width:760px;align-self:flex-end;background:#172941;border-color:#35577d}
+.nvidia-research-message>b,.nvidia-research-activity>b{display:flex;align-items:center;gap:7px;margin-bottom:9px;color:#91b9e7;font-size:8px;letter-spacing:1.3px}
+.nvidia-research-message p{margin:0;color:#dbe5f3;font-size:12px;line-height:1.7;white-space:pre-wrap;overflow-wrap:anywhere}
+.nvidia-research-message pre{margin:0;color:#d8e3f1;font:400 12px/1.8 Inter,sans-serif;white-space:pre-wrap;overflow-wrap:anywhere}
+.nvidia-research-sources{display:grid;gap:7px;margin-top:13px}
+.nvidia-research-sources a{display:flex;align-items:center;gap:7px;color:#8fc5ff;font-size:10px;overflow-wrap:anywhere}
+.nvidia-research-activity{max-width:900px;width:100%;margin:0 auto;padding:13px 16px;border:1px solid #34577b;border-radius:12px;background:#0d2034}
+.nvidia-research-activity>b{color:#8fc5ff}
+.nvidia-research-activity p{margin:0 0 7px;color:#d2e2f5;font-size:11px}
+.nvidia-research-activity ol{margin:0;padding-left:20px;color:#91a8c5;font-size:10px;line-height:1.8}
+.nvidia-research-error{max-width:900px;width:100%;margin:0 auto;padding:10px 12px;border:1px solid #824c58;border-radius:9px;background:#351e29;color:#ffc3ca;font-size:11px}
+.nvidia-research-compose{flex:none;padding:12px clamp(12px,3vw,34px) 13px;border-top:1px solid #263348;background:#0d1727}
+.nvidia-research-refresh{display:flex;align-items:center;gap:7px;margin:0 0 8px;padding:7px 10px;border:1px solid #385675;border-radius:8px;background:#14283e;color:#a9c9eb;font-size:10px}
+.nvidia-research-compose form{max-width:940px;margin:auto;padding:12px 13px 9px;border:1px solid #3a4b63;border-radius:14px;background:#111e2e}
+.nvidia-research-compose textarea{width:100%;min-height:55px;max-height:170px;resize:vertical;border:0;outline:0;background:transparent;color:#edf4ff;font:400 12px/1.65 Inter,sans-serif}
+.nvidia-research-compose textarea::placeholder{color:#8496ae}
+.nvidia-research-compose form>div{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.nvidia-research-compose form small,.nvidia-research-compose>small{color:#8294ad;font-size:9px}
+.nvidia-research-compose form button{display:flex;align-items:center;gap:7px;padding:9px 13px;border:0;border-radius:9px;background:#347ac2;color:white;font-size:10px;font-weight:700}
+.nvidia-research-compose button:disabled{opacity:.4;cursor:not-allowed}
+.nvidia-research-compose>small{display:block;max-width:940px;margin:8px auto 0;text-align:center}
+@media(max-width:700px){.nvidia-research-shell{height:calc(100dvh - 104px);min-height:550px;grid-template-columns:minmax(0,1fr);grid-template-rows:112px minmax(0,1fr);border-radius:12px}.nvidia-research-history{padding:7px 9px 6px;border-right:0;border-bottom:1px solid #263348;overflow:hidden;gap:5px}.nvidia-research-new{width:max-content;padding:8px 11px;font-size:10px}.nvidia-research-label{padding:4px 3px 0;font-size:7px}.nvidia-research-sessions{display:flex;overflow-x:auto;overflow-y:hidden}.nvidia-research-session{flex:none;max-width:190px;padding:2px 5px;background:#15243a;border:1px solid #293e59}.nvidia-research-session>button:first-child{max-width:145px;font-size:9px}.nvidia-research-session>button:last-child{padding:4px}.nvidia-research-history>small{display:none}.nvidia-research-header{height:55px;padding:0 12px}.nvidia-research-header>span{width:31px;height:31px}.nvidia-research-header b{font-size:12px}.nvidia-research-header small{font-size:7px}.nvidia-research-body{padding:17px 11px;gap:12px}.nvidia-research-intro{margin:3px auto 6px}.nvidia-research-intro p{font-size:10px}.nvidia-research-capabilities{gap:5px}.nvidia-research-capabilities span{font-size:8px;padding:6px 8px}.nvidia-research-message{padding:12px}.nvidia-research-message p,.nvidia-research-message pre{font-size:11px}.nvidia-research-compose{padding:8px}.nvidia-research-compose form{padding:9px}.nvidia-research-compose form small{font-size:8px}.nvidia-research-compose form button{padding:8px 10px;font-size:9px}}

@@ -1935,10 +1935,10 @@ async def _get_job_artifacts(db_url: str, job_id: str) -> dict | None:
         Dict with 'tools', 'outputs', and 'sources' (counts), or None if no artifacts found.
     """
     from ..jobs.crypto import ContentEncryptionError
-    from ..jobs.event_store import EventStore
+    from ..jobs.event_reader import get_events_async
 
     try:
-        events = await EventStore.get_events_async(db_url, job_id, 0, 10000)
+        events = await get_events_async(db_url, job_id, 0, 10000)
         if not events:
             return None
 
@@ -1990,7 +1990,15 @@ async def _sse_generator(job_store, job_id: str, db_url: str, start_event_id: in
     """
     from ..jobs.crypto import ContentEncryptionInvalidData
     from ..jobs.crypto import ContentEncryptionUnavailable
+    from ..jobs.event_reader import cloudflare_events_enabled
     from ..jobs.event_store import EventStore
+
+    # Durable Objects do not support PostgreSQL LISTEN/NOTIFY. Use polling when
+    # Cloudflare reads are explicitly selected.
+    if cloudflare_events_enabled():
+        async for event in _sse_generator_polling(job_store, job_id, db_url, start_event_id):
+            yield event
+        return
 
     if EventStore.is_postgres(db_url):
         try:
@@ -2246,7 +2254,7 @@ async def _sse_generator_polling(job_store, job_id: str, db_url: str, start_even
     from ..jobs.connection_manager import get_connection_manager
     from ..jobs.crypto import ContentEncryptionInvalidData
     from ..jobs.crypto import ContentEncryptionUnavailable
-    from ..jobs.event_store import EventStore
+    from ..jobs.event_reader import get_events_async
 
     connection_manager = get_connection_manager()
     last_status = None
@@ -2297,7 +2305,7 @@ async def _sse_generator_polling(job_store, job_id: str, db_url: str, start_even
                     limit = 10000 if job.status in terminal_statuses else 1000
                 else:
                     limit = 10000 if job.status in terminal_statuses else 100
-                events = await EventStore.get_events_async(db_url, job_id, last_event_id, limit)
+                events = await get_events_async(db_url, job_id, last_event_id, limit)
 
                 if events:
                     last_keepalive = time.monotonic()

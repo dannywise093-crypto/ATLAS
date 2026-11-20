@@ -270,6 +270,40 @@ export default {
         nvidia: { configured: Boolean(env.NVIDIA_API_KEY), label: "NVIDIA API Catalog", model: "nvidia/nemotron-3-ultra-550b-a55b", role: env.NVIDIA_API_KEY ? "primary" : "not_configured" }
       }, skills: getSkillCatalogStats() });
     }
+    if (url.pathname === "/api/engineering/visual") {
+      if (request.method !== "POST") return json({ error: "Method not allowed." }, 405, { allow: "POST" });
+      if (!authorized(request, env)) return json({ error: "Unauthorized." }, 401);
+      if (rateLimited(request)) return json({ error: "Engineering image-generation limit reached. Please wait before trying again." }, 429, { "retry-after": "60" });
+      if (!env.AI) return json({ error: "Cloudflare Workers AI is not configured for image generation." }, 503);
+      const length = Number(request.headers.get("content-length") || 0);
+      if (length > 8 * 1024) return json({ error: "The image prompt is too large." }, 413);
+      let body;
+      try { body = await request.json(); } catch { return json({ error: "A valid JSON body is required." }, 400); }
+      if (!body || typeof body.prompt !== "string" || !body.prompt.trim() || body.prompt.length > 1800) {
+        return json({ error: "Provide a visual prompt between 1 and 1,800 characters." }, 400);
+      }
+      try {
+        const generated = await env.AI.run("@cf/black-forest-labs/flux-1-schnell", {
+          prompt: body.prompt.trim().slice(0, 1800),
+          steps: 4
+        });
+        if (generated instanceof Response) {
+          if (!generated.ok) return json({ error: "The image model could not complete this request." }, 502);
+          return new Response(generated.body, { status: 200, headers: { "Content-Type": generated.headers.get("Content-Type") || "image/png", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" } });
+        }
+        if (generated instanceof ReadableStream) {
+          return new Response(generated, { status: 200, headers: { "Content-Type": "image/png", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" } });
+        }
+        if (generated instanceof Uint8Array || generated instanceof ArrayBuffer) {
+          return new Response(generated, { status: 200, headers: { "Content-Type": "image/png", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" } });
+        }
+        return json({ error: "The image model returned an unsupported response format." }, 502);
+      } catch (error) {
+        console.error("NEXORA engineering visual generation failed:", classifyAIError(error).status);
+        return json({ error: "The image model is temporarily unavailable. Please retry later." }, 503, { "retry-after": "5" });
+      }
+    }
+
     if (url.pathname === "/api/skills") {
       if (request.method !== "GET") return json({ error: "Method not allowed." }, 405, { allow: "GET" });
       if (!authorized(request, env)) return json({ error: "Unauthorized." }, 401);
@@ -422,7 +456,7 @@ export default {
 
     // ACKE: search on demand for current facts or explicit research requests.
     // Search is optional and fails closed; timeless prompts do not trigger it.
-    let research = { status: "skipped", sources: [], checkedAt: null, archive: { status: env.KNOWLEDGE_DB ? "skipped" : "disabled", storedSources: 0, storedChunks: 0 } };
+    let research = { status: "skipped", sources: [], checkedAt: null, provider: null, archive: { status: env.KNOWLEDGE_DB ? "skipped" : "disabled", storedSources: 0, storedChunks: 0 } };
     let modelMessages = messages;
     const latestPrompt = messages[messages.length - 1].content;
     const skillInventory = getSkillCatalogStats();
@@ -444,6 +478,8 @@ export default {
         status: searchResult.status,
         sources: evidence.sources,
         checkedAt: evidence.checkedAt,
+        provider: searchResult.provider || null,
+        diagnostics: searchResult.diagnostics || [],
         archive,
       };
       modelMessages = [
@@ -486,7 +522,7 @@ export default {
           const answer = extractAnswer(result);
           if (answer) {
             const sourceFooter = research.sources.length
-              ? "\n\nSources checked (" + research.checkedAt + "):\n" + research.sources.map((source, index) => (index + 1) + ". " + source.title + " — " + source.url).join("\n") + "\nThese are search-result snippets; full source pages were not independently verified."
+              ? "\n\nSources checked (" + research.checkedAt + ") via " + (research.provider || "web search") + ":\n" + research.sources.map((source, index) => (index + 1) + ". " + source.title + " — " + source.url).join("\n") + "\nThese are search-result snippets; full source pages were not independently verified."
               : research.status === "unavailable" || research.status === "no_results"
                 ? "\n\nLive web research could not provide usable sources for this request. Current facts have not been independently verified."
                 : "";
@@ -515,7 +551,7 @@ export default {
         const answer = extractAnswer(result);
         if (answer) {
           const sourceFooter = research.sources.length
-            ? "\n\nSources checked (" + research.checkedAt + "):\n"
+            ? "\n\nSources checked (" + research.checkedAt + ") via " + (research.provider || "web search") + ":\n"
               + research.sources.map((source, index) => (index + 1) + ". " + source.title + " — " + source.url).join("\n")
               + "\nThese are search-result snippets; full source pages were not independently verified."
             : research.status === "unavailable" || research.status === "no_results"

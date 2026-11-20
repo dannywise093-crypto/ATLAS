@@ -1,0 +1,59 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "nexora-deep-researcher",
+  "main": "research-worker/index.js",
+  "compatibility_date": "2026-11-20",
+  "workers_dev": true,
+  "triggers": { "crons": ["*/15 * * * *"] },
+  "containers": [
+    {
+      "class_name": "ResearchContainer",
+      "scheduling_policy": "durable_object",
+      "images": {
+        "base": {
+          "dockerfile": "./agents/nvidia-deep-researcher/deploy/Dockerfile",
+          "build_context": "./agents/nvidia-deep-researcher"
+        }
+      }
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "RESEARCH_CONTAINER",
+        "class_name": "ResearchContainer"
+      },
+      {
+        "name": "RESEARCH_STORAGE",
+        "class_name": "ResearchStorageObject"
+      },
+      {
+        "name": "RESEARCH_CHECKPOINT_COORDINATOR",
+        "class_name": "CheckpointCoordinator"
+      }
+    ]
+  },
+  "exports": {
+    "ResearchContainer": {
+      "type": "durable-object",
+      "storage": "sqlite"
+    },
+    "ResearchStorageObject": {
+      "type": "durable-object",
+      "storage": "sqlite"
+    },
+    "CheckpointCoordinator": {
+      "type": "durable-object",
+      "storage": "sqlite"
+    }
+  },
+  "migrations": [
+    {
+      "tag": "checkpoint-coordinator-v1",
+      "new_sqlite_classes": ["CheckpointCoordinator"]
+    }
+  ],
+  "observability": {
+    "enabled": true
+  }
+}

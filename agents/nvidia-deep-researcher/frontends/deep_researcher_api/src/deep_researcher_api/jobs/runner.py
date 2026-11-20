@@ -272,6 +272,7 @@ def _write_job_source_failure_if_running_sync(
     stored_output: str,
     final_report_event: dict[str, Any] | None = None,
     job_output_cipher: Any | None = None,
+    event_store: Any | None = None,
 ) -> bool:
     """Persist a source failure, then store its optional final-report event best-effort."""
     from sqlalchemy import text
@@ -293,7 +294,11 @@ def _write_job_source_failure_if_running_sync(
 
     if final_report_event is not None:
         try:
-            EventStore(db_url, job_id, content_cipher=job_output_cipher).store(final_report_event)
+            if event_store is None:
+                raise RuntimeError("event store is required for source-failure report events")
+            event_store.store(final_report_event)
+            if hasattr(event_store, "flush"):
+                event_store.flush()
         except Exception as exc:
             logger.warning(
                 "Job %s source-failure final-report event write failed exception=%s",
@@ -317,6 +322,22 @@ def _write_job_failure_if_running_sync(db_url: str, job_id: str, public_error: s
     with engine.begin() as conn:
         result = conn.execute(stmt, {"error": public_error, "job_id": job_id})
         return (result.rowcount or 0) == 1
+
+
+async def _create_event_store_for_job(db_url: str, job_id: str, content_cipher: Any | None = None) -> Any:
+    """Create the event writer matching the configured event reader backend.
+
+    Owner lookup and Cloudflare client construction are synchronous I/O, so
+    keep them off the worker event loop. SQL remains the default backend.
+    """
+    from .event_reader import build_event_store_for_job
+
+    return await asyncio.to_thread(
+        build_event_store_for_job,
+        db_url,
+        job_id,
+        content_cipher=content_cipher,
+    )
 
 
 async def _persist_empty_source_failure(
@@ -350,6 +371,7 @@ async def _persist_empty_source_failure(
             stored_output,
             final_report_event,
             job_output_cipher,
+            event_store,
         )
     except Exception as exc:
         logger.warning(
@@ -908,7 +930,9 @@ async def run_agent_job(
 
                     callbacks: list[Any] = []
 
-                    raw_event_store = EventStore(db_url, job_id, content_cipher=job_output_cipher)
+                    raw_event_store = await _create_event_store_for_job(
+                        db_url, job_id, content_cipher=job_output_cipher
+                    )
                     event_store = BatchingEventStore(raw_event_store)
                     callbacks.append(AgentEventCallback(event_store))
 
@@ -1043,7 +1067,7 @@ async def run_agent_job(
         logger.info("Job %s cancelled", job_id)
         interrupted = True
         if event_store is None:
-            event_store = BatchingEventStore(EventStore(db_url, job_id))
+            event_store = BatchingEventStore(await _create_event_store_for_job(db_url, job_id))
 
         await asyncio.to_thread(_teardown_sandbox, sandbox_runtime, job_id=job_id, interrupted=True)
         _store_terminal_event_best_effort(
@@ -1065,7 +1089,9 @@ async def run_agent_job(
     except EmptySourceRegistryError as e:
         logger.info("Job %s failed because no research sources were available (%s)", job_id, e.reason.value)
         if event_store is None:
-            event_store = BatchingEventStore(EventStore(db_url, job_id, content_cipher=job_output_cipher))
+            event_store = BatchingEventStore(
+                await _create_event_store_for_job(db_url, job_id, content_cipher=job_output_cipher)
+            )
 
         await asyncio.to_thread(_harvest_sandbox_artifacts, sandbox_runtime, job_id=job_id, interrupted=False)
         wrote = await _persist_empty_source_failure(
@@ -1098,7 +1124,7 @@ async def run_agent_job(
             log_content_metadata(e),
         )
         if event_store is None:
-            event_store = BatchingEventStore(EventStore(db_url, job_id))
+            event_store = BatchingEventStore(await _create_event_store_for_job(db_url, job_id))
 
         # Persist only the exception class name: raw messages can embed
         # credentials or internal hostnames, and both the event stream and the

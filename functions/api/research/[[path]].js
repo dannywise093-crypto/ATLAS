@@ -63,15 +63,11 @@ export async function onRequest({ request, env }) {
     return json({ error: "Research route not found or method not allowed." }, 404);
   }
 
-  const baseUrl = String(env.DEEP_RESEARCHER_URL || "").replace(/\/+$/, "");
   const token = env.NEXORA_RESEARCH_API_TOKEN;
-  let backend;
-  try { backend = new URL(baseUrl); } catch { backend = null; }
-  const secureTransport = backend && (backend.protocol === "https:" ||
-    (["localhost", "127.0.0.1"].includes(backend.hostname) && backend.protocol === "http:"));
-  if (!baseUrl || !token || token.length < 32 || !secureTransport || backend.username || backend.password) {
+  const researchService = env.NEXORA_RESEARCH;
+  if (!token || token.length < 32 || !researchService || typeof researchService.fetch !== "function") {
     return json({
-      error: "NVIDIA Deep Researcher is not configured yet.",
+      error: "NVIDIA Deep Researcher is not connected to the Cloudflare research Worker yet.",
       code: "research_backend_not_configured"
     }, 503);
   }
@@ -94,10 +90,10 @@ export async function onRequest({ request, env }) {
     }
   }
 
-  const upstreamUrl = baseUrl + "/v1/jobs/async/" + path;
+  const upstreamUrl = "https://nexora-deep-researcher.internal/v1/jobs/async/" + path;
   const isStream = path.includes("/stream");
   try {
-    const upstream = await fetch(upstreamUrl, {
+    const upstreamRequest = new Request(upstreamUrl, {
       method: request.method,
       headers: {
         Authorization: "Bearer " + token,
@@ -107,6 +103,7 @@ export async function onRequest({ request, env }) {
       ...(body ? { body: JSON.stringify(body) } : {}),
       signal: request.signal
     });
+    const upstream = await researchService.fetch(upstreamRequest);
 
     const headers = new Headers({
       "Cache-Control": "no-store",

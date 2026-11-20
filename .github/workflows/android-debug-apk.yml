@@ -1,4 +1,4 @@
-name: Build ATLAS Android test APK
+name: Build NEXORA AI Android test APK
 
 on:
   workflow_dispatch:
@@ -7,31 +7,62 @@ on:
   pull_request:
     branches: [ main ]
 
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-24.04
     steps:
       - name: Check out project
         uses: actions/checkout@v5
+        with:
+          persist-credentials: false
 
       - name: Set up Node
         uses: actions/setup-node@v5
         with:
           node-version: 24
+          cache: npm
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle and dependency cache
+        uses: gradle/actions/setup-gradle@v4
 
       - name: Install Python gateway dependencies
         run: python -m pip install -r server/requirements.txt
 
       - name: Check Python gateway syntax
-        run: python -m compileall -q server voice-service
+        run: python -m compileall -q server voice-service agents/nvidia-deep-researcher/src/deep_researcher_agent/common
+
+      - name: Test Cloudflare research storage adapters
+        working-directory: agents/nvidia-deep-researcher/frontends/deep_researcher_api
+        env:
+          PYTHONPATH: src
+        run: |
+          python -m pip install pytest 'pydantic>=2.0.0'
+          python -m pytest -q tests/test_cloudflare_storage.py tests/test_cloudflare_job_repository.py
+
+      - name: Test Cloudflare MCP job-store adapter
+        working-directory: agents/nvidia-deep-researcher/mcp
+        env:
+          PYTHONPATH: src
+        run: |
+          python -m pip install pytest pytest-asyncio asyncpg 'mcp==1.28.1' 'langgraph==1.2.11' 'langgraph-checkpoint==4.1.1' 'langchain-core==1.5.6'
+          python -m pytest -q tests/test_cloudflare_job_store.py tests/test_cloudflare_checkpoint_schema.py tests/test_cloudflare_checkpointer.py
 
       - name: Check Cloudflare Pages Functions and Worker syntax
-        run: node --check functions/api/_gateway.js && node --check functions/api/chat.js && node --check functions/api/copilot.js && node --check functions/api/health.js && node --check functions/api/nvidia.js && node --check functions/api/providers.js && node --check functions/api/transcribe.js && node --check functions/api/tts.js && node --check cloudflare/worker.js && node --check cloudflare/worker.test.js
+        run: node --check functions/api/_gateway.js && node --check functions/api/chat.js && node --check functions/api/copilot.js && node --check functions/api/health.js && node --check functions/api/nvidia.js && node --check functions/api/providers.js && node --check functions/api/transcribe.js && node --check functions/api/tts.js && node --check cloudflare/worker.js && node --check cloudflare/worker.test.js && node --check research-worker/checkpoint-objects.js && node --check research-worker/checkpoint-index.js && node --check research-worker/checkpoint-coordinator-core.js && node --check research-worker/checkpoint-coordinator.js && node --check research-worker/index.js && node --test research-worker/checkpoint-objects.test.js research-worker/checkpoint-index.test.js research-worker/checkpoint-coordinator-core.test.js research-worker/checkpoint-garbage-collector.test.js
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Test ATLAS core
+      - name: Test NEXORA core
         run: npm test
 
       - name: Build web app
@@ -46,19 +77,27 @@ jobs:
       - name: Sync web app into Android project
         run: npx cap sync android
 
-      - name: Set up Java
-        uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: '17'
-
       - name: Build debug APK
         working-directory: android
-        run: chmod +x gradlew && ./gradlew assembleDebug
+        shell: bash
+        run: |
+          chmod +x gradlew
+          for attempt in 1 2 3; do
+            echo "Android Gradle build attempt ${attempt}/3"
+            if ./gradlew --no-daemon --refresh-dependencies assembleDebug; then
+              exit 0
+            fi
+            if [ "$attempt" -lt 3 ]; then
+              echo "Gradle dependency/build attempt failed; waiting before retry."
+              sleep $((attempt * 20))
+            fi
+          done
+          echo "Android APK build failed after three attempts."
+          exit 1
 
       - name: Upload test APK
         uses: actions/upload-artifact@v5
         with:
-          name: atlas-ai-debug-apk
+          name: nexora-ai-debug-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error

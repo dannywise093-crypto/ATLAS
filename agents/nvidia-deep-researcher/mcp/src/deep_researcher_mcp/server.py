@@ -284,8 +284,8 @@ def _validate_startup_configuration(settings: ServerSettings) -> None:
     if not settings.config_path.is_file():
         raise ValueError(f"MCP workflow config does not exist: {settings.config_path}")
 
-    # NAT and the MCP job ledger share the same Postgres deployment. Normalize
-    # driver-qualified URLs once before either lifecycle is started.
+    # The NAT workflow checkpointer and MCP todo reader still use PostgreSQL.
+    # Normalize the checkpoint URL even when the MCP job ledger is Cloudflare-backed.
     os.environ[_CHECKPOINT_DB_ENV_VAR] = _resolve_checkpoint_db_url()
 
 
@@ -363,10 +363,23 @@ class MCPRuntime:
         self.app = self._build_app()
 
     def _create_job_manager(self) -> JobManager:
+        # This switch migrates the MCP job ledger only. LangGraph checkpoints
+        # and todo progress still require the checkpoint database until the
+        # checkpoint saver and cleanup paths are migrated independently.
         checkpoint_db_url = _resolve_checkpoint_db_url()
+        backend = os.getenv("DEEP_RESEARCHER_MCP_JOB_STORE", "postgres").strip().lower()
+        if backend == "postgres":
+            store = JobStore(checkpoint_db_url)
+        elif backend == "cloudflare":
+            from .cloudflare_job_store import CloudflareMCPJobStore
+
+            store = CloudflareMCPJobStore.from_env(checkpoint_db_url=checkpoint_db_url)
+        else:
+            raise ValueError("DEEP_RESEARCHER_MCP_JOB_STORE must be 'postgres' or 'cloudflare'")
+
         return JobManager(
             cast(WorkflowRunner, self.runner),
-            JobStore(checkpoint_db_url),
+            store,
             checkpoint_todo_reader=CheckpointTodoReader(checkpoint_db_url),
         )
 

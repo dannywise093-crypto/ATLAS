@@ -810,7 +810,7 @@ class EventStore:
 
 class BatchingEventStore:
     """
-    Wraps EventStore with time-based and size-based batching.
+    Wraps an event-store-compatible writer with time-based and size-based batching.
 
     Buffers events and flushes them in a single transaction when either:
     - The buffer reaches MAX_BATCH_SIZE events, or
@@ -826,7 +826,7 @@ class BatchingEventStore:
     FLUSH_INTERVAL_MS = 200
     MAX_BATCH_SIZE = 10
 
-    def __init__(self, event_store: EventStore):
+    def __init__(self, event_store: Any):
         self._store = event_store
         self._buffer: list[dict] = []
         self._lock = threading.Lock()

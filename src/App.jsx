@@ -6,9 +6,11 @@ import { getRoboticsTransportCatalog } from "./roboticsTransports.js";
 import { speakText, stopSpeechPlayback } from "./voiceInterface.js";
 import { createCloudflareVoice } from "./cloudflareVoice.js";
 import { Code2 } from "lucide-react";
+import EngineeringStudio from "./EngineeringStudio.jsx";
 import CopilotMessage from "./CopilotMessage.jsx";
+import NvidiaResearchChat from "./NvidiaResearchChat.jsx";
 import { getNeuralRuntimeStatus, checkAtlasBackend, generateAtlasResponse, generateAtlasCopilotResponse, generateProviderResponse } from "./modelRuntime.js";
-import { Activity, Bot, BrainCircuit, Camera, Check, Database, Eye, GraduationCap, Home, Menu, MessageSquare, Mic, Plus, Radio, Search, Send, Settings, ShieldCheck, Sparkles, Trash2, Volume2, X } from "lucide-react";
+import { Activity, Bot, BrainCircuit, Camera, Check, Database, Eye, GraduationCap, Home, Menu, MessageSquare, Mic, Plus, Radio, Search, Send, Settings, ShieldCheck, Sparkles, Trash2, Volume2, Wrench, X } from "lucide-react";
 
 function atlasStorageKey(key) {
   // NEXORA AI is now an open workspace: chat and settings use device-local keys,
@@ -42,7 +44,7 @@ const initial = [
   { role: "atlas", text: "Welcome to NEXORA AI. I’m your general-purpose AI assistant, connected through the secured Cloudflare model gateway. I can help with research, engineering, software development, reasoning, and the specialist skill library. Ask a question to get started." },
   { role: "atlas", text: "Your conversation is routed through the configured hosted model. Relevant skill references are selected automatically when they match your request." }
 ];
-const nav = [["Overview",Home],["AI Assistant",MessageSquare],["Research Center",Search],["Copilot",Code2],["Vision Center",Eye],["Voice Center",Mic],["Memory",Database],["Learning",GraduationCap],["Robotics",Bot],["Settings",Settings]];
+const nav = [["Overview",Home],["AI Assistant",MessageSquare],["Research Center",Search],["NVIDIA Deep Research",BrainCircuit],["Engineering Studio",Wrench],["Copilot",Code2],["Vision Center",Eye],["Voice Center",Mic],["Memory",Database],["Learning",GraduationCap],["Robotics",Bot],["Settings",Settings]];
 
 function AtlasWorkspace() {
   const [page,setPage] = useState("Overview");
@@ -302,27 +304,42 @@ function AtlasWorkspace() {
     setResearchReport(null);
     setResearchProgress(["Submitting research request…"]);
     setResearchStatus("Submitting to NVIDIA Deep Researcher…");
+    let streamController=null;
     try{
-      const submit=await fetch("/api/research/submit",{
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({agent_type:"deep_researcher",input:question})
-      });
+      const submitController=new AbortController();
+      const submitTimer=setTimeout(()=>submitController.abort(),30000);
+      let submit;
+      try{
+        submit=await fetch("/api/research/submit",{
+          method:"POST",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({agent_type:"deep_researcher",input:question}),
+          signal:submitController.signal
+        });
+      }finally{clearTimeout(submitTimer);}
       const submitted=await submit.json().catch(()=>({}));
-      if(!submit.ok)throw new Error(submitted.detail?.message||submitted.error||"Research submission failed.");
+      if(!submit.ok)throw new Error(submitted.detail?.message||submitted.error||"Research submission failed (HTTP "+submit.status+").");
       const jobId=submitted.job_id;
       if(typeof jobId!=="string"||!jobId)throw new Error("The research service did not return a job ID.");
       setResearchJobId(jobId);
       setResearchProgress(items=>[...items,"Research job created: "+jobId]);
-      setResearchStatus("Research is running. Receiving live progress…");
+      setResearchStatus("Research is running. Checking job status while live progress streams…");
 
-      try{
-        const stream=await fetch("/api/research/job/"+encodeURIComponent(jobId)+"/stream");
-        if(stream.ok&&stream.body){
+      // Consume SSE in the background. Never await stream closure before polling:
+      // many SSE servers intentionally keep the connection open for the job's lifetime.
+      streamController=new AbortController();
+      const progressController=streamController;
+      (async()=>{
+        try{
+          const stream=await fetch("/api/research/job/"+encodeURIComponent(jobId)+"/stream",{signal:progressController.signal});
+          if(!stream.ok||!stream.body){
+            setResearchProgress(items=>[...items,"Live progress stream unavailable (HTTP "+stream.status+"); checking job status."]);
+            return;
+          }
           const reader=stream.body.getReader();
           const decoder=new TextDecoder();
           let buffer="";
-          while(true){
+          while(!progressController.signal.aborted){
             const part=await reader.read();
             if(part.done)break;
             buffer+=decoder.decode(part.value,{stream:true});
@@ -338,37 +355,57 @@ function AtlasWorkspace() {
               setResearchProgress(items=>[...items.slice(-29),eventName+": "+String(detail).slice(0,240)]);
             }
           }
-        }else{
-          setResearchProgress(items=>[...items,"Live progress stream unavailable; checking job status instead."]);
+          if(buffer.trim()&&!progressController.signal.aborted){
+            setResearchProgress(items=>[...items.slice(-29),"progress: "+buffer.trim().slice(0,240)]);
+          }
+        }catch(streamError){
+          if(streamError.name!=="AbortError"){
+            setResearchProgress(items=>[...items.slice(-29),"Live progress stream interrupted; status checks continue."]);
+          }
         }
-      }catch(streamError){
-        setResearchProgress(items=>[...items,"Live stream interrupted; checking job status."]);
-      }
+      })();
 
       let completed=false;
       for(let attempt=0;attempt<90;attempt++){
-        const statusResponse=await fetch("/api/research/job/"+encodeURIComponent(jobId));
-        const statusData=await statusResponse.json().catch(()=>({}));
-        if(statusResponse.ok){
-          const status=String(statusData.status||statusData.job?.status||statusData.job_info?.status||"").toLowerCase();
-          if(["success","completed","complete"].includes(status)){
-            completed=true;
-            break;
+        const statusController=new AbortController();
+        const statusTimer=setTimeout(()=>statusController.abort(),15000);
+        try{
+          const statusResponse=await fetch("/api/research/job/"+encodeURIComponent(jobId),{signal:statusController.signal});
+          const statusData=await statusResponse.json().catch(()=>({}));
+          if(statusResponse.ok){
+            const status=String(statusData.status||statusData.job?.status||statusData.job_info?.status||"").toLowerCase();
+            if(["success","completed","complete"].includes(status)){
+              completed=true;
+              break;
+            }
+            if(["failure","failed","error","cancelled","interrupted"].includes(status)){
+              throw new Error(statusData.error||statusData.detail?.message||"The research job ended with status: "+status);
+            }
+            if(attempt===0||attempt%5===0){
+              setResearchStatus("Research is still running ("+(attempt*2)+" seconds elapsed)…");
+              setResearchProgress(items=>[...items.slice(-29),"Job status: "+(status||"in progress")]);
+            }
+          }else if(attempt===0||attempt%5===0){
+            setResearchProgress(items=>[...items.slice(-29),"Status check returned HTTP "+statusResponse.status+"; retrying."]);
           }
-          if(["failure","failed","error","cancelled","interrupted"].includes(status)){
-            throw new Error(statusData.error||statusData.detail?.message||"The research job ended with status: "+status);
-          }
-        }
+        }catch(statusError){
+          if(statusError.name!=="AbortError"&&statusError.message.startsWith("The research job ended"))throw statusError;
+          if(attempt===0||attempt%5===0)setResearchProgress(items=>[...items.slice(-29),"Status check timed out; retrying."]);
+        }finally{clearTimeout(statusTimer);}
         await new Promise(resolve=>setTimeout(resolve,2000));
       }
-      if(!completed)throw new Error("The research job is still running. Its ID has been saved; use Refresh report to check again.");
+      if(!completed)throw new Error("Research is still running after 3 minutes. The job ID is saved; use Refresh report later rather than waiting indefinitely.");
+      streamController.abort();
       const finalReport=await loadResearchReport(jobId);
       if(!finalReport)throw new Error("The research job finished, but its final report could not be loaded. Use Refresh report to try again.");
       setResearchStatus("Deep research completed.");
     }catch(error){
-      setResearchError(error.message);
+      if(streamController)streamController.abort();
+      const message=error.name==="AbortError"?"The research request timed out while contacting the research service. Please retry.":error.message;
+      setResearchError(message);
       setResearchStatus("Research did not complete.");
     }finally{
+      if(streamController)streamController.abort();
       setResearchBusy(false);
     }
   }
@@ -492,6 +529,8 @@ function AtlasWorkspace() {
     <h2>DEVELOPMENT MODULES</h2><div className="grid two">{card(<MessageSquare/>,"Conversational intelligence","NVIDIA when configured, with Cloudflare Workers AI model fallbacks; otherwise Cloudflare Workers AI is primary.","Interface ready")}{card(<Eye/>,"Perception & vision","Prepare image inputs for future computer vision.","Preview ready")}{card(<GraduationCap/>,"Learning system","Plan supervised demonstrations and evaluation.","Planned")}{card(<Bot/>,"Robotics integration","A safe bridge to controllers after simulation and testing.","Not connected")}</div>
     <div className="safety"><ShieldCheck/><div><b>Safety-first development</b><p>This is a software prototype. It does not control physical devices. Real robot movement must use independent safety limits and supervised testing.</p></div></div>
   </section> : page==="AI Assistant" ? <section className="stack grok-page"><div className="grok-workspace"><aside className="grok-history"><button className="grok-new-chat" onClick={newConversation}><Plus size={17}/> <span>New chat</span></button><div className="grok-history-label">YOUR CHATS</div><div className="grok-history-list" aria-label="NEXORA AI conversation history">{conversations.map(item=><div className={item.id===activeConversation?.id?"grok-history-item active":"grok-history-item"} key={item.id}><button className="grok-history-open" onClick={()=>{setActiveConversationId(item.id);setInput("");}} title={item.title}>{item.title}</button><button className="grok-history-delete" onClick={()=>deleteConversation(item.id)} aria-label={"Delete "+item.title} title="Delete conversation"><Trash2 size={14}/></button></div>)}</div><div className="grok-history-foot"><span className="grok-status-dot"/> NEXORA AI · PRIVATE SESSION</div></aside><div className="grok-chat-main"><div className="grok-topbar"><div className="grok-title"><span className="grok-mark"><AtlasLogo/></span><div><b>NEXORA AI</b><small>GENERAL INTELLIGENCE</small></div></div><div className="grok-top-actions"><span className="grok-model-tag">AUTO MODEL</span><span className="grok-online"><i/> {gatewayReady?"ONLINE":"CONNECTING"}</span></div></div><div className="grok-messages">{messages.map((m,i)=><div className={"grok-message "+m.role} key={i}>{m.role==="atlas"&&<span className="grok-message-avatar"><AtlasLogo/></span>}<div className="grok-message-body">{m.role==="user"&&<b>YOU</b>}<CopilotMessage text={m.text}/></div></div>)}</div><div className="grok-compose-area"><div className="grok-model-row"><label htmlFor="atlas-provider">MODEL</label><select id="atlas-provider" value={provider} onChange={e=>setProvider(e.target.value)}><option value="atlas">NEXORA AI · Auto</option><option value="nvidia" disabled={!providerStates.nvidia?.configured}>NVIDIA API Catalog{providerStates.nvidia?.configured?"":" · unavailable"}</option></select></div><form className="grok-composer" onSubmit={send}><textarea aria-label="Message NEXORA AI" rows="1" value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();e.currentTarget.form.requestSubmit();}}} placeholder="Ask NEXORA AI anything…"/><div className="grok-composer-bottom"><span>Enter to send · Shift + Enter for a new line</span><button aria-label="Send message" disabled={!input.trim()||generating}><Send size={17}/></button></div></form><small>{generating?"NEXORA AI is thinking…":"AI can make mistakes. Verify important information."}</small></div></div></div></section>
+  : page==="NVIDIA Deep Research" ? <NvidiaResearchChat />
+  : page==="Engineering Studio" ? <EngineeringStudio />
   : page==="Research Center" ? <section className="stack">
     {heading("NVIDIA Deep Research Center","Run structured, multi-step research and receive a source-backed report.",researchAvailable?"BACKEND ONLINE":"BACKEND CHECK")}
     <article className="card">

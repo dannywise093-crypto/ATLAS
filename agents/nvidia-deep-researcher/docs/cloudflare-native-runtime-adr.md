@@ -1,0 +1,103 @@
+# NEXORA NVIDIA Deep Research: Cloudflare-Native Runtime ADR
+
+Status: Proposed implementation contract  
+Scope: `feat/engineering-design-development` only  
+Production changes: None authorized by this document
+
+## Decision
+
+The production research runtime must not depend on PostgreSQL, SQLite files, or a database hidden inside the Container. Durable state must be held by Cloudflare services and accessed through explicit adapters.
+
+Use:
+- **Durable Objects (DO):** per-tenant/job coordination, atomic state transitions, idempotency, leases, event sequencing, and checkpoint transaction coordination.
+- **D1:** indexed job metadata and access/admission records where cross-job queries and relational constraints are required.
+- **R2:** report/artifact bytes and large checkpoint payloads; metadata stores immutable object keys, hashes, sizes, and content types.
+- **Cloudflare Container:** compute only. Container disk and process memory are caches, never the source of truth.
+
+The existing `ResearchStorage` DO record/event API remains a transport primitive. The existing `CloudflareJobMetadataRepository` is a prototype and is explicitly not a drop-in replacement for NAT's JobStore.
+
+## Existing blockers confirmed in source
+
+1. The MCP `deep_researcher_mcp.job_store.JobStore` is directly coupled to asyncpg/PostgreSQL and includes principal ownership, queued/running/terminal states, runner ownership, heartbeats, polling, stale-job reconciliation, TTL cleanup, and checkpoint cleanup.
+2. The FastAPI async job API imports NAT's `nat.front_ends.fastapi.async_jobs.job_store.JobStore`; readiness also checks NAT's mapped SQL tables and Dask scheduler.
+3. `deep_researcher_agent.common.get_checkpointer` currently selects only LangGraph's PostgreSQL or SQLite saver.
+4. Artifact storage factory currently builds SQL metadata storage; S3 support is available in the vendored implementation, but must be verified for R2 compatibility and credential/signature requirements before use.
+5. Current readiness policy still requires `NAT_JOB_STORE_DB_URL` and `DEEP_RESEARCHER_CHECKPOINT_DB`. Those requirements must not be removed until their replacement adapters are wired and tested.
+
+## Implementation progress
+
+- A bounded Cloudflare job-metadata prototype now includes revision-checked runner claims, runner-owned heartbeats, runner-fenced terminal writes, and stale-lease interruption.
+- Unit coverage exercises competing claims, wrong-runner rejection, terminal-state fencing, and stale-versus-fresh lease handling.
+- This prototype is **not** wired into the MCP JobManager or NAT FastAPI job store. It does not yet provide durable queue scheduling, cancellation signalling, idempotent submission, checkpoint cleanup, or complete expiry cleanup. It is not a production runtime replacement.
+
+## MCP job-ledger integration milestone
+
+The MCP server now has an opt-in `CloudflareMCPJobStore` implementation of the existing `JobStore` interface. Set `DEEP_RESEARCHER_MCP_JOB_STORE=cloudflare` to select it; the default remains PostgreSQL. The adapter stores MCP job records in the tenant-scoped Durable Object namespace `mcp-jobs` and implements create/read, runner claim, runner-owned heartbeat, conditional state transitions, principal-scoped polling, stale-job reconciliation, and terminal-job expiry.
+
+Required configuration for this opt-in path:
+- `NEXORA_RESEARCH_TENANT`
+- `NEXORA_RESEARCH_STORAGE_URL`
+- `NEXORA_RESEARCH_API_TOKEN`
+- Existing `DEEP_RESEARCHER_CHECKPOINT_DB` (still required for LangGraph checkpoints and todo progress).
+
+Expiry cleanup deliberately removes the matching LangGraph checkpoint writes, blobs, and snapshots from the checkpoint database before deleting the Durable Object job capability. The job-store adapter shares that checkpoint database pool with the todo reader. This is an intermediate hybrid integration; it does **not** make the research runtime Cloudflare-only.
+Durable Object records are capped at 256 KiB by `research-worker/storage.js`; the adapter rejects oversized job records before sending them. Large final reports still require the pending R2 artifact/report path and must not be treated as supported by this interim adapter.
+
+Remaining blockers before enabling this in production:
+- LangGraph still uses the PostgreSQL checkpoint saver.
+- The FastAPI/NAT async job API still uses NAT's separate SQL JobStore and Dask scheduling contract.
+- MCP background execution still uses process-local asyncio tasks; durable queue dispatch, cancellation signalling, and cross-container recovery are not implemented.
+- R2 artifact/report storage and the full production readiness contract remain incomplete.
+
+The CI workflow now runs the MCP adapter's focused tests in addition to the API storage adapter tests. Passing these tests validates the adapter contract against an in-memory Durable Object transport; it does not validate a deployed Worker or real NVIDIA research execution.
+
+## Required implementation sequence
+
+### A. Job lifecycle adapter
+- Define a storage protocol independent of asyncpg, SQLAlchemy, and NAT internals.
+- Implement the MCP job contract on Cloudflare storage: create, get, principal-scoped poll, conditional queued-to-running claim, runner-owned heartbeat/update, guarded failure, stale lease reconciliation, terminal-only expiry, and deletion.
+- Preserve UUID job IDs, TTL semantics, runner ownership, and safe handling of ambiguous network acknowledgements.
+- Make submit idempotent using a caller-supplied idempotency key scoped to the authenticated principal.
+- Add concurrent claim/update tests and multi-tenant isolation tests.
+- Separately adapt the FastAPI/NAT job API; do not assume the MCP adapter replaces NAT's SQLAlchemy JobStore.
+
+### B. LangGraph checkpoint adapter
+- The exact locked API and storage design are documented in [langgraph-cloudflare-checkpoint-design.md](./langgraph-cloudflare-checkpoint-design.md); this design is based on the upstream LangGraph 1.2.11 `BaseCheckpointSaver` source and the MCP lockfile.
+- Implement the supported LangGraph `BaseCheckpointSaver` contract for the installed LangGraph version, including `get_tuple`, `list`, `put`, and `put_writes` (sync/async variants as required).
+- Preserve thread ID, checkpoint namespace, checkpoint ID, parent checkpoint config, channel versions, pending writes, metadata, and serializer/type fidelity.
+- Use DO transactions for atomic checkpoint + write updates; use R2 for payloads that exceed DO/D1 limits, with hash-verified immutable blobs.
+- Prove round-trip, overwrite/version, pending-write, namespace, concurrent writer, and process-restart resume behavior before switching the runtime.
+
+### C. Durable artifact/report storage
+- Store bytes in R2 and metadata/indexes in D1 or DO.
+- Verify artifact ownership, path normalization, MIME sniffing, content hash, size limits, and cleanup.
+- Test R2's S3-compatible endpoint with the actual artifact client before enabling it.
+
+### D. Scheduler and recovery
+- Do not rely on in-memory asyncio tasks or ephemeral Dask future references as the durable queue.
+- Persist job leases and attempt IDs. A reconciler must safely re-queue or mark interrupted jobs based on checkpoint availability and lease expiry.
+- Define cancellation as a durable state transition, then signal the active runner; terminal states must not be overwritten by late workers.
+- Validate the actual Cloudflare Container scheduling model and plan limits before selecting the runner topology.
+
+### E. Readiness and deployment
+- Readiness must probe real D1/DO/R2 bindings and verify schema/permissions, not merely check that environment variables exist.
+- Only after A-D pass may SQL URL requirements be removed from runtime policy.
+- Provision provider credentials and the shared service token as Worker/Container secrets; never log or expose values.
+- Deploy the research Worker, verify internal readiness, then run a real research request and validate its citations and persisted report.
+
+## Release gates
+
+- No SQL connection or SQLite file is opened in production.
+- Job ownership isolation and idempotency pass automated tests.
+- Checkpoints survive container restart and resume the same graph thread.
+- Cancellation, stale-worker recovery, expiry, and cleanup pass race tests.
+- R2 artifact writes are hash-verified and tenant-scoped.
+- Worker readiness reports ready only when every required binding and provider secret is valid.
+- A real NVIDIA research run completes end-to-end and can be reopened after a fresh client session.
+
+## Explicit non-goals
+
+- No fake readiness flag or placeholder backend.
+- No PostgreSQL/hosted external database workaround.
+- No removal of the research UI or merging into normal NEXORA chat.
+- No production deployment or secret changes as part of this ADR.
