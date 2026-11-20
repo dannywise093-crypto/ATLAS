@@ -182,10 +182,10 @@ async def test_thread_delete_uses_encoded_tenant_and_thread_scope(monkeypatch):
         return {"tombstoned": True}
 
     monkeypatch.setattr(saver, "_call", call)
-    await saver.adelete_thread("thread/with spaces")
+    await saver.adelete_thread("thread:with-colon")
     assert calls == [(
         "POST",
-        "/internal/checkpoint-threads/nexora-test/thread%2Fwith%20spaces/delete",
+        "/internal/checkpoint-threads/nexora-test/thread%3Awith-colon/delete",
         {},
     )]
 
