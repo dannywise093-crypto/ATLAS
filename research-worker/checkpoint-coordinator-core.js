@@ -89,7 +89,16 @@ export class CheckpointCoordinatorCore {
         return { ...state.lease, reused: true };
       }
 
-      const fencingToken = state.lastFencingToken + 1;
+      // Durable Object state is the primary lease record, but recover the
+      // monotonic counter from D1 too. This prevents fencing-token reuse if a
+      // coordinator object is ever recreated while checkpoint rows survive.
+      const persistedThread = typeof this.checkpointIndex.getThread === "function"
+        ? await this.checkpointIndex.getThread(scope)
+        : null;
+      const persistedToken = Number.isSafeInteger(persistedThread?.fencing_token)
+        ? persistedThread.fencing_token
+        : 0;
+      const fencingToken = Math.max(state.lastFencingToken, persistedToken) + 1;
       const lease = {
         leaseId: this.makeLeaseId(),
         holderId,
