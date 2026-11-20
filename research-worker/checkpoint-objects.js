@@ -1,3 +1,5 @@
+import { D1CheckpointIndex } from "./checkpoint-index.js";
+
 const MAX_OBJECT_BYTES = 32 * 1024 * 1024;
 const SAFE_SEGMENT = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 
@@ -52,7 +54,8 @@ async function readBoundedBody(request) {
 export async function handleCheckpointObjectRequest(request, env, tenant) {
   if (!safeSegment(tenant)) return json({ error: "Invalid tenant." }, 400);
   const bucket = env.RESEARCH_CHECKPOINTS_BUCKET;
-  if (!bucket) return json({ error: "Checkpoint object storage is not configured." }, 503);
+  const db = env.RESEARCH_CHECKPOINTS_DB;
+  if (!bucket || !db) return json({ error: "Checkpoint D1/R2 storage is not configured." }, 503);
 
   const parts = new URL(request.url).pathname.split("/").filter(Boolean);
   if (parts.length === 4 && parts[3] === "objects" && request.method === "POST") {
@@ -73,6 +76,17 @@ export async function handleCheckpointObjectRequest(request, env, tenant) {
         createdAt: String(createdAt),
       },
     });
+    try {
+      await new D1CheckpointIndex(db).enqueueGarbage({
+        tenantId: tenant,
+        objectKey: key,
+        queuedAt: createdAt,
+        notBefore: createdAt + 24 * 60 * 60 * 1000,
+      });
+    } catch {
+      await bucket.delete(key);
+      return json({ error: "Could not register checkpoint payload for safe garbage collection." }, 503);
+    }
     return json({ ok: true, objectId, sha256: digest, size: bytes.byteLength, createdAt }, 201);
   }
 
