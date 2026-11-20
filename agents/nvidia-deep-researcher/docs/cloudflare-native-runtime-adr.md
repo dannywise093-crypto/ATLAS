@@ -41,6 +41,7 @@ Required configuration for this opt-in path:
 - Existing `DEEP_RESEARCHER_CHECKPOINT_DB` (still required for LangGraph checkpoints and todo progress).
 
 Expiry cleanup deliberately removes the matching LangGraph checkpoint writes, blobs, and snapshots from the checkpoint database before deleting the Durable Object job capability. The job-store adapter shares that checkpoint database pool with the todo reader. This is an intermediate hybrid integration; it does **not** make the research runtime Cloudflare-only.
+Durable Object records are capped at 256 KiB by `research-worker/storage.js`; the adapter rejects oversized job records before sending them. Large final reports still require the pending R2 artifact/report path and must not be treated as supported by this interim adapter.
 
 Remaining blockers before enabling this in production:
 - LangGraph still uses the PostgreSQL checkpoint saver.
