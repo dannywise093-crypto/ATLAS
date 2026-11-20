@@ -116,6 +116,12 @@ export class CheckpointCoordinator extends DurableObject {
       if (error instanceof CheckpointLeaseError) {
         return json({ error: error.message, code: error.code }, error.status);
       }
+      if (error?.code === "invalid_input" || error?.code === "invalid_writes") {
+        return json({ error: error.message, code: error.code }, 400);
+      }
+      if (error?.code === "missing_binding") {
+        return json({ error: error.message, code: error.code }, 503);
+      }
       if (error?.code === "write_conflict" || error?.code === "fencing_conflict") {
         return json({ error: "Checkpoint publication lost its revision or fencing race.", code: error.code }, 409);
       }
