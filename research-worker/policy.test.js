@@ -76,7 +76,8 @@ test("Cloudflare checkpoint mode stays blocked until D1, R2, coordinator, and sa
     "RESEARCH_CHECKPOINTS_DB (D1)",
     "RESEARCH_CHECKPOINTS_BUCKET (R2)",
     "RESEARCH_CHECKPOINT_COORDINATOR (Durable Object)",
-    "Cloudflare LangGraph checkpoint saver implementation and conformance tests",
+    "NEXORA_RESEARCH_PUBLIC_URL",
+    "NEXORA_RESEARCH_TENANT",
   ]);
 });
 
@@ -93,4 +94,26 @@ test("unsupported checkpoint backend is never reported ready", () => {
   const result = researchReadiness({ NEXORA_RESEARCH_CHECKPOINT_BACKEND: "sqlite" });
   assert.equal(result.ready, false);
   assert.equal(result.checkpointBackendSupported, false);
+});
+
+test("Cloudflare checkpoint mode reports missing runtime bindings before starting the container", () => {
+  const env = {
+    NEXORA_RESEARCH_CHECKPOINT_BACKEND: "cloudflare",
+    NVIDIA_API_KEY: "configured",
+    TAVILY_API_KEY: "configured",
+    EXA_API_KEY: "configured",
+    NIMBLE_API_KEY: "configured",
+    YDC_API_KEY: "configured",
+    SERPER_API_KEY: "configured",
+    NEXORA_RESEARCH_API_TOKEN: "x".repeat(40),
+    NAT_JOB_STORE_DB_URL: "configured",
+    DEEP_RESEARCHER_CHECKPOINT_DB: "cloudflare://nexora",
+  };
+  assert.deepEqual(missingRuntimeConfig(env), [
+    "RESEARCH_CHECKPOINTS_DB (D1)",
+    "RESEARCH_CHECKPOINTS_BUCKET (R2)",
+    "RESEARCH_CHECKPOINT_COORDINATOR (Durable Object)",
+    "NEXORA_RESEARCH_PUBLIC_URL",
+    "NEXORA_RESEARCH_TENANT",
+  ]);
 });
