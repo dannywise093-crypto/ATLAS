@@ -109,3 +109,37 @@ def test_writer_factory_selects_cloudflare_with_persisted_tenant(monkeypatch):
 
     assert isinstance(writer, CloudflareEventStore)
     assert writer.storage.tenant == event_reader.tenant_for_job_owner("oauth", "verified-user-42")
+
+
+@pytest.mark.asyncio
+async def test_cloudflare_reader_collects_multiple_durable_object_pages(monkeypatch):
+    class PagedStorage:
+        def __init__(self, *, tenant: str):
+            self.tenant = tenant
+
+        async def aget_events(self, job_id: str, *, after: int, limit: int):
+            start = max(after + 1, 1)
+            end = min(start + limit - 1, 450)
+            return {
+                "events": [
+                    {"sequence": seq, "event": {"type": "progress", "data": {"n": seq}}}
+                    for seq in range(start, end + 1)
+                ]
+            }
+
+    monkeypatch.setenv("NEXORA_RESEARCH_EVENT_STORE", "cloudflare")
+    events = await event_reader.get_events_async(
+        "sqlite:///jobs.db",
+        "job_456",
+        after_id=0,
+        limit=450,
+        owner_lookup=lambda job_id, db_url: {
+            "owner_auth_type": "oauth",
+            "owner_subject": "verified-user-42",
+        },
+        storage_factory=lambda **kwargs: PagedStorage(**kwargs),
+    )
+
+    assert len(events) == 450
+    assert events[0]["_id"] == 1
+    assert events[-1]["_id"] == 450
