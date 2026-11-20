@@ -57,7 +57,7 @@ jobs:
           python -m pytest -q tests/test_cloudflare_job_store.py tests/test_cloudflare_checkpoint_schema.py
 
       - name: Check Cloudflare Pages Functions and Worker syntax
-        run: node --check functions/api/_gateway.js && node --check functions/api/chat.js && node --check functions/api/copilot.js && node --check functions/api/health.js && node --check functions/api/nvidia.js && node --check functions/api/providers.js && node --check functions/api/transcribe.js && node --check functions/api/tts.js && node --check cloudflare/worker.js && node --check cloudflare/worker.test.js && node --check research-worker/checkpoint-objects.js && node --test research-worker/checkpoint-objects.test.js
+        run: node --check functions/api/_gateway.js && node --check functions/api/chat.js && node --check functions/api/copilot.js && node --check functions/api/health.js && node --check functions/api/nvidia.js && node --check functions/api/providers.js && node --check functions/api/transcribe.js && node --check functions/api/tts.js && node --check cloudflare/worker.js && node --check cloudflare/worker.test.js && node --check research-worker/checkpoint-objects.js && node --check research-worker/checkpoint-index.js && node --test research-worker/checkpoint-objects.test.js research-worker/checkpoint-index.test.js
 
       - name: Install dependencies
         run: npm ci
