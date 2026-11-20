@@ -37,10 +37,14 @@ function jsonProjection(value, label) {
 }
 
 function scope(input) {
+  const checkpointNs = input.checkpointNs ?? "";
+  if (typeof checkpointNs !== "string" || checkpointNs.length > 256 || /[\\u0000-\\u001f]/.test(checkpointNs)) {
+    throw new CheckpointIndexError("Invalid checkpoint namespace.", "invalid_input");
+  }
   return {
     tenantId: requiredId(input.tenantId, "tenant"),
     threadId: requiredId(input.threadId, "thread"),
-    checkpointNs: input.checkpointNs === undefined ? "" : requiredId(input.checkpointNs || "default", "checkpoint namespace") === "default" && input.checkpointNs === "" ? "" : input.checkpointNs,
+    checkpointNs,
   };
 }
 
