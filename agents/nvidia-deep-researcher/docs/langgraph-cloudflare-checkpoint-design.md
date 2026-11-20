@@ -121,6 +121,10 @@ Checkpoint and pending-write publication must not be represented as one 256 KiB 
 
 The initial D1 schema is in `agents/nvidia-deep-researcher/deploy/checkpoint_schema.sql`. It defines tenant/thread/namespace-scoped thread heads, checkpoint descriptors, pending-write descriptors, R2 garbage-collection queue entries, and the supporting history/order indexes. A Python `sqlite3` conformance test exercises schema creation, idempotency, tenant/namespace key isolation, foreign-key relationships, and payload descriptor constraints. These tests validate SQLite-compatible DDL locally; they do not prove that a provisioned Cloudflare D1 database has been migrated or that R2/DO runtime operations work.
 
+
+
+The private research Worker also has an initial R2 payload API in `research-worker/checkpoint-objects.js`, routed through `research-worker/index.js`. It generates opaque object IDs server-side, scopes keys by tenant, bounds payload size, stores SHA-256/size metadata, verifies integrity on reads, and prevents cross-tenant reads/deletes. Node tests cover upload, binary round-trip, tamper detection, tenant isolation, deletion, and missing-bucket behavior. The API remains dormant until `RESEARCH_CHECKPOINTS_BUCKET` is provisioned; it is not yet called by a LangGraph saver.
+
 The schema is not yet bound to the research Worker. No D1 database ID, R2 bucket, or checkpoint coordinator binding has been configured. There is no Python LangGraph saver implementation yet.
 
 ## 9. Integration gate
