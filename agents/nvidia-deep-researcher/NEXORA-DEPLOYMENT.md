@@ -164,3 +164,31 @@ adapter, Pages proxy, dedicated research chat, and all-provider configuration.
 It does not yet contain a deployed Cloudflare research Container, a
 Cloudflare-native durable JobStore adapter, or a verified live end-to-end
 research run.
+
+
+## Persistence adapter investigation — verified source findings
+
+The pinned NVIDIA/NeMo implementation has no existing Cloudflare D1 or Durable Object persistence adapter. The current runtime has several independent persistence consumers, so replacing only the front-end database URL would be incomplete:
+
+1. **NAT async JobStore** — the pinned NeMo Agent Toolkit JobStore is a SQLAlchemy ORM implementation. It persists JobInfo records and manages Dask futures. It uses async SQLAlchemy sessions and ORM operations, not a pluggable key/value storage interface.
+2. **Deep Researcher EventStore** — the vendored API has its own SQLAlchemy EventStore. It performs synchronous and asynchronous SQL operations for event replay and SSE; PostgreSQL additionally uses LISTEN/NOTIFY, while SQLite uses polling.
+3. **Research admission/access metadata** — vendored API modules use direct database connections and SQL statements for admission limits, ownership, and conversation-to-report lookup. These must be migrated as well.
+4. **LangGraph workflow checkpoints** — the vendored get_checkpointer() factory explicitly selects AsyncPostgresSaver for PostgreSQL DSNs and AsyncSqliteSaver for local SQLite. There is no Durable Object saver in the pinned source.
+5. **Dask execution** — async job submission stores scheduler futures and Dask variables in addition to SQL metadata. Durable metadata alone would not make a running job survive a Container/Dask scheduler restart.
+
+Cloudflare outbound HTTP intercepts provide a viable transport from a Container to a WorkerEntrypoint with access to Durable Object bindings. They do not supply a SQLAlchemy dialect, a JobStore implementation, an EventStore implementation, or a LangGraph checkpointer. A Cloudflare-native design must therefore implement and contract-test each persistence adapter and define recovery semantics for Dask jobs before the runtime can be considered durable. Do not substitute a remote HTTP wrapper around only the EventStore and call the whole system persistent.
+
+### Required implementation sequence
+
+- Define a versioned Durable Object storage API for jobs, events, admission, ownership, report references, and checkpoints, with atomic per-job writes, pagination, expiry, and tenant scoping.
+- Implement a NAT-compatible JobStore adapter (or a narrowly maintained upstream patch) and verify all methods used by the async routes and Dask runner.
+- Replace the vendored EventStore and direct SQL access paths with the same durable storage contract; retain SSE replay and polling semantics without relying on PostgreSQL notifications.
+- Implement a LangGraph BaseCheckpointSaver backed by the storage contract and test checkpoint listing, reads, writes, versions, and thread isolation.
+- Define what happens when a Container or local Dask scheduler stops during a job. Either add durable task recovery/reattachment or explicitly mark interrupted jobs and allow safe retry; never report an unfinished task as successful merely because its metadata survived.
+- Add integration tests against a local Durable Object-compatible test harness before considering deployment.
+
+### Upstream lifecycle risk
+
+The official NeMo Agent Toolkit repository announced deprecation in October 2026 and end-of-life by the end of 2026. The vendored project pins nvidia-nat 1.8.0, so production readiness also requires an explicit decision on supported successor compatibility or a maintained fork. This does not change the user's pinned NVIDIA source revision; it is a dependency-lifecycle risk to resolve before production.
+
+**Current result:** the repository remains fail-closed. No external database has been introduced, no ephemeral SQLite persistence has been enabled for production, and no Cloudflare deployment or production routing change has been made.
