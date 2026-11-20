@@ -1,8 +1,9 @@
 """Shared, tenant-aware event reader for SQL and Cloudflare storage.
 
-Cloudflare mode is deliberately opt-in. The tenant is derived only from the
-persisted job_access owner record; request-supplied tenant identifiers are
-never accepted. SQL remains the default until the Cloudflare writer is enabled.
+Cloudflare mode is deliberately opt-in and the same flag selects both reads
+and runner writes. The tenant is derived only from the persisted job_access
+owner record; request-supplied tenant identifiers are never accepted. SQL
+remains the default. Other job lifecycle and checkpoint stores remain SQL-backed.
 """
 
 from __future__ import annotations
