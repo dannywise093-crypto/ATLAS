@@ -231,8 +231,10 @@ async def test_alist_paginates_all_checkpoints_when_no_limit_is_given(monkeypatc
         )
     ]
 
-    assert [item.checkpoint["id"] for item in items] == ["cp-4", "cp-3", "cp-2"]
-    assert calls == [None, "cp-3", "cp-2"]
+    assert len(items) == 101
+    assert items[0].checkpoint["id"] == "cp-100"
+    assert items[-1].checkpoint["id"] == "cp-000"
+    assert calls == [None, "cp-001"]
 
 
 @pytest.mark.asyncio
