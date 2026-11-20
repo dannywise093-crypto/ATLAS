@@ -68,16 +68,25 @@ export class D1CheckpointIndex {
       throw new CheckpointIndexError("A positive fencing token is required.", "invalid_input");
     }
     const insert = this.db.prepare(`
-      INSERT OR IGNORE INTO research_checkpoint_threads
+      INSERT INTO research_checkpoint_threads
         (tenant_id, thread_id, checkpoint_ns, head_checkpoint_id, revision, fencing_token, created_at, updated_at)
-      VALUES (?, ?, ?, NULL, 0, ?, ?, ?)
-    `).bind(s.tenantId, s.threadId, s.checkpointNs, fencingToken, now, now);
+      SELECT ?, ?, ?, NULL, 0, ?, ?, ?
+      WHERE NOT EXISTS (
+        SELECT 1 FROM research_checkpoint_thread_tombstones
+        WHERE tenant_id = ? AND thread_id = ?
+      )
+      ON CONFLICT(tenant_id, thread_id, checkpoint_ns) DO NOTHING
+    `).bind(s.tenantId, s.threadId, s.checkpointNs, fencingToken, now, now, s.tenantId, s.threadId);
     const advance = this.db.prepare(`
       UPDATE research_checkpoint_threads
       SET fencing_token = ?, updated_at = ?
       WHERE tenant_id = ? AND thread_id = ? AND checkpoint_ns = ?
         AND fencing_token < ? AND deleted_at IS NULL
-    `).bind(fencingToken, now, s.tenantId, s.threadId, s.checkpointNs, fencingToken);
+        AND NOT EXISTS (
+          SELECT 1 FROM research_checkpoint_thread_tombstones
+          WHERE tenant_id = ? AND thread_id = ?
+        )
+    `).bind(fencingToken, now, s.tenantId, s.threadId, s.checkpointNs, fencingToken, s.tenantId, s.threadId);
     const results = await this.db.batch([insert, advance]);
     const row = await this.getThread(s);
     if (!row || row.fencing_token !== fencingToken) {
@@ -102,10 +111,15 @@ export class D1CheckpointIndex {
     const metadataJson = jsonProjection(input.metadataJson, "Metadata projection");
     const channelVersionsJson = jsonProjection(input.channelVersionsJson, "Channel versions projection");
     const threadInsert = this.db.prepare(`
-      INSERT OR IGNORE INTO research_checkpoint_threads
+      INSERT INTO research_checkpoint_threads
         (tenant_id, thread_id, checkpoint_ns, head_checkpoint_id, revision, fencing_token, created_at, updated_at)
-      VALUES (?, ?, ?, NULL, 0, ?, ?, ?)
-    `).bind(s.tenantId, s.threadId, s.checkpointNs, fencingToken, createdAt, createdAt);
+      SELECT ?, ?, ?, NULL, 0, ?, ?, ?
+      WHERE NOT EXISTS (
+        SELECT 1 FROM research_checkpoint_thread_tombstones
+        WHERE tenant_id = ? AND thread_id = ?
+      )
+      ON CONFLICT(tenant_id, thread_id, checkpoint_ns) DO NOTHING
+    `).bind(s.tenantId, s.threadId, s.checkpointNs, fencingToken, createdAt, createdAt, s.tenantId, s.threadId);
     const advance = this.db.prepare(`
       UPDATE research_checkpoint_threads
       SET head_checkpoint_id = ?, revision = revision + 1, updated_at = ?
@@ -113,12 +127,17 @@ export class D1CheckpointIndex {
         AND revision = ? AND fencing_token = ? AND deleted_at IS NULL
         AND head_checkpoint_id IS ?
         AND NOT EXISTS (
+          SELECT 1 FROM research_checkpoint_thread_tombstones
+          WHERE tenant_id = ? AND thread_id = ?
+        )
+        AND NOT EXISTS (
           SELECT 1 FROM research_checkpoints
           WHERE tenant_id = ? AND thread_id = ? AND checkpoint_ns = ? AND checkpoint_id = ?
         )
     `).bind(
       checkpointId, createdAt, s.tenantId, s.threadId, s.checkpointNs,
       expectedRevision, fencingToken, parentId,
+      s.tenantId, s.threadId,
       s.tenantId, s.threadId, s.checkpointNs, checkpointId,
     );
     const insert = this.db.prepare(`
@@ -246,6 +265,46 @@ export class D1CheckpointIndex {
       ORDER BY task_path, task_id, write_index
     `).bind(s.tenantId, s.threadId, s.checkpointNs, checkpointId).all();
     return result.results || [];
+  }
+
+  async deleteThread(input) {
+    const tenantId = requiredId(input.tenantId, "tenant");
+    const threadId = requiredId(input.threadId, "thread");
+    const now = Number.isSafeInteger(input.deletedAt) ? input.deletedAt : Date.now();
+    const notBefore = Number.isSafeInteger(input.notBefore) ? input.notBefore : now + 24 * 60 * 60 * 1000;
+    const statements = [
+      this.db.prepare(`
+        INSERT OR IGNORE INTO research_checkpoint_thread_tombstones (tenant_id, thread_id, deleted_at)
+        VALUES (?, ?, ?)
+      `).bind(tenantId, threadId, now),
+      this.db.prepare(`
+        INSERT OR IGNORE INTO research_checkpoint_r2_gc (object_key, tenant_id, queued_at, not_before)
+        SELECT checkpoint_r2_key, tenant_id, ?, ? FROM research_checkpoints
+        WHERE tenant_id = ? AND thread_id = ?
+      `).bind(now, notBefore, tenantId, threadId),
+      this.db.prepare(`
+        INSERT OR IGNORE INTO research_checkpoint_r2_gc (object_key, tenant_id, queued_at, not_before)
+        SELECT metadata_r2_key, tenant_id, ?, ? FROM research_checkpoints
+        WHERE tenant_id = ? AND thread_id = ?
+      `).bind(now, notBefore, tenantId, threadId),
+      this.db.prepare(`
+        INSERT OR IGNORE INTO research_checkpoint_r2_gc (object_key, tenant_id, queued_at, not_before)
+        SELECT value_r2_key, tenant_id, ?, ? FROM research_checkpoint_writes
+        WHERE tenant_id = ? AND thread_id = ?
+      `).bind(now, notBefore, tenantId, threadId),
+      this.db.prepare(`
+        DELETE FROM research_checkpoint_threads WHERE tenant_id = ? AND thread_id = ?
+      `).bind(tenantId, threadId),
+    ];
+    const results = await this.db.batch(statements);
+    return {
+      tenantId,
+      threadId,
+      tombstoned: true,
+      deletedScopes: changes(results[4]),
+      objectsQueued: results.slice(1, 4).reduce((sum, result) => sum + changes(result), 0),
+      notBefore,
+    };
   }
 
   async enqueueGarbage(input) {
