@@ -25,7 +25,6 @@ from langgraph.checkpoint.base import (
     CheckpointTuple,
     WRITES_IDX_MAP,
     get_checkpoint_id,
-    writes_sort_key,
 )
 from langchain_core.runnables import RunnableConfig
 
