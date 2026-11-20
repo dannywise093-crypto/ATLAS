@@ -160,7 +160,23 @@ export class D1CheckpointIndex {
       metadataJson, channelVersionsJson, createdAt,
       s.tenantId, s.threadId, s.checkpointNs, expectedRevision + 1, checkpointId, fencingToken,
     );
-    const results = await this.db.batch([threadInsert, advance, insert]);
+    const retainCheckpointObject = this.db.prepare(`
+      DELETE FROM research_checkpoint_r2_gc
+      WHERE object_key = ? AND tenant_id = ? AND EXISTS (
+        SELECT 1 FROM research_checkpoints
+        WHERE tenant_id = ? AND thread_id = ? AND checkpoint_ns = ? AND checkpoint_id = ?
+          AND checkpoint_r2_key = ?
+      )
+    `).bind(checkpoint.key, s.tenantId, s.tenantId, s.threadId, s.checkpointNs, checkpointId, checkpoint.key);
+    const retainMetadataObject = this.db.prepare(`
+      DELETE FROM research_checkpoint_r2_gc
+      WHERE object_key = ? AND tenant_id = ? AND EXISTS (
+        SELECT 1 FROM research_checkpoints
+        WHERE tenant_id = ? AND thread_id = ? AND checkpoint_ns = ? AND checkpoint_id = ?
+          AND metadata_r2_key = ?
+      )
+    `).bind(metadata.key, s.tenantId, s.tenantId, s.threadId, s.checkpointNs, checkpointId, metadata.key);
+    const results = await this.db.batch([threadInsert, advance, insert, retainCheckpointObject, retainMetadataObject]);
     if (changes(results[1]) !== 1 || changes(results[2]) !== 1) {
       throw new CheckpointIndexError("Checkpoint revision or fencing token is stale; no checkpoint was published.", "write_conflict");
     }
@@ -214,7 +230,8 @@ export class D1CheckpointIndex {
     if (!Array.isArray(input.writes) || input.writes.length < 1 || input.writes.length > 128) {
       throw new CheckpointIndexError("Writes must contain between 1 and 128 entries.", "invalid_input");
     }
-    const statements = input.writes.map((write) => {
+    const statements = [];
+    for (const write of input.writes) {
       const payload = descriptor(write.value, "write value", s.tenantId);
       const taskId = requiredId(write.taskId, "task ID");
       const channel = requiredId(write.channel, "write channel");
@@ -222,7 +239,7 @@ export class D1CheckpointIndex {
       if (!Number.isSafeInteger(write.writeIndex) || write.writeIndex < -16 || write.writeIndex > 4096) {
         throw new CheckpointIndexError("Invalid write index.", "invalid_input");
       }
-      return this.db.prepare(`
+      statements.push(this.db.prepare(`
         INSERT INTO research_checkpoint_writes (
           tenant_id, thread_id, checkpoint_ns, checkpoint_id, task_id, task_path,
           write_index, channel, value_type, value_r2_key, value_sha256, value_bytes, created_at
@@ -247,13 +264,25 @@ export class D1CheckpointIndex {
         write.writeIndex, channel, payload.type, payload.key, payload.sha256, payload.bytes,
         Number.isSafeInteger(write.createdAt) ? write.createdAt : Date.now(),
         s.tenantId, s.threadId, s.checkpointNs, checkpointId,
-      );
-    });
+      ));
+      statements.push(this.db.prepare(`
+        DELETE FROM research_checkpoint_r2_gc
+        WHERE object_key = ? AND tenant_id = ? AND EXISTS (
+          SELECT 1 FROM research_checkpoint_writes
+          WHERE tenant_id = ? AND thread_id = ? AND checkpoint_ns = ? AND checkpoint_id = ?
+            AND task_id = ? AND write_index = ? AND value_r2_key = ?
+        )
+      `).bind(payload.key, s.tenantId, s.tenantId, s.threadId, s.checkpointNs,
+        checkpointId, taskId, write.writeIndex, payload.key));
+    }
     const results = await this.db.batch(statements);
     if (results.some((result) => !result.success)) {
       throw new CheckpointIndexError("Could not persist checkpoint writes.", "storage_error");
     }
-    return { accepted: results.reduce((sum, result) => sum + changes(result), 0), requested: statements.length };
+    return {
+      accepted: results.filter((_, index) => index % 2 === 0).reduce((sum, result) => sum + changes(result), 0),
+      requested: input.writes.length,
+    };
   }
 
   async listWrites(input) {
