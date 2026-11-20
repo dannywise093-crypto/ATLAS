@@ -60,6 +60,32 @@ export class D1CheckpointIndex {
     this.db = db;
   }
 
+  async claimThread(input) {
+    const s = scope(input);
+    const fencingToken = input.fencingToken;
+    const now = Number.isSafeInteger(input.now) ? input.now : Date.now();
+    if (!Number.isSafeInteger(fencingToken) || fencingToken < 1) {
+      throw new CheckpointIndexError("A positive fencing token is required.", "invalid_input");
+    }
+    const insert = this.db.prepare(`
+      INSERT OR IGNORE INTO research_checkpoint_threads
+        (tenant_id, thread_id, checkpoint_ns, head_checkpoint_id, revision, fencing_token, created_at, updated_at)
+      VALUES (?, ?, ?, NULL, 0, ?, ?, ?)
+    `).bind(s.tenantId, s.threadId, s.checkpointNs, fencingToken, now, now);
+    const advance = this.db.prepare(`
+      UPDATE research_checkpoint_threads
+      SET fencing_token = ?, updated_at = ?
+      WHERE tenant_id = ? AND thread_id = ? AND checkpoint_ns = ?
+        AND fencing_token < ? AND deleted_at IS NULL
+    `).bind(fencingToken, now, s.tenantId, s.threadId, s.checkpointNs, fencingToken);
+    const results = await this.db.batch([insert, advance]);
+    const row = await this.getThread(s);
+    if (!row || row.fencing_token !== fencingToken) {
+      throw new CheckpointIndexError("A newer fencing token already owns this checkpoint thread.", "fencing_conflict");
+    }
+    return { ...row, claimed: changes(results[1]) === 1 };
+  }
+
   async putCheckpoint(input) {
     const s = scope(input);
     const checkpointId = requiredId(input.checkpointId, "checkpoint ID");
