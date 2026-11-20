@@ -200,3 +200,84 @@ def test_typed_serializer_round_trips_checkpoint_and_metadata():
     for value in values:
         type_name, payload = saver.serde.dumps_typed(value)
         assert saver.serde.loads_typed((type_name, payload)) == value
+
+@pytest.mark.asyncio
+async def test_alist_paginates_all_checkpoints_when_no_limit_is_given(monkeypatch):
+    from types import SimpleNamespace
+
+    saver = _saver()
+    calls = []
+    pages = {
+        None: [{"checkpoint_id": "cp-4"}, {"checkpoint_id": "cp-3"}],
+        "cp-3": [{"checkpoint_id": "cp-2"}],
+        "cp-2": [],
+    }
+
+    async def coordinator(config, action, payload=None):
+        assert action == "list"
+        cursor = (payload or {}).get("beforeCheckpointId")
+        calls.append(cursor)
+        return {"checkpoints": pages[cursor]}
+
+    async def get_tuple(config):
+        checkpoint_id = config["configurable"]["checkpoint_id"]
+        return SimpleNamespace(metadata={"source": "test"}, config=config, checkpoint={"id": checkpoint_id})
+
+    monkeypatch.setattr(saver, "_coordinator", coordinator)
+    monkeypatch.setattr(saver, "aget_tuple", get_tuple)
+    items = [
+        item async for item in saver.alist(
+            {"configurable": {"thread_id": "thread-1"}},
+        )
+    ]
+
+    assert [item.checkpoint["id"] for item in items] == ["cp-4", "cp-3", "cp-2"]
+    assert calls == [None, "cp-3", "cp-2"]
+
+
+@pytest.mark.asyncio
+async def test_alist_applies_filter_across_pages_and_honors_limit(monkeypatch):
+    from types import SimpleNamespace
+
+    saver = _saver()
+    pages = {
+        None: [{"checkpoint_id": "cp-4"}, {"checkpoint_id": "cp-3"}],
+        "cp-3": [{"checkpoint_id": "cp-2"}, {"checkpoint_id": "cp-1"}],
+    }
+    calls = []
+
+    async def coordinator(config, action, payload=None):
+        cursor = (payload or {}).get("beforeCheckpointId")
+        calls.append(cursor)
+        return {"checkpoints": pages.get(cursor, [])}
+
+    async def get_tuple(config):
+        checkpoint_id = config["configurable"]["checkpoint_id"]
+        return SimpleNamespace(
+            metadata={"source": "keep" if checkpoint_id in {"cp-3", "cp-1"} else "skip"},
+            config=config,
+            checkpoint={"id": checkpoint_id},
+        )
+
+    monkeypatch.setattr(saver, "_coordinator", coordinator)
+    monkeypatch.setattr(saver, "aget_tuple", get_tuple)
+    items = [
+        item async for item in saver.alist(
+            {"configurable": {"thread_id": "thread-1"}},
+            filter={"source": "keep"},
+            limit=2,
+        )
+    ]
+
+    assert [item.checkpoint["id"] for item in items] == ["cp-3", "cp-1"]
+    assert calls == [None, "cp-3"]
+
+
+@pytest.mark.asyncio
+async def test_alist_rejects_non_positive_limits():
+    saver = _saver()
+    with pytest.raises(ValueError, match="positive integer"):
+        _ = [item async for item in saver.alist(
+            {"configurable": {"thread_id": "thread-1"}},
+            limit=0,
+        )]
