@@ -456,7 +456,7 @@ export default {
 
     // ACKE: search on demand for current facts or explicit research requests.
     // Search is optional and fails closed; timeless prompts do not trigger it.
-    let research = { status: "skipped", sources: [], checkedAt: null, archive: { status: env.KNOWLEDGE_DB ? "skipped" : "disabled", storedSources: 0, storedChunks: 0 } };
+    let research = { status: "skipped", sources: [], checkedAt: null, provider: null, archive: { status: env.KNOWLEDGE_DB ? "skipped" : "disabled", storedSources: 0, storedChunks: 0 } };
     let modelMessages = messages;
     const latestPrompt = messages[messages.length - 1].content;
     const skillInventory = getSkillCatalogStats();
@@ -478,6 +478,8 @@ export default {
         status: searchResult.status,
         sources: evidence.sources,
         checkedAt: evidence.checkedAt,
+        provider: searchResult.provider || null,
+        diagnostics: searchResult.diagnostics || [],
         archive,
       };
       modelMessages = [
@@ -520,7 +522,7 @@ export default {
           const answer = extractAnswer(result);
           if (answer) {
             const sourceFooter = research.sources.length
-              ? "\n\nSources checked (" + research.checkedAt + "):\n" + research.sources.map((source, index) => (index + 1) + ". " + source.title + " — " + source.url).join("\n") + "\nThese are search-result snippets; full source pages were not independently verified."
+              ? "\n\nSources checked (" + research.checkedAt + ") via " + (research.provider || "web search") + ":\n" + research.sources.map((source, index) => (index + 1) + ". " + source.title + " — " + source.url).join("\n") + "\nThese are search-result snippets; full source pages were not independently verified."
               : research.status === "unavailable" || research.status === "no_results"
                 ? "\n\nLive web research could not provide usable sources for this request. Current facts have not been independently verified."
                 : "";
@@ -549,7 +551,7 @@ export default {
         const answer = extractAnswer(result);
         if (answer) {
           const sourceFooter = research.sources.length
-            ? "\n\nSources checked (" + research.checkedAt + "):\n"
+            ? "\n\nSources checked (" + research.checkedAt + ") via " + (research.provider || "web search") + ":\n"
               + research.sources.map((source, index) => (index + 1) + ". " + source.title + " — " + source.url).join("\n")
               + "\nThese are search-result snippets; full source pages were not independently verified."
             : research.status === "unavailable" || research.status === "no_results"
