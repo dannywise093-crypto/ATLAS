@@ -64,7 +64,7 @@ export class CheckpointCoordinator extends DurableObject {
     }
     if (request.method !== "POST") return json({ error: "Method not allowed." }, 405);
     const route = new URL(request.url).pathname;
-    if (!["/acquire", "/renew", "/release", "/publish", "/get", "/list", "/put-writes", "/list-writes"].includes(route)) {
+    if (!["/acquire", "/renew", "/release", "/publish", "/get", "/get-thread", "/list", "/put-writes", "/list-writes"].includes(route)) {
       return json({ error: "Coordinator route not found." }, 404);
     }
     const declared = Number(request.headers.get("content-length") || 0);
@@ -97,6 +97,9 @@ export class CheckpointCoordinator extends DurableObject {
       if (route === "/release") return json(await core.release(input));
       if (route === "/publish") return json(await core.publish(input));
       const index = new D1CheckpointIndex(this.env.RESEARCH_CHECKPOINTS_DB);
+      if (route === "/get-thread") {
+        return json({ thread: await index.getThread(input) });
+      }
       if (route === "/get") {
         if (typeof input.checkpointId !== "string") return json({ error: "checkpointId is required." }, 400);
         const checkpoint = await index.getCheckpoint(input);
