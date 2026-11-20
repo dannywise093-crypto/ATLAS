@@ -309,9 +309,15 @@ class CloudflareCheckpointSaver(BaseCheckpointSaver):
             await self._release(config, lease)
 
     async def adelete_thread(self, thread_id: str) -> None:
-        raise NotImplementedError(
-            "Thread deletion is disabled until the tenant-scoped D1 delete and delayed R2 garbage collector are enabled"
+        if not isinstance(thread_id, str) or not thread_id or len(thread_id) > 256:
+            raise ValueError("A valid thread_id is required")
+        path = (
+            f"/internal/checkpoint-threads/{quote(self.tenant, safe='')}/"
+            f"{quote(thread_id, safe='')}/delete"
         )
+        result = await self._call("POST", path, {})
+        if not result or result.get("tombstoned") is not True:
+            raise CloudflareCheckpointError("Checkpoint thread deletion was not confirmed")
 
     # NAT's workflow executes asynchronously. Fail closed if a caller accidentally
     # selects this saver from a synchronous LangGraph execution path.
