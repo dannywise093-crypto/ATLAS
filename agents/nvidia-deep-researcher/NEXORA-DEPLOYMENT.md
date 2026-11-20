@@ -285,3 +285,23 @@ ownership/admission invariants. In particular, the current SQL-based
 readiness probe and route startup must not be bypassed until the API, runner,
 cancellation monitor, admission/access helpers, EventStore, and checkpoint
 saver have coordinated Cloudflare-native replacements and integration tests.
+
+
+### Cloudflare event persistence adapter milestone
+
+Added `CloudflareEventStore` as a separate prototype over the Durable Object
+event append/read API. It preserves per-job sequence IDs as the existing
+`_id` cursor expected by event consumers, supports sync and async reads,
+single-event writes, and batch writes (implemented as ordered individual
+appends, not an atomic transaction). It also mirrors the existing encrypted
+artifact-content preparation/return hooks when a content cipher is supplied.
+Tests use an in-memory fake and do not contact Cloudflare.
+
+The adapter is not wired into `AgentEventCallback`, `BatchingEventStore`,
+FastAPI SSE routes, or the runner. The existing route layer calls
+`EventStore.get_events_async(db_url, ...)`; the new adapter instead requires an
+explicit authenticated `CloudflareStorageClient`. The current Worker event
+API does not provide PostgreSQL LISTEN/NOTIFY, so live updates still require
+polling or a separately designed Durable Object/WebSocket notification path.
+Batch append is not atomic, and no cross-job event cleanup/retention policy has
+been migrated. Do not disable the SQL EventStore based on this adapter alone.
