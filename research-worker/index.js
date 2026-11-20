@@ -125,7 +125,8 @@ export default {
     if (url.pathname.startsWith("/internal/checkpoint-threads/")) {
       const parts = url.pathname.split("/").filter(Boolean);
       const tenant = parts[2];
-      const threadId = parts[3];
+      let threadId;
+      try { threadId = decodeURIComponent(parts[3] || ""); } catch { threadId = ""; }
       if (parts.length !== 5 || parts[4] !== "delete" ||
           !/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(tenant || "") ||
           !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$/.test(threadId || "")) {
@@ -143,7 +144,8 @@ export default {
     if (url.pathname.startsWith("/internal/checkpoint-coordinator/")) {
       const parts = url.pathname.split("/").filter(Boolean);
       const tenant = parts[2];
-      const threadId = parts[3];
+      let threadId;
+      try { threadId = decodeURIComponent(parts[3] || ""); } catch { threadId = ""; }
       const action = parts[4];
       const checkpointNs = url.searchParams.get("namespace") ?? "";
       if (parts.length !== 5 ||
