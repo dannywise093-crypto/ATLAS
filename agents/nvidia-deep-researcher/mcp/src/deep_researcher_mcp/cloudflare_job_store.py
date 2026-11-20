@@ -27,6 +27,7 @@ import asyncpg
 from .job_store import Job, JobDepth, JobState
 
 _DEFAULT_TTL_SECONDS = 24 * 60 * 60
+_MAX_RECORD_BYTES = 256 * 1024  # Must match research-worker/storage.js.
 _NAMESPACE = "mcp-jobs"
 _TERMINAL_STATES = frozenset({"complete", "failed"})
 _IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
@@ -115,10 +116,13 @@ class _CloudflareMCPStorageClient:
         self, namespace: str, key: str, value: dict[str, Any], *, expected_revision: int
     ) -> dict[str, Any]:
         url = self._url(f"records/{quote(namespace, safe='')}/{quote(key, safe='')}")
-        return await asyncio.to_thread(
-            self._request, "PUT", url,
-            {"value": value, "expectedRevision": expected_revision},
-        )
+        payload = {"value": value, "expectedRevision": expected_revision}
+        payload_size = len(json.dumps(payload, separators=(",", ":"), allow_nan=False).encode("utf-8"))
+        if payload_size > _MAX_RECORD_BYTES:
+            raise ValueError(
+                "MCP job record exceeds the Cloudflare 256 KiB limit; R2 report storage is required"
+            )
+        return await asyncio.to_thread(self._request, "PUT", url, payload)
 
     async def alist_records(
         self, namespace: str, *, after: str | None = None, limit: int = 200
