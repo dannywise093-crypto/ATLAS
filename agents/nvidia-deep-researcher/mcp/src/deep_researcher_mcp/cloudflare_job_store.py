@@ -368,8 +368,8 @@ class CloudflareMCPJobStore:
             try:
                 await self._write(job_id, self._serialize(job), record["revision"])
                 return True
-            except Exception as exc:
-                if type(exc).__name__ != "CloudflareStorageConflict" or attempt + 1 == self._conflict_retries:
+            except CloudflareStorageConflict:
+                if attempt + 1 == self._conflict_retries:
                     raise
         return False
 
@@ -387,8 +387,8 @@ class CloudflareMCPJobStore:
             try:
                 await self._write(job_id, self._serialize(job), record["revision"])
                 return job
-            except Exception as exc:
-                if type(exc).__name__ != "CloudflareStorageConflict" or attempt + 1 == self._conflict_retries:
+            except CloudflareStorageConflict:
+                if attempt + 1 == self._conflict_retries:
                     raise
         return None
 
