@@ -144,6 +144,9 @@ export default {
         coordinatorUrl.protocol = "https:";
         coordinatorUrl.hostname = "checkpoint-coordinator.internal";
         coordinatorUrl.pathname = "/" + action;
+        coordinatorUrl.searchParams.set("tenant", tenant);
+        coordinatorUrl.searchParams.set("thread", threadId);
+        coordinatorUrl.searchParams.set("namespace", checkpointNs);
         return await stub.fetch(new Request(coordinatorUrl, request));
       } catch {
         return json({ error: "Checkpoint coordinator is unavailable." }, 503);
