@@ -515,3 +515,36 @@ test("cloud TTS does not silently use the default voice when clone backend token
   assert.equal(response.status, 503);
   assert.equal(workersAiCalled, false);
 });
+
+test("research image generation returns a real Workers AI image and labels it as illustrative", async () => {
+  let called;
+  const env = envWith(async (model, input) => { called = { model, input }; return { image: "aGVsbG8=" }; });
+  const req = new Request("https://atlas.test/api/research/generate-image", {
+    method: "POST",
+    headers: { authorization: `Bearer ${token}`, "content-type": "application/json", "cf-connecting-ip": "198.51.100.44" },
+    body: JSON.stringify({ prompt: "A labelled educational diagram of the water cycle." })
+  });
+  const response = await worker.fetch(req, env);
+  const body = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(body.generated, true);
+  assert.equal(body.image, "data:image/jpeg;base64,aGVsbG8=");
+  assert.match(body.note, /not photographic evidence/);
+  assert.equal(called.model, "@cf/black-forest-labs/flux-1-schnell");
+  assert.equal(called.input.steps, 4);
+});
+
+test("research image generation rejects unsafe topics and malformed prompts", async () => {
+  let called = false;
+  const env = envWith(async () => { called = true; return { image: "aGVsbG8=" }; });
+  const make = prompt => new Request("https://atlas.test/api/research/generate-image", {
+    method: "POST",
+    headers: { authorization: `Bearer ${token}`, "content-type": "application/json", "cf-connecting-ip": "198.51.100.45" },
+    body: JSON.stringify({ prompt })
+  });
+  const unsafe = await worker.fetch(make("A detailed weapon illustration"), env);
+  assert.equal(unsafe.status, 400);
+  const empty = await worker.fetch(make(" "), env);
+  assert.equal(empty.status, 400);
+  assert.equal(called, false);
+});
