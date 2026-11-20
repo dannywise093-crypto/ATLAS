@@ -1,4 +1,4 @@
-name: Build ATLAS Android test APK
+name: Build NEXORA AI Android test APK
 
 on:
   workflow_dispatch:
@@ -7,17 +7,32 @@ on:
   pull_request:
     branches: [ main ]
 
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-24.04
     steps:
       - name: Check out project
         uses: actions/checkout@v5
+        with:
+          persist-credentials: false
 
       - name: Set up Node
         uses: actions/setup-node@v5
         with:
           node-version: 24
+          cache: npm
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle and dependency cache
+        uses: gradle/actions/setup-gradle@v4
 
       - name: Install Python gateway dependencies
         run: python -m pip install -r server/requirements.txt
@@ -31,7 +46,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Test ATLAS core
+      - name: Test NEXORA core
         run: npm test
 
       - name: Build web app
@@ -46,19 +61,27 @@ jobs:
       - name: Sync web app into Android project
         run: npx cap sync android
 
-      - name: Set up Java
-        uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: '17'
-
       - name: Build debug APK
         working-directory: android
-        run: chmod +x gradlew && ./gradlew assembleDebug
+        shell: bash
+        run: |
+          chmod +x gradlew
+          for attempt in 1 2 3; do
+            echo "Android Gradle build attempt ${attempt}/3"
+            if ./gradlew --no-daemon --refresh-dependencies assembleDebug; then
+              exit 0
+            fi
+            if [ "$attempt" -lt 3 ]; then
+              echo "Gradle dependency/build attempt failed; waiting before retry."
+              sleep $((attempt * 20))
+            fi
+          done
+          echo "Android APK build failed after three attempts."
+          exit 1
 
       - name: Upload test APK
         uses: actions/upload-artifact@v5
         with:
-          name: atlas-ai-debug-apk
+          name: nexora-ai-debug-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
