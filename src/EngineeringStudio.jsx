@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import { generateAtlasResponse } from "./modelRuntime.js";
 import { Download, Image as ImageIcon, Search, Settings2, Wrench } from "lucide-react";
 
@@ -20,6 +20,7 @@ export default function EngineeringStudio() {
   const [discipline, setDiscipline] = useState("Automotive / Mechanical");
   const [constraints, setConstraints] = useState("");
   const [busy, setBusy] = useState(false);
+  const designControllerRef = useRef(null);
   const [visualBusy, setVisualBusy] = useState(false);
   const [report, setReport] = useState("");
   const [visual, setVisual] = useState("");
@@ -37,16 +38,38 @@ export default function EngineeringStudio() {
   async function createDesign(event) {
     event.preventDefault();
     if (!idea.trim() || busy) return;
+    const controller = new AbortController();
+    designControllerRef.current = controller;
     setBusy(true); setError(""); setReport(""); setVisual("");
-    setStage("Researching the engineering problem and developing a concept brief…");
+    const startedAt = Date.now();
+    setStage("Preparing the engineering brief…");
+    const progressTimer = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - startedAt) / 1000);
+      setStage("NEXORA is researching and drafting the concept package… " + elapsed + "s elapsed.");
+    }, 5000);
+    const deadlineTimer = setTimeout(() => controller.abort(), 75000);
     try {
-      const answer = await generateAtlasResponse([{ role: "user", text: prompt }]);
+      const answer = await generateAtlasResponse([{ role: "user", text: prompt }], controller.signal);
+      if (controller.signal.aborted) return;
       setReport(answer);
       setStage("Concept package generated. Review assumptions and source references.");
     } catch (err) {
-      setError(err?.message || "NEXORA could not complete the engineering request.");
+      const message = controller.signal.aborted || err?.name === "AbortError"
+        ? "This request exceeded the 75-second limit. Try a shorter project brief or submit it again."
+        : (err?.message || "NEXORA could not complete the engineering request.");
+      setError(message);
       setStage("The design request could not be completed.");
-    } finally { setBusy(false); }
+    } finally {
+      clearInterval(progressTimer);
+      clearTimeout(deadlineTimer);
+      if (designControllerRef.current === controller) designControllerRef.current = null;
+      setBusy(false);
+    }
+  }
+
+  function cancelDesign() {
+    designControllerRef.current?.abort();
+    setStage("Cancelling the engineering request…");
   }
 
   async function saveVisual() {
@@ -110,7 +133,7 @@ export default function EngineeringStudio() {
           <textarea id="eng-idea" rows="5" maxLength="6000" value={idea} onChange={e=>setIdea(e.target.value)} placeholder="Example: Research and develop an original high-performance hybrid supercar powertrain and exterior body concept. Include subsystem architecture, materials, calculations, manufacturing considerations and a validation plan." required/>
           <label htmlFor="eng-constraints">Requirements and constraints (optional)</label>
           <textarea id="eng-constraints" rows="3" maxLength="3000" value={constraints} onChange={e=>setConstraints(e.target.value)} placeholder="Target use, size envelope, budget range, materials, power source, operating environment, regulations…"/>
-          <button type="submit" disabled={!idea.trim()||busy}>{busy?"Developing engineering package…":"Research & develop concept"}</button>
+          <div className="engineering-submit-actions"><button type="submit" disabled={!idea.trim()||busy}>{busy?"Developing engineering package…":"Research & develop concept"}</button>{busy&&<button type="button" className="secondary" onClick={cancelDesign}>Cancel</button>}</div>
         </form>
         <p className="engineering-stage" aria-live="polite"><span className="engineering-dot"/>{stage}</p>
         {error&&<p role="alert" className="engineering-error">{error}</p>}
