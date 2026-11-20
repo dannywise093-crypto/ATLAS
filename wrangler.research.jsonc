@@ -4,6 +4,7 @@
   "main": "research-worker/index.js",
   "compatibility_date": "2026-11-20",
   "workers_dev": true,
+  "triggers": { "crons": ["*/15 * * * *"] },
   "containers": [
     {
       "class_name": "ResearchContainer",
