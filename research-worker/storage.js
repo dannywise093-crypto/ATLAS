@@ -42,7 +42,7 @@ export class ResearchStorage extends DurableObject {
   }
 
   async fetch(request) {
-    const supplied = (request.headers.get("authorization") || "").replace(/^Bearer\\s+/i, "");
+    const supplied = extractBearerToken(request.headers.get("authorization"));
     const expected = this.env.NEXORA_RESEARCH_API_TOKEN;
     if (!expected || expected.length < 32 || !constantTimeEqual(supplied, expected)) {
       return response({ error: "Unauthorized." }, 401);
