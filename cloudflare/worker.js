@@ -113,7 +113,6 @@ const WINDOW_MS = 60_000;
 const MAX_PER_WINDOW = 24;
 const buckets = new Map();
 const speechBuckets = new Map();
-const visualBuckets = new Map();
 
 function json(body, status = 200, extraHeaders = {}) {
   return new Response(JSON.stringify(body), {
@@ -248,12 +247,6 @@ export default {
     if (!authorized(request, env)) return json({ error: "Unauthorized." }, 401);
     if (url.pathname === "/api/research/generate-image") {
       if (request.method !== "POST") return json({ error: "Method not allowed." }, 405, { allow: "POST" });
-      const ip = request.headers.get("cf-connecting-ip") || "unknown";
-      const now = Date.now();
-      const bucket = visualBuckets.get(ip);
-      if (!bucket || now - bucket.start >= 60 * 60_000) visualBuckets.set(ip, { start: now, count: 1 });
-      else if (bucket.count >= 3) return json({ error: "Image generation limit reached. Please try again later." }, 429, { "retry-after": "3600" });
-      else bucket.count++;
       if (!env.AI) return json({ error: "Cloudflare Workers AI is not configured for image generation." }, 503);
       const length = Number(request.headers.get("content-length") || 0);
       if (length > 6 * 1024) return json({ error: "Image prompt is too large." }, 413);
