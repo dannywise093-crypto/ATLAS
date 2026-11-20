@@ -97,3 +97,24 @@ def test_client_rejects_insecure_remote_endpoint_and_short_token():
         CloudflareStorageClient(tenant="tenant-a", base_url="https://research.example.com/unexpected-path", token="x" * 40)
     with pytest.raises(ValueError):
         CloudflareStorageClient(tenant="tenant-a", base_url="https://research.example.com", token="short")
+
+
+def test_list_records_uses_namespace_route_and_cursor_pagination():
+    with patch(
+        "deep_researcher_api.jobs.cloudflare_storage.urlopen",
+        return_value=_Response({"records": [{"key": "job-2"}], "nextAfter": None}),
+    ) as open_url:
+        page = _client().list_records("jobs", after="job-1", limit=500)
+
+    request = open_url.call_args.args[0]
+    assert request.get_method() == "GET"
+    assert request.full_url.endswith("/records/jobs?limit=200&after=job-1")
+    assert page["records"][0]["key"] == "job-2"
+
+
+def test_list_records_rejects_invalid_cursor_and_limit():
+    client = _client()
+    with pytest.raises(ValueError):
+        client.list_records("jobs", after="../escape")
+    with pytest.raises(ValueError):
+        client.list_records("jobs", limit=0)
