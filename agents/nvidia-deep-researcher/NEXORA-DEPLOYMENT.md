@@ -243,3 +243,21 @@ deployment. The current Node policy tests do not exercise the SQLite-backed
 Durable Object itself.
 
 **Current result:** the repository remains fail-closed. No external database has been introduced, no ephemeral SQLite persistence has been enabled for production, and no Cloudflare deployment or production routing change has been made.
+
+
+### Durable record collection API milestone
+
+The Durable Object gateway now supports bounded, key-ordered pagination for a
+single tenant and namespace using `GET /v1/tenants/:tenant/records/:namespace?after=:key&limit=:n`.
+The Python transport client exposes this as `list_records`. The cursor is an
+exclusive record key; pages are capped at 200 entries and return `nextAfter`
+when another page exists. This supplies a prerequisite for enumerating job
+records without loading an unbounded collection into memory.
+
+This does not implement NAT `JobStore` semantics. The upstream store also
+creates and updates relational `JobInfo` rows, tracks Dask futures in scheduler
+Variables, cancels futures, expires jobs, and performs status/expiry queries.
+The NEXORA API additionally depends on transactional admission and ownership
+records, SQL joins, event-store behavior, and LangGraph checkpoints. Those
+contracts still require explicit adapters and integration tests before the
+NVIDIA API can be switched to Cloudflare-native persistence.
