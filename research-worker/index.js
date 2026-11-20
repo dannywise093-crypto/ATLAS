@@ -1,5 +1,6 @@
 import { DurableObject } from "cloudflare:workers";
 import { ResearchStorage } from "./storage.js";
+import { handleCheckpointObjectRequest } from "./checkpoint-objects.js";
 import { validStorageRequest } from "./storage-policy.js";
 import { constantTimeEqual, extractBearerToken, isAllowedResearchRoute, missingRuntimeConfig, researchReadiness } from "./policy.js";
 
@@ -115,6 +116,19 @@ export default {
       const readiness = researchReadiness(env);
       return json(readiness, readiness.ready ? 200 : 503);
     }
+    if (url.pathname.startsWith("/internal/checkpoint-objects/")) {
+      const parts = url.pathname.split("/").filter(Boolean);
+      const tenant = parts[2];
+      if (!tenant || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(tenant)) {
+        return json({ error: "Invalid checkpoint tenant." }, 400);
+      }
+      try {
+        return await handleCheckpointObjectRequest(request, env, tenant);
+      } catch {
+        return json({ error: "Checkpoint object storage operation failed." }, 500);
+      }
+    }
+
     if (url.pathname.startsWith("/internal/storage/")) {
       const parts = url.pathname.split("/").filter(Boolean);
       const tenant = parts[4];
