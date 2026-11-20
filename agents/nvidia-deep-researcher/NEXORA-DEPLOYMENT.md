@@ -305,3 +305,27 @@ API does not provide PostgreSQL LISTEN/NOTIFY, so live updates still require
 polling or a separately designed Durable Object/WebSocket notification path.
 Batch append is not atomic, and no cross-job event cleanup/retention policy has
 been migrated. Do not disable the SQL EventStore based on this adapter alone.
+
+
+### Shared tenant-aware event reader milestone
+
+Added `deep_researcher_api.jobs.event_reader` as a common SQL/Cloudflare
+read boundary. SQL remains the default. Cloudflare reads require the explicit
+`NEXORA_RESEARCH_EVENT_STORE=cloudflare` setting and derive the tenant key
+from the persisted `job_access.owner_auth_type` and `owner_subject` values.
+The tenant key is a stable SHA-256-derived identifier and does not expose the
+owner subject. Missing owner metadata or invalid Cloudflare configuration
+fails closed rather than falling back to another tenant.
+
+The job-artifact reader and SSE polling reader now use this boundary. When
+Cloudflare reads are selected, SSE deliberately uses polling because Durable
+Objects do not implement PostgreSQL LISTEN/NOTIFY. The PostgreSQL pub/sub
+path remains unchanged for the default SQL backend.
+
+**Do not enable Cloudflare event reads in a live environment yet.** The runner
+still writes through SQL `EventStore` and `BatchingEventStore`; enabling
+Cloudflare reads before the matching Cloudflare writer is integrated would
+produce an empty/split event stream. The new reader and its tests are an
+integration milestone, not a completed storage migration. The NAT JobStore,
+Dask future recovery, cancellation/status metadata, admission/access tables,
+artifact store, and LangGraph checkpoint saver remain SQL-backed.
