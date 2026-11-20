@@ -30,6 +30,26 @@ The existing `ResearchStorage` DO record/event API remains a transport primitive
 - Unit coverage exercises competing claims, wrong-runner rejection, terminal-state fencing, and stale-versus-fresh lease handling.
 - This prototype is **not** wired into the MCP JobManager or NAT FastAPI job store. It does not yet provide durable queue scheduling, cancellation signalling, idempotent submission, checkpoint cleanup, or complete expiry cleanup. It is not a production runtime replacement.
 
+## MCP job-ledger integration milestone
+
+The MCP server now has an opt-in `CloudflareMCPJobStore` implementation of the existing `JobStore` interface. Set `DEEP_RESEARCHER_MCP_JOB_STORE=cloudflare` to select it; the default remains PostgreSQL. The adapter stores MCP job records in the tenant-scoped Durable Object namespace `mcp-jobs` and implements create/read, runner claim, runner-owned heartbeat, conditional state transitions, principal-scoped polling, stale-job reconciliation, and terminal-job expiry.
+
+Required configuration for this opt-in path:
+- `NEXORA_RESEARCH_TENANT`
+- `NEXORA_RESEARCH_STORAGE_URL`
+- `NEXORA_RESEARCH_API_TOKEN`
+- Existing `DEEP_RESEARCHER_CHECKPOINT_DB` (still required for LangGraph checkpoints and todo progress).
+
+Expiry cleanup deliberately removes the matching LangGraph checkpoint writes, blobs, and snapshots from the checkpoint database before deleting the Durable Object job capability. The job-store adapter shares that checkpoint database pool with the todo reader. This is an intermediate hybrid integration; it does **not** make the research runtime Cloudflare-only.
+
+Remaining blockers before enabling this in production:
+- LangGraph still uses the PostgreSQL checkpoint saver.
+- The FastAPI/NAT async job API still uses NAT's separate SQL JobStore and Dask scheduling contract.
+- MCP background execution still uses process-local asyncio tasks; durable queue dispatch, cancellation signalling, and cross-container recovery are not implemented.
+- R2 artifact/report storage and the full production readiness contract remain incomplete.
+
+The CI workflow now runs the MCP adapter's focused tests in addition to the API storage adapter tests. Passing these tests validates the adapter contract against an in-memory Durable Object transport; it does not validate a deployed Worker or real NVIDIA research execution.
+
 ## Required implementation sequence
 
 ### A. Job lifecycle adapter
