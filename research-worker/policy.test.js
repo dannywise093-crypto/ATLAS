@@ -1,6 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { constantTimeEqual, isAllowedResearchRoute, missingRuntimeConfig } from "./policy.js";
+import { constantTimeEqual, extractBearerToken, isAllowedResearchRoute, missingRuntimeConfig } from "./policy.js";
+
+test("research Worker parses bearer tokens using whitespace and case-insensitive scheme matching", () => {
+  assert.equal(extractBearerToken("Bearer secret-value"), "secret-value");
+  assert.equal(extractBearerToken("bearer\\tsecret-value"), "secret-value");
+  assert.equal(extractBearerToken("Basic secret-value"), "");
+  assert.equal(extractBearerToken(null), "");
+});
 
 test("research Worker compares service tokens without accepting mismatches", () => {
   assert.equal(constantTimeEqual("same-secret-value", "same-secret-value"), true);
