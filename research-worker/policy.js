@@ -1,3 +1,9 @@
+export function extractBearerToken(header) {
+  if (typeof header !== "string") return "";
+  const match = header.match(/^Bearer\s+(.+)$/i);
+  return match ? match[1].trim() : "";
+}
+
 export function constantTimeEqual(left, right) {
   if (typeof left !== "string" || typeof right !== "string" || left.length !== right.length) return false;
   let difference = 0;
