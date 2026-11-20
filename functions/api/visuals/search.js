@@ -1,5 +1,5 @@
 const MAX_QUERY_LENGTH = 240;
-const BLOCKED_QUERY = /\\b(?:gun|firearm|weapon|ammunition|explosive|bomb|knife|drug|cocaine|heroin|methamphetamine|self[- ]harm)\\b/i;
+const BLOCKED_QUERY = /\b(?:gun|firearm|weapon|ammunition|explosive|bomb|knife|drug|cocaine|heroin|methamphetamine|self[- ]harm)\b/i;
 
 function cleanMetadata(value = "") {
   return String(value)
@@ -11,7 +11,7 @@ function cleanMetadata(value = "") {
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
     .replace(/&nbsp;/g, " ")
-    .replace(/\\s+/g, " ")
+    .replace(/\s+/g, " ")
     .trim()
     .slice(0, 500);
 }
@@ -27,7 +27,7 @@ function safeHttpUrl(value) {
 
 export async function onRequestGet({ request }) {
   const url = new URL(request.url);
-  const query = String(url.searchParams.get("q") || "").replace(/\\s+/g, " ").trim().slice(0, MAX_QUERY_LENGTH);
+  const query = String(url.searchParams.get("q") || "").replace(/\s+/g, " ").trim().slice(0, MAX_QUERY_LENGTH);
   if (!query) return Response.json({ error: "Enter a topic to search for research images." }, { status: 400 });
   if (BLOCKED_QUERY.test(query)) return Response.json({ error: "This visual search topic is not supported." }, { status: 400 });
 
