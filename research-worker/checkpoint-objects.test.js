@@ -60,13 +60,13 @@ test("R2 checkpoint payload download verifies bytes and preserves binary content
   const bytes = new Uint8Array([0, 255, 1, 128, 42]);
   const put = await handleCheckpointObjectRequest(
     request("/internal/checkpoint-objects/tenant-a/objects", "POST", bytes),
-    { RESEARCH_CHECKPOINTS_BUCKET: bucket },
+    { RESEARCH_CHECKPOINTS_BUCKET: bucket, RESEARCH_CHECKPOINTS_DB: fakeDb() },
     "tenant-a",
   );
   const { objectId } = await put.json();
   const get = await handleCheckpointObjectRequest(
     request("/internal/checkpoint-objects/tenant-a/objects/" + objectId),
-    { RESEARCH_CHECKPOINTS_BUCKET: bucket },
+    { RESEARCH_CHECKPOINTS_BUCKET: bucket, RESEARCH_CHECKPOINTS_DB: fakeDb() },
     "tenant-a",
   );
   assert.equal(get.status, 200);
@@ -77,7 +77,7 @@ test("R2 checkpoint payload integrity mismatches fail closed", async () => {
   const bucket = fakeBucket();
   const put = await handleCheckpointObjectRequest(
     request("/internal/checkpoint-objects/tenant-a/objects", "POST", new Uint8Array([1, 2, 3])),
-    { RESEARCH_CHECKPOINTS_BUCKET: bucket },
+    { RESEARCH_CHECKPOINTS_BUCKET: bucket, RESEARCH_CHECKPOINTS_DB: fakeDb() },
     "tenant-a",
   );
   const { objectId } = await put.json();
@@ -85,7 +85,7 @@ test("R2 checkpoint payload integrity mismatches fail closed", async () => {
   bucket.values.get(key).bytes[0] = 9;
   const get = await handleCheckpointObjectRequest(
     request("/internal/checkpoint-objects/tenant-a/objects/" + objectId),
-    { RESEARCH_CHECKPOINTS_BUCKET: bucket },
+    { RESEARCH_CHECKPOINTS_BUCKET: bucket, RESEARCH_CHECKPOINTS_DB: fakeDb() },
     "tenant-a",
   );
   assert.equal(get.status, 500);
@@ -95,19 +95,19 @@ test("R2 checkpoint objects are tenant scoped and cannot be addressed with trave
   const bucket = fakeBucket();
   const put = await handleCheckpointObjectRequest(
     request("/internal/checkpoint-objects/tenant-a/objects", "POST", new Uint8Array([4])),
-    { RESEARCH_CHECKPOINTS_BUCKET: bucket },
+    { RESEARCH_CHECKPOINTS_BUCKET: bucket, RESEARCH_CHECKPOINTS_DB: fakeDb() },
     "tenant-a",
   );
   const { objectId } = await put.json();
   const otherTenant = await handleCheckpointObjectRequest(
     request("/internal/checkpoint-objects/tenant-b/objects/" + objectId),
-    { RESEARCH_CHECKPOINTS_BUCKET: bucket },
+    { RESEARCH_CHECKPOINTS_BUCKET: bucket, RESEARCH_CHECKPOINTS_DB: fakeDb() },
     "tenant-b",
   );
   assert.equal(otherTenant.status, 404);
   const traversal = await handleCheckpointObjectRequest(
     request("/internal/checkpoint-objects/tenant-a/objects/../secret"),
-    { RESEARCH_CHECKPOINTS_BUCKET: bucket },
+    { RESEARCH_CHECKPOINTS_BUCKET: bucket, RESEARCH_CHECKPOINTS_DB: fakeDb() },
     "tenant-a",
   );
   assert.equal(traversal.status, 404);
@@ -117,19 +117,19 @@ test("R2 checkpoint object deletion is tenant scoped and idempotent", async () =
   const bucket = fakeBucket();
   const put = await handleCheckpointObjectRequest(
     request("/internal/checkpoint-objects/tenant-a/objects", "POST", new Uint8Array([5])),
-    { RESEARCH_CHECKPOINTS_BUCKET: bucket },
+    { RESEARCH_CHECKPOINTS_BUCKET: bucket, RESEARCH_CHECKPOINTS_DB: fakeDb() },
     "tenant-a",
   );
   const { objectId } = await put.json();
   const deleted = await handleCheckpointObjectRequest(
     request("/internal/checkpoint-objects/tenant-a/objects/" + objectId, "DELETE"),
-    { RESEARCH_CHECKPOINTS_BUCKET: bucket },
+    { RESEARCH_CHECKPOINTS_BUCKET: bucket, RESEARCH_CHECKPOINTS_DB: fakeDb() },
     "tenant-a",
   );
   assert.equal((await deleted.json()).deleted, true);
   const missing = await handleCheckpointObjectRequest(
     request("/internal/checkpoint-objects/tenant-a/objects/" + objectId, "DELETE"),
-    { RESEARCH_CHECKPOINTS_BUCKET: bucket },
+    { RESEARCH_CHECKPOINTS_BUCKET: bucket, RESEARCH_CHECKPOINTS_DB: fakeDb() },
     "tenant-a",
   );
   assert.equal((await missing.json()).deleted, false);
