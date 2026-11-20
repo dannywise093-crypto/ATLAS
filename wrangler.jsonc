@@ -12,5 +12,6 @@
       "database_id": "27a086e4-c14b-4822-9d47-267f68163773",
       "migrations_dir": "migrations"
     }
-  ]
+  ],
+  "name": "atlas-coding-chat"
 }
