@@ -9,6 +9,7 @@ import pytest
 from deep_researcher_api.jobs.cloudflare_storage import (
     CloudflareStorageClient,
     CloudflareStorageConflict,
+    CloudflareStorageNotFound,
 )
 
 
@@ -63,6 +64,14 @@ def test_event_append_and_pagination_use_job_scoped_routes():
     assert open_url.call_args_list[1].args[0].full_url.endswith("/events/job-1?after=1&limit=200")
 
 
+def test_missing_record_returns_none():
+    from urllib.error import HTTPError
+
+    error = HTTPError("https://example.test", 404, "missing", {}, io.BytesIO(b"{}"))
+    with patch("deep_researcher_api.jobs.cloudflare_storage.urlopen", side_effect=error):
+        assert _client().get_record("jobs", "missing") is None
+
+
 def test_revision_conflict_is_not_silently_retried():
     from urllib.error import HTTPError
 
@@ -85,5 +94,7 @@ def test_identifiers_reject_path_traversal_and_invalid_values(bad):
 def test_client_rejects_insecure_remote_endpoint_and_short_token():
     with pytest.raises(ValueError):
         CloudflareStorageClient(tenant="tenant-a", base_url="http://research.example.com", token="x" * 40)
+    with pytest.raises(ValueError):
+        CloudflareStorageClient(tenant="tenant-a", base_url="https://research.example.com/unexpected-path", token="x" * 40)
     with pytest.raises(ValueError):
         CloudflareStorageClient(tenant="tenant-a", base_url="https://research.example.com", token="short")
