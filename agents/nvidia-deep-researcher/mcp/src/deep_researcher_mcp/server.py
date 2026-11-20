@@ -373,7 +373,7 @@ class MCPRuntime:
         elif backend == "cloudflare":
             from .cloudflare_job_store import CloudflareMCPJobStore
 
-            store = CloudflareMCPJobStore.from_env()
+            store = CloudflareMCPJobStore.from_env(checkpoint_db_url=checkpoint_db_url)
         else:
             raise ValueError("DEEP_RESEARCHER_MCP_JOB_STORE must be 'postgres' or 'cloudflare'")
 
