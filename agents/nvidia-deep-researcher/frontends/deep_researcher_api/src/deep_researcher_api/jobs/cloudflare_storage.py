@@ -24,6 +24,10 @@ class CloudflareStorageConflict(CloudflareStorageError):
     """A record revision did not match the expected revision."""
 
 
+class CloudflareStorageNotFound(CloudflareStorageError):
+    """A requested durable record does not exist."""
+
+
 class CloudflareStorageClient:
     """Tenant-scoped client for the private research Worker storage routes."""
 
@@ -84,6 +88,8 @@ class CloudflareStorageClient:
             detail = exc.read(4096).decode("utf-8", errors="replace")
             if exc.code == 409:
                 raise CloudflareStorageConflict("Storage revision conflict") from exc
+            if exc.code == 404:
+                raise CloudflareStorageNotFound("Storage record not found") from exc
             raise CloudflareStorageError(f"Storage gateway returned HTTP {exc.code}") from exc
         except (URLError, TimeoutError, OSError) as exc:
             raise CloudflareStorageError("Storage gateway request failed") from exc
@@ -95,10 +101,8 @@ class CloudflareStorageClient:
         key = self._segment(key, "record key")
         try:
             return self._request("GET", self._url(f"records/{quote(namespace, safe='')}/{quote(key, safe='')}"))
-        except CloudflareStorageError as exc:
-            if "HTTP 404" in str(exc):
-                return None
-            raise
+        except CloudflareStorageNotFound:
+            return None
 
     def put_record(
         self,
@@ -152,6 +156,9 @@ class CloudflareStorageClient:
         return await asyncio.to_thread(
             self.put_record, namespace, key, value, expected_revision=expected_revision
         )
+
+    async def adelete_record(self, namespace: str, key: str) -> dict[str, Any]:
+        return await asyncio.to_thread(self.delete_record, namespace, key)
 
     async def aappend_event(self, job_id: str, event: dict[str, Any]) -> dict[str, Any]:
         return await asyncio.to_thread(self.append_event, job_id, event)
