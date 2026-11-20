@@ -21,6 +21,34 @@ async function sha256(bytes) {
   return Array.from(new Uint8Array(digest), (value) => value.toString(16).padStart(2, "0")).join("");
 }
 
+async function readBoundedBody(request) {
+  const reader = request.body?.getReader();
+  if (!reader) return new Uint8Array();
+  const chunks = [];
+  let total = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > MAX_OBJECT_BYTES) {
+        await reader.cancel();
+        return null;
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  const result = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    result.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return result;
+}
+
 export async function handleCheckpointObjectRequest(request, env, tenant) {
   if (!safeSegment(tenant)) return json({ error: "Invalid tenant." }, 400);
   const bucket = env.RESEARCH_CHECKPOINTS_BUCKET;
@@ -30,8 +58,8 @@ export async function handleCheckpointObjectRequest(request, env, tenant) {
   if (parts.length === 4 && parts[3] === "objects" && request.method === "POST") {
     const declared = Number(request.headers.get("content-length") || 0);
     if (declared > MAX_OBJECT_BYTES) return json({ error: "Checkpoint payload is too large." }, 413);
-    const bytes = await request.arrayBuffer();
-    if (bytes.byteLength > MAX_OBJECT_BYTES) return json({ error: "Checkpoint payload is too large." }, 413);
+    const bytes = await readBoundedBody(request);
+    if (bytes === null) return json({ error: "Checkpoint payload is too large." }, 413);
     const objectId = crypto.randomUUID();
     const digest = await sha256(bytes);
     const createdAt = Date.now();
