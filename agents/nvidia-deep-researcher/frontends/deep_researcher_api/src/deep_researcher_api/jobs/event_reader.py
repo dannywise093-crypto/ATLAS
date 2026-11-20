@@ -87,6 +87,28 @@ async def get_events_async(
     )
 
 
+def build_event_store_for_job(
+    db_url: str,
+    job_id: str,
+    *,
+    content_cipher: Any | None = None,
+    owner_lookup: Callable[[str, str], dict[str, Any] | None] | None = None,
+    storage_factory: Callable[..., CloudflareStorageClient] = CloudflareStorageClient,
+):
+    """Build the matching event writer for the currently selected read backend."""
+    if cloudflare_events_enabled():
+        storage = _storage_for_job(
+            job_id,
+            db_url,
+            owner_lookup=owner_lookup,
+            storage_factory=storage_factory,
+        )
+        return CloudflareEventStore(storage, job_id, content_cipher=content_cipher)
+    from .event_store import EventStore
+
+    return EventStore(db_url, job_id, content_cipher=content_cipher)
+
+
 def get_events_sync(
     db_url: str,
     job_id: str,
