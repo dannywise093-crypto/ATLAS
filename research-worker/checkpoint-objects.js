@@ -67,6 +67,20 @@ export async function handleCheckpointObjectRequest(request, env, tenant) {
     const digest = await sha256(bytes);
     const createdAt = Date.now();
     const key = objectKey(tenant, objectId);
+    // Register the object as a delayed-GC candidate before uploading it.
+    // If R2 fails after a partial write, the scheduled collector can still
+    // remove the object. Successful checkpoint publication removes this
+    // candidate only after D1 references the object.
+    try {
+      await new D1CheckpointIndex(db).enqueueGarbage({
+        tenantId: tenant,
+        objectKey: key,
+        queuedAt: createdAt,
+        notBefore: createdAt + 24 * 60 * 60 * 1000,
+      });
+    } catch {
+      return json({ error: "Could not register checkpoint payload for safe garbage collection." }, 503);
+    }
     await bucket.put(key, bytes, {
       httpMetadata: { contentType: "application/octet-stream" },
       customMetadata: {
@@ -76,17 +90,6 @@ export async function handleCheckpointObjectRequest(request, env, tenant) {
         createdAt: String(createdAt),
       },
     });
-    try {
-      await new D1CheckpointIndex(db).enqueueGarbage({
-        tenantId: tenant,
-        objectKey: key,
-        queuedAt: createdAt,
-        notBefore: createdAt + 24 * 60 * 60 * 1000,
-      });
-    } catch {
-      await bucket.delete(key);
-      return json({ error: "Could not register checkpoint payload for safe garbage collection." }, 503);
-    }
     return json({ ok: true, objectId, sha256: digest, size: bytes.byteLength, createdAt }, 201);
   }
 
