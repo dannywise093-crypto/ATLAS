@@ -132,7 +132,11 @@ class CloudflareCheckpointSaver(BaseCheckpointSaver):
         namespace = configurable.get("checkpoint_ns", "")
         if not isinstance(thread_id, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,255}", thread_id):
             raise ValueError("LangGraph config requires a valid thread_id")
-        if not isinstance(namespace, str) or len(namespace) > 256:
+        if (
+            not isinstance(namespace, str)
+            or len(namespace) > 256
+            or any(ord(char) < 32 for char in namespace)
+        ):
             raise ValueError("LangGraph checkpoint_ns is invalid")
         encoded_ns = urlencode({"namespace": namespace})
         prefix = (
