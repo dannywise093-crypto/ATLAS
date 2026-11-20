@@ -86,7 +86,7 @@ function AtlasWorkspace() {
   const [menu,setMenu] = useState(false);
   const [notice,setNotice] = useState("");
   const [generating,setGenerating] = useState(false);
-  const [researchQuery,setResearchQuery] = useState("");
+  const [researchQuery,setResearchQuery] = useState(()=>{try{return localStorage.getItem(atlasStorageKey("research-query"))||"";}catch{return "";}});
   const [researchAvailable,setResearchAvailable] = useState(false);
   const [researchStatus,setResearchStatus] = useState("Research backend has not been checked.");
   const [researchBusy,setResearchBusy] = useState(false);
@@ -103,6 +103,7 @@ function AtlasWorkspace() {
   const [imageGenerating,setImageGenerating] = useState(false);
 
   useEffect(()=>{try{if(researchJobId)localStorage.setItem(atlasStorageKey("research-job-id"),researchJobId);else localStorage.removeItem(atlasStorageKey("research-job-id"));}catch{}},[researchJobId]);
+  useEffect(()=>{try{if(researchQuery.trim())localStorage.setItem(atlasStorageKey("research-query"),researchQuery);else localStorage.removeItem(atlasStorageKey("research-query"));}catch{}},[researchQuery]);
   useEffect(()=>{
     if(page!=="Research Center")return;
     const controller=new AbortController();
