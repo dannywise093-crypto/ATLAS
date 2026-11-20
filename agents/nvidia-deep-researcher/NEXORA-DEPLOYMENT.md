@@ -144,6 +144,30 @@ The approved API surface is the upstream async job API:
 - `GET /v1/jobs/async/job/{job_id}/report`
 - `GET /v1/jobs/async/agents`
 
+## Authenticated runtime readiness probe
+
+The research Worker exposes `GET /internal/readiness` behind the existing
+`NEXORA_RESEARCH_API_TOKEN` bearer check. It reports only configuration
+booleans, selected event-store mode, and missing setting names; it never
+returns secret values. This endpoint does not start the Container or perform
+provider API calls. A configured response is only a deployment preflight, not
+proof of a live NVIDIA request.
+
+The current Cloudflare account inspection found no deployed
+`nexora-deep-researcher` Worker. The Pages service binding in
+`wrangler.jsonc` therefore currently targets a service that is not present in
+the account. Existing provider secret names (including NVIDIA, Tavily, Exa,
+Nimble, You.com, and Serper) are present on `atlas-model-gateway`, but
+Cloudflare does not allow those secret values to be read back or implicitly
+shared with a new Worker. They must be separately provisioned on the research
+Worker by the account owner; never attempt to copy them through source code.
+
+The Container startup currently still expects SQLAlchemy JobStore and
+LangGraph checkpoint database settings. The Cloudflare event adapter is only
+one part of the persistence contract and does not replace those stores. The
+readiness endpoint intentionally reports missing settings instead of
+pretending the Durable Object event store makes the full runtime durable.
+
 ## Deployment gates
 
 Do not deploy or switch production routing until all of these are true:
