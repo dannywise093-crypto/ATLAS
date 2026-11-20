@@ -1,6 +1,6 @@
 # LangGraph Checkpoint Migration Design
 
-Status: Implementation contract for the next checkpoint milestone  
+Status: Implementation contract; initial D1 metadata schema and SQLite conformance tests are committed. The LangGraph saver and runtime wiring are not implemented.  
 Target dependency lock: `langgraph==1.2.11`, `langgraph-checkpoint==4.1.1`, `langchain-core==1.5.6`  
 Target branch: `feat/engineering-design-development`  
 Production changes: None
@@ -117,7 +117,13 @@ Checkpoint and pending-write publication must not be represented as one 256 KiB 
 11. DeltaChannel history reconstructs through parent links and pending writes.
 12. Explicit behavior for unsupported delete-for-runs, copy, and prune methods.
 
-## 8. Integration gate
+## 8. Current implementation status
+
+The initial D1 schema is in `agents/nvidia-deep-researcher/deploy/checkpoint_schema.sql`. It defines tenant/thread/namespace-scoped thread heads, checkpoint descriptors, pending-write descriptors, R2 garbage-collection queue entries, and the supporting history/order indexes. A Python `sqlite3` conformance test exercises schema creation, idempotency, tenant/namespace key isolation, foreign-key relationships, and payload descriptor constraints. These tests validate SQLite-compatible DDL locally; they do not prove that a provisioned Cloudflare D1 database has been migrated or that R2/DO runtime operations work.
+
+The schema is not yet bound to the research Worker. No D1 database ID, R2 bucket, or checkpoint coordinator binding has been configured. There is no Python LangGraph saver implementation yet.
+
+## 9. Integration gate
 
 The checkpoint saver must first be tested independently against the exact locked LangGraph versions. Then wire it behind an explicit opt-in flag while PostgreSQL remains the default. Run the complete NVIDIA workflow through an interruption/restart test and compare resulting state/report behavior against the PostgreSQL saver.
 
