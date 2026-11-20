@@ -294,3 +294,15 @@ body{background:radial-gradient(ellipse at 82% 0%,rgba(38,103,207,.17),transpare
 .robot-sensor-reading strong{font-size:13px;color:#a6f0d6}
 .robot-sensor-reading small{font-size:9px;color:#7eaaa0}
 @media(max-width:700px){.robot-sensor-reading{grid-template-columns:1fr auto}.robot-sensor-reading small{grid-column:1/-1}}
+
+/* Copilot complete-code and Python execution */
+.copilot-rich-message{display:grid;gap:12px;min-width:0}.copilot-message-text{white-space:pre-wrap;overflow-wrap:anywhere;margin:0!important;line-height:1.7}
+.copilot-code-card{min-width:0;overflow:hidden;border:1px solid #2b3e59;border-radius:13px;background:#080d16}.copilot-code-card>header{display:flex;justify-content:space-between;padding:12px 14px;border-bottom:1px solid #26364d;color:#a9bddc;font-size:10px;font-weight:700;letter-spacing:1px}
+.copilot-code-card>pre{margin:0;padding:16px;max-height:520px;overflow:auto;color:#e1eaf8;font:12px/1.65 ui-monospace,SFMono-Regular,Consolas,monospace;white-space:pre;tab-size:4}
+.copilot-code-actions{padding:10px 12px 12px;border-top:1px solid #26364d}.copilot-action-row{display:flex;gap:8px;flex-wrap:wrap}
+.copilot-code-button{display:inline-flex;align-items:center;gap:7px;padding:8px 11px;border:1px solid #344b6d;border-radius:8px;background:#14233a;color:#dce9ff;font-size:11px;font-weight:700}
+.copilot-code-button.run{background:#245fba;border-color:#397edb;color:white}.copilot-code-button.danger{background:#48232b;border-color:#87404c}
+.copilot-run-output{margin-top:12px;border:1px solid #31435d;border-radius:9px;overflow:hidden;background:#060a11}.copilot-run-output.complete{border-color:#286b55}.copilot-run-output.error,.copilot-run-output.timeout{border-color:#85404a}
+.copilot-output-heading{display:flex;justify-content:space-between;padding:9px 11px;background:#101b2b;color:#9cb8df;font-size:9px;font-weight:800;letter-spacing:1px}.copilot-run-output.complete .copilot-output-heading{color:#75d7ad}.copilot-run-output.error .copilot-output-heading,.copilot-run-output.timeout .copilot-output-heading{color:#f19ba5}
+.copilot-run-output pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:300px;overflow:auto;margin:0;padding:12px;color:#d5e2f4;font:11px/1.6 ui-monospace,SFMono-Regular,Consolas,monospace}
+.copilot-runtime-note,.copilot-code-unsupported{display:block;margin-top:9px;color:#8293ad;font-size:9px;line-height:1.5}.copilot-code-unsupported{padding:9px;border-radius:7px;background:#101b2b}
