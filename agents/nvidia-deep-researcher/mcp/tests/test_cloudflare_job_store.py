@@ -10,7 +10,11 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from deep_researcher_mcp.cloudflare_job_store import CloudflareMCPJobStore, CloudflareStorageConflict
+from deep_researcher_mcp.cloudflare_job_store import (
+    CloudflareMCPJobStore,
+    CloudflareStorageConflict,
+    _CloudflareMCPStorageClient,
+)
 
 
 class _MemoryStorage:
@@ -214,3 +218,18 @@ async def test_expiry_cleanup_removes_checkpoint_rows_before_job_capability(monk
 
 async def _return(value):
     return value
+
+
+@pytest.mark.asyncio
+async def test_cloudflare_record_size_limit_rejects_oversized_report_before_request():
+    client = _CloudflareMCPStorageClient.__new__(_CloudflareMCPStorageClient)
+    client.base_url = "https://research.example.workers.dev"
+    client.tenant = "nexora"
+    client._request = lambda *_args, **_kwargs: pytest.fail("network must not be called")
+    with pytest.raises(ValueError, match="256 KiB limit"):
+        await client.aput_record(
+            "mcp-jobs",
+            "job-large",
+            {"result": "x" * (256 * 1024)},
+            expected_revision=1,
+        )
