@@ -25,6 +25,10 @@
       {
         "name": "RESEARCH_STORAGE",
         "class_name": "ResearchStorageObject"
+      },
+      {
+        "name": "RESEARCH_CHECKPOINT_COORDINATOR",
+        "class_name": "CheckpointCoordinator"
       }
     ]
   },
@@ -36,8 +40,18 @@
     "ResearchStorageObject": {
       "type": "durable-object",
       "storage": "sqlite"
+    },
+    "CheckpointCoordinator": {
+      "type": "durable-object",
+      "storage": "sqlite"
     }
   },
+  "migrations": [
+    {
+      "tag": "checkpoint-coordinator-v1",
+      "new_sqlite_classes": ["CheckpointCoordinator"]
+    }
+  ],
   "observability": {
     "enabled": true
   }
