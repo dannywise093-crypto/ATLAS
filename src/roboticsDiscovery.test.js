@@ -102,7 +102,6 @@ test("native scanner reports Bluetooth disabled and does not start scanning", as
 });
 
 
-import { decodeStandardBleSensors, connectNativeBleSensorDevice } from "./roboticsDiscovery.js";
 
 test("decodes standard BLE temperature and humidity characteristics into real unit-labelled readings", () => {
   const temperature = new DataView(new Uint8Array([0x92, 0x09]).buffer); // 24.50 C
