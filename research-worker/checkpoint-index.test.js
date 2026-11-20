@@ -121,6 +121,9 @@ test("invalid typed payload descriptors and untrusted R2 prefixes are rejected b
     (error) => error instanceof CheckpointIndexError && error.code === "invalid_input");
   await assert.rejects(index.putCheckpoint(input({metadata:descriptor("wrong").key})),
     (error) => error instanceof CheckpointIndexError && error.code === "invalid_input");
+  await assert.rejects(index.putCheckpoint(input({checkpoint: {
+    ...descriptor("foreign"), key:"nexora-checkpoints/other-tenant/foreign"
+  }})), (error) => error instanceof CheckpointIndexError && error.code === "invalid_input");
 });
 
 test("constructor fails closed without a D1 binding", () => {
