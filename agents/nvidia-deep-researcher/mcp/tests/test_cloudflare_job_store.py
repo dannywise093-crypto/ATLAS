@@ -181,7 +181,9 @@ async def test_failed_transition_and_stale_job_reconciliation_are_fenced():
     assert (await store.get(old_id)).state == "failed"
     assert (await store.get(fresh_id)).state == "running"
 
-    assert await store.mark_failed_if_queued_or_owned(fresh_id, "wrong-runner", "no")
+    assert not await store.mark_failed_if_queued_or_owned(fresh_id, "wrong-runner", "no")
+    assert (await store.get(fresh_id)).state == "running"
+    assert await store.mark_failed_if_queued_or_owned(fresh_id, "runner-live", "owner stopped")
     assert (await store.get(fresh_id)).state == "failed"
 
 
