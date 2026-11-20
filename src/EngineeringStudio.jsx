@@ -69,9 +69,11 @@ export default function EngineeringStudio() {
     if (!idea.trim() || visualBusy) return;
     setVisualBusy(true); setVisualError("");
     try {
-      const visualPrompt = "Create a high-quality industrial design concept render for this engineering project: " + idea.trim() +
-        ". Discipline: " + discipline + ". Constraints: " + (constraints.trim() || "Use plausible conceptual proportions.") +
-        ". Show a clean studio product visualization, realistic materials, neutral background, three-quarter view, precise engineering design language. Concept illustration only, not a manufacturing drawing. No text, labels, logos, watermark, people, or brand imitation.";
+      // The Pages Function currently accepts prompts up to 1,800 characters.
+      // Keep the composed prompt below that limit even when the user enters a long brief.
+      const visualPrompt = "Create a high-quality industrial design concept render: " + idea.trim().slice(0, 950) +
+        ". Discipline: " + discipline + ". Constraints: " + (constraints.trim().slice(0, 300) || "Use plausible conceptual proportions.") +
+        ". Clean studio product visualization, realistic materials, neutral background, three-quarter view. Concept illustration only, not a manufacturing drawing. No text, labels, logos, watermark, people, or brand imitation.";
       const response = await fetch("/api/engineering/visual", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt: visualPrompt })
