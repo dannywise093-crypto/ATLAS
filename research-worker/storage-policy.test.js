@@ -15,6 +15,8 @@ test("storage identifiers reject traversal and unsafe characters", () => {
 });
 
 test("record routes allow only scoped CRUD methods", () => {
+  assert.equal(validStorageRequest("GET", "/v1/tenants/app/records/jobs"), true);
+  assert.equal(validStorageRequest("PUT", "/v1/tenants/app/records/jobs"), false);
   assert.equal(validStorageRequest("GET", "/v1/tenants/app/records/jobs/job-1"), true);
   assert.equal(validStorageRequest("PUT", "/v1/tenants/app/records/checkpoints/thread_1"), true);
   assert.equal(validStorageRequest("POST", "/v1/tenants/app/records/jobs/job-1"), false);
