@@ -74,8 +74,19 @@ export async function onRequestPost({ request, env }) {
         headers: { "Content-Type": "image/png", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" }
       });
     }
-    if (generated instanceof Uint8Array || generated instanceof ArrayBuffer) {
-      return new Response(generated, {
+    // Workers AI image models commonly return an object such as
+    // { image: Uint8Array }, rather than returning the bytes directly.
+    const image = generated && typeof generated === "object" && "image" in generated
+      ? generated.image
+      : generated;
+    if (image instanceof Uint8Array || image instanceof ArrayBuffer) {
+      return new Response(image, {
+        status: 200,
+        headers: { "Content-Type": "image/png", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" }
+      });
+    }
+    if (Array.isArray(image) && image.every(value => Number.isInteger(value) && value >= 0 && value <= 255)) {
+      return new Response(new Uint8Array(image), {
         status: 200,
         headers: { "Content-Type": "image/png", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" }
       });
