@@ -191,4 +191,30 @@ Cloudflare outbound HTTP intercepts provide a viable transport from a Container 
 
 The official NeMo Agent Toolkit repository announced deprecation in October 2026 and end-of-life by the end of 2026. The vendored project pins nvidia-nat 1.8.0, so production readiness also requires an explicit decision on supported successor compatibility or a maintained fork. This does not change the user's pinned NVIDIA source revision; it is a dependency-lifecycle risk to resolve before production.
 
+## Durable Object storage API scaffold — not yet an NVIDIA adapter
+
+The research Worker now exports a SQLite-backed `ResearchStorageObject` and
+exposes it only through the authenticated private route prefix
+`/internal/storage/v1/...`. The current version provides:
+
+- Tenant-scoped JSON records with monotonically increasing revisions and
+  optional optimistic concurrency checks.
+- Tenant/job-scoped append-only event records with sequence numbers and
+  bounded pagination.
+- Identifier validation, bearer-token checks at both Worker and Durable
+  Object boundaries, payload-size limits, and strict JSON-object validation.
+
+This is a storage primitive only. It does **not** yet implement the NAT
+SQLAlchemy JobStore interface, the vendored EventStore interface, admission /
+ownership queries, LangGraph checkpoint saver, or Dask task recovery. The
+Python Container does not yet call this API. Therefore it must not be described
+as durable NVIDIA job persistence, and the Worker continues to require the
+existing fail-closed runtime configuration.
+
+The storage API also needs Durable Object runtime contract tests (including
+concurrent writes, revision conflicts, event ordering, tenant isolation,
+pagination boundaries, malformed payloads, and unauthorized requests) before
+deployment. The current Node policy tests do not exercise the SQLite-backed
+Durable Object itself.
+
 **Current result:** the repository remains fail-closed. No external database has been introduced, no ephemeral SQLite persistence has been enabled for production, and no Cloudflare deployment or production routing change has been made.
