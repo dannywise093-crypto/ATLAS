@@ -136,3 +136,8 @@ These are implementation slices, not a live Cloudflare deployment. The D1 databa
 The async saver has focused tests for typed restore, parent config/revision publication, and LangGraph reserved pending-write indices. CI installs the exact locked LangGraph version and runs those tests. Remaining gates: run the full LangGraph checkpoint conformance suite; test real D1/R2 operations, payloads above the D1 projection limit, concurrent writers, and process/DO restart; then run the complete NVIDIA workflow through an interruption/restart test and compare state/report behavior against PostgreSQL.
 
 Do not remove `DEEP_RESEARCHER_CHECKPOINT_DB`, change production policy, or enable the Cloudflare checkpoint saver in production until all tests above pass. This document does not authorize production secrets, deployment, or PR merge.
+
+
+## Resource provisioning
+
+See [Cloudflare checkpoint storage provisioning](./cloudflare-checkpoint-provisioning.md) for the dedicated D1/R2 resource creation commands, schema application, and the current account blocker. The production checkpoint backend must remain unchanged until those steps and live recovery tests are complete.
