@@ -1,6 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { isSafeStorageSegment, validStorageRequest } from "./storage-policy.js";
+import { extractBearerToken, isSafeStorageSegment, validStorageRequest } from "./storage-policy.js";
+
+test("storage bearer parser accepts the Bearer scheme and rejects other schemes", () => {
+  assert.equal(extractBearerToken("Bearer token-value"), "token-value");
+  assert.equal(extractBearerToken("bearer\\t token-value"), "token-value");
+  assert.equal(extractBearerToken("Basic token-value"), "");
+  assert.equal(extractBearerToken(null), "");
+});
 
 test("storage identifiers reject traversal and unsafe characters", () => {
   for (const value of ["tenant-1", "job_123", "research.v1"]) assert.equal(isSafeStorageSegment(value), true);
