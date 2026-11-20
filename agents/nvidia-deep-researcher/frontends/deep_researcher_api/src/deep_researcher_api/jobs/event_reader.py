@@ -82,9 +82,22 @@ async def get_events_async(
         owner_lookup=owner_lookup,
         storage_factory=storage_factory,
     )
-    return await CloudflareEventStore.get_events_async(
-        storage, job_id, after_id, limit, content_cipher=content_cipher
-    )
+    if isinstance(after_id, bool) or not isinstance(after_id, int) or after_id < 0:
+        raise ValueError("after_id must be a non-negative integer")
+    if isinstance(limit, bool) or not isinstance(limit, int) or limit < 1:
+        raise ValueError("limit must be a positive integer")
+    adapter = CloudflareEventStore(storage, job_id, content_cipher=content_cipher)
+    events: list[dict] = []
+    cursor = after_id
+    while len(events) < limit:
+        page = await adapter.aget_events(after_id=cursor, limit=min(200, limit - len(events)))
+        if not page:
+            break
+        events.extend(page)
+        cursor = page[-1]["_id"]
+        if len(page) < min(200, limit - (len(events) - len(page))):
+            break
+    return events
 
 
 def build_event_store_for_job(
@@ -130,4 +143,21 @@ def get_events_sync(
         owner_lookup=owner_lookup,
         storage_factory=storage_factory,
     )
-    return CloudflareEventStore.get_events(storage, job_id, after_id, limit, content_cipher=content_cipher)
+    if isinstance(after_id, bool) or not isinstance(after_id, int) or after_id < 0:
+        raise ValueError("after_id must be a non-negative integer")
+    if isinstance(limit, bool) or not isinstance(limit, int) or limit < 1:
+        raise ValueError("limit must be a positive integer")
+    adapter = CloudflareEventStore(storage, job_id, content_cipher=content_cipher)
+    events: list[dict] = []
+    cursor = after_id
+    while len(events) < limit:
+        page = adapter.get_events(after_id=cursor, limit=min(200, limit - len(events)))
+        if not page:
+            break
+        previous_count = len(events)
+        events.extend(page)
+        cursor = page[-1]["_id"]
+        requested = min(200, limit - previous_count)
+        if len(page) < requested:
+            break
+    return events
