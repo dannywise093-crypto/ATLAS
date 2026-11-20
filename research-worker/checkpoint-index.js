@@ -83,7 +83,7 @@ export class D1CheckpointIndex {
     if (!row || row.fencing_token !== fencingToken) {
       throw new CheckpointIndexError("A newer fencing token already owns this checkpoint thread.", "fencing_conflict");
     }
-    return { ...row, claimed: changes(results[1]) === 1 };
+    return { ...row, claimed: true };
   }
 
   async putCheckpoint(input) {
