@@ -104,7 +104,7 @@ export class ResearchStorageObject extends ResearchStorage {}
 
 export default {
   async fetch(request, env) {
-    const supplied = (request.headers.get("authorization") || "").replace(/^Bearer\\s+/i, "");
+    const supplied = extractBearerToken(request.headers.get("authorization"));
     const expected = env.NEXORA_RESEARCH_API_TOKEN;
     if (!expected || expected.length < 32 || !constantTimeEqual(supplied, expected)) {
       return json({ error: "Unauthorized." }, 401);
