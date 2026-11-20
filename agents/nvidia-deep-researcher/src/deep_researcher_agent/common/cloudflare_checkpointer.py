@@ -59,7 +59,7 @@ class CloudflareCheckpointSaver(BaseCheckpointSaver):
             raise ValueError("NEXORA_RESEARCH_STORAGE_URL must be HTTPS")
         if len(self.token) < 32:
             raise ValueError("NEXORA_RESEARCH_API_TOKEN must contain at least 32 characters")
-        if not self.tenant or len(self.tenant) > 128 or not all(
+        if not self.tenant or len(self.tenant) > 128 or not self.tenant[0].isalnum() or not all(
             char.isascii() and (char.isalnum() or char in "._-") for char in self.tenant
         ):
             raise ValueError("NEXORA_RESEARCH_TENANT is invalid")
@@ -163,7 +163,8 @@ class CloudflareCheckpointSaver(BaseCheckpointSaver):
         checkpoint_id = get_checkpoint_id(config)
         if checkpoint_id is None:
             thread = await self._coordinator(config, "get-thread")
-            checkpoint_id = (thread or {}).get("thread", {}).get("head_checkpoint_id")
+            thread_row = (thread or {}).get("thread") or {}
+            checkpoint_id = thread_row.get("head_checkpoint_id")
             if not checkpoint_id:
                 return None
         response = await self._coordinator(config, "get", {"checkpointId": checkpoint_id})
@@ -282,6 +283,8 @@ class CloudflareCheckpointSaver(BaseCheckpointSaver):
         task_id: str, task_path: str = "",
     ) -> None:
         _, _, _, _ = self._scope(config)
+        if not writes:
+            return
         checkpoint_id = get_checkpoint_id(config)
         if not checkpoint_id:
             raise ValueError("Pending writes require checkpoint_id")
