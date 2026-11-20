@@ -62,6 +62,7 @@ The CI workflow now runs the MCP adapter's focused tests in addition to the API 
 - Separately adapt the FastAPI/NAT job API; do not assume the MCP adapter replaces NAT's SQLAlchemy JobStore.
 
 ### B. LangGraph checkpoint adapter
+- The exact locked API and storage design are documented in [langgraph-cloudflare-checkpoint-design.md](./langgraph-cloudflare-checkpoint-design.md); this design is based on the upstream LangGraph 1.2.11 `BaseCheckpointSaver` source and the MCP lockfile.
 - Implement the supported LangGraph `BaseCheckpointSaver` contract for the installed LangGraph version, including `get_tuple`, `list`, `put`, and `put_writes` (sync/async variants as required).
 - Preserve thread ID, checkpoint namespace, checkpoint ID, parent checkpoint config, channel versions, pending writes, metadata, and serializer/type fidelity.
 - Use DO transactions for atomic checkpoint + write updates; use R2 for payloads that exceed DO/D1 limits, with hash-verified immutable blobs.
