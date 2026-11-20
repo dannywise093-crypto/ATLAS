@@ -1,4 +1,5 @@
 import { DurableObject } from "cloudflare:workers";
+import { constantTimeEqual, isAllowedResearchRoute, missingRuntimeConfig } from "./policy.js";
 
 const API_PREFIX = "/v1/jobs/async/";
 const CONTAINER_PORT = 8000;
@@ -16,50 +17,6 @@ function json(body, status = 200, extraHeaders = {}) {
       ...extraHeaders,
     },
   });
-}
-
-function constantTimeEqual(left, right) {
-  if (typeof left !== "string" || typeof right !== "string" || left.length !== right.length) return false;
-  let difference = 0;
-  for (let index = 0; index < left.length; index += 1) {
-    difference |= left.charCodeAt(index) ^ right.charCodeAt(index);
-  }
-  return difference === 0;
-}
-
-function isAllowedResearchRoute(pathname, method) {
-  if (pathname === "/health") return method === "GET";
-  if (!pathname.startsWith(API_PREFIX)) return false;
-  const route = pathname.slice(API_PREFIX.length).replace(/\/$/, "");
-  if (route === "agents") return method === "GET";
-  if (route === "submit") return method === "POST";
-  const match = route.match(/^job\/[A-Za-z0-9_-]{1,80}(?:\/(stream(?:\/[0-9]+)?|cancel|state|report|report\/edit))?$/);
-  if (!match) return false;
-  const action = match[1] || "";
-  if (action === "cancel" || action === "report/edit") return method === "POST";
-  return method === "GET";
-}
-
-function missingRuntimeConfig(env) {
-  const missing = [];
-  for (const name of [
-    "NVIDIA_API_KEY",
-    "TAVILY_API_KEY",
-    "EXA_API_KEY",
-    "NIMBLE_API_KEY",
-    "YDC_API_KEY",
-    "SERPER_API_KEY",
-    "NEXORA_RESEARCH_API_TOKEN",
-  ]) {
-    if (typeof env[name] !== "string" || !env[name].trim()) missing.push(name);
-  }
-  // NVIDIA's async job store and LangGraph checkpoints must survive container
-  // restarts. Local SQLite files on a Container's ephemeral disk are not valid
-  // production persistence. Fail closed until a durable adapter is configured.
-  for (const name of ["NAT_JOB_STORE_DB_URL", "DEEP_RESEARCHER_CHECKPOINT_DB"]) {
-    if (typeof env[name] !== "string" || !env[name].trim()) missing.push(name);
-  }
-  return missing;
 }
 
 export class ResearchContainer extends DurableObject {
