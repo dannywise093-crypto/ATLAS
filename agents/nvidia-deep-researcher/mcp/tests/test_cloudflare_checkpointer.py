@@ -51,11 +51,24 @@ async def test_restore_latest_checkpoint_and_pending_writes(monkeypatch):
         if action == "get":
             return {"checkpoint": row}
         if action == "list-writes":
-            return {"writes": []}
+            return {"writes": [{
+                "task_id": "task-1",
+                "channel": "answer",
+                "value_type": "msgpack",
+                "value_r2_key": "nexora-checkpoints/nexora-test/write-1",
+                "value_sha256": "c" * 64,
+                "value_bytes": 4,
+            }]}
         raise AssertionError(action)
 
     async def download(descriptor):
-        return checkpoint if descriptor["type"] == "msgpack" and descriptor["sha256"] == "a" * 64 else metadata
+        if descriptor["sha256"] == "a" * 64:
+            return checkpoint
+        if descriptor["sha256"] == "b" * 64:
+            return metadata
+        if descriptor["sha256"] == "c" * 64:
+            return "restored pending value"
+        raise AssertionError("Unexpected checkpoint payload descriptor")
 
     monkeypatch.setattr(saver, "_coordinator", coordinator)
     monkeypatch.setattr(saver, "_download", download)
@@ -66,7 +79,7 @@ async def test_restore_latest_checkpoint_and_pending_writes(monkeypatch):
     assert result.metadata == metadata
     assert result.config["configurable"]["checkpoint_id"] == "cp-2"
     assert result.parent_config["configurable"]["checkpoint_id"] == "cp-1"
-    assert result.pending_writes == []
+    assert result.pending_writes == [("task-1", "answer", "restored pending value")]
 
 
 @pytest.mark.asyncio
