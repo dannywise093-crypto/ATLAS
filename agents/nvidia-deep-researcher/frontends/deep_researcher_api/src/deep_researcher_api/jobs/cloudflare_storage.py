@@ -49,7 +49,14 @@ class CloudflareStorageClient:
         local_http = parsed.scheme == "http" and parsed.hostname in {"localhost", "127.0.0.1", "::1"}
         if parsed.scheme != "https" and not local_http:
             raise ValueError("Research storage URL must use HTTPS (HTTP is allowed only for localhost tests)")
-        if not parsed.hostname or parsed.path not in {"", "/"} or parsed.username or parsed.password or parsed.query or parsed.fragment:
+        if (
+            not parsed.hostname
+            or parsed.path not in {"", "/"}
+            or parsed.username
+            or parsed.password
+            or parsed.query
+            or parsed.fragment
+        ):
             raise ValueError("Research storage URL must be an origin without credentials, query, or fragment")
         if len(self.token) < 32:
             raise ValueError("NEXORA_RESEARCH_API_TOKEN must contain at least 32 characters")
@@ -71,7 +78,11 @@ class CloudflareStorageClient:
         )
 
     def _request(self, method: str, url: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
-        data = None if payload is None else json.dumps(payload, separators=(",", ":"), allow_nan=False).encode("utf-8")
+        data = (
+            None
+            if payload is None
+            else json.dumps(payload, separators=(",", ":"), allow_nan=False).encode("utf-8")
+        )
         request = Request(
             url,
             data=data,
@@ -131,7 +142,10 @@ class CloudflareStorageClient:
     def delete_record(self, namespace: str, key: str) -> dict[str, Any]:
         namespace = self._segment(namespace, "namespace")
         key = self._segment(key, "record key")
-        return self._request("DELETE", self._url(f"records/{quote(namespace, safe='')}/{quote(key, safe='')}"))
+        return self._request(
+            "DELETE",
+            self._url(f"records/{quote(namespace, safe='')}/{quote(key, safe='')}"),
+        )
 
     def append_event(self, job_id: str, event: dict[str, Any]) -> dict[str, Any]:
         job_id = self._segment(job_id, "job ID")
