@@ -1,5 +1,6 @@
 import { DurableObject } from "cloudflare:workers";
 import { ResearchStorage } from "./storage.js";
+import { validStorageRequest } from "./storage-policy.js";
 import { constantTimeEqual, isAllowedResearchRoute, missingRuntimeConfig } from "./policy.js";
 
 const CONTAINER_PORT = 8000;
@@ -110,6 +111,26 @@ export default {
     }
 
     const url = new URL(request.url);
+    if (url.pathname.startsWith("/internal/storage/")) {
+      const parts = url.pathname.split("/").filter(Boolean);
+      const tenant = parts[3];
+      if (!validStorageRequest(request.method, url.pathname.slice("/internal/storage".length))) {
+        return json({ error: "Storage route not found or method not allowed." }, 404);
+      }
+      if (!tenant || !env.RESEARCH_STORAGE) {
+        return json({ error: "Research storage is unavailable." }, 503);
+      }
+      try {
+        const id = env.RESEARCH_STORAGE.idFromName(tenant);
+        const stub = env.RESEARCH_STORAGE.get(id);
+        const storageUrl = new URL(request.url);
+        storageUrl.pathname = url.pathname.slice("/internal/storage".length);
+        return await stub.fetch(new Request(storageUrl, request));
+      } catch {
+        return json({ error: "Research storage is unavailable." }, 503);
+      }
+    }
+
     if (!isAllowedResearchRoute(url.pathname, request.method)) {
       return json({ error: "Research route not found or method not allowed." }, 404);
     }
