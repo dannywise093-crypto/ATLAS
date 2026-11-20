@@ -186,7 +186,9 @@ class CloudflareCheckpointSaver(BaseCheckpointSaver):
                 "sha256": item["value_sha256"], "bytes": item["value_bytes"],
             })
             pending_writes.append((item["task_id"], item["channel"], value))
-        pending_writes.sort(key=lambda item: writes_sort_key("", item[0], 0))
+        # The coordinator returns rows ordered by task_path, task_id and write_index.
+        # Preserve that LangGraph execution order; the checkpoint package does not
+        # expose a stable public writes_sort_key helper across supported versions.
         result_config = {
             "configurable": {
                 **{k: v for k, v in configurable.items() if k not in {"checkpoint_id"}},
