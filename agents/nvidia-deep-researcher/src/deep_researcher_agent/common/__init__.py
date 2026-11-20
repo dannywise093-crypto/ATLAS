@@ -24,6 +24,8 @@ import aiosqlite
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
+
+from .cloudflare_checkpointer import CloudflareCheckpointSaver
 from psycopg.rows import dict_row
 from psycopg_pool import AsyncConnectionPool
 
@@ -147,6 +149,12 @@ async def get_checkpointer(checkpoint_db: str) -> BaseCheckpointSaver:
     """
     checkpointer = _checkpointers.get(checkpoint_db)
     if checkpointer is not None:
+        return checkpointer
+
+    if checkpoint_db.startswith("cloudflare://"):
+        checkpointer = CloudflareCheckpointSaver()
+        _checkpointers[checkpoint_db] = checkpointer
+        logger.info("Cloudflare D1/R2 LangGraph checkpointer initialized.")
         return checkpointer
 
     if is_postgres_dsn(checkpoint_db):
