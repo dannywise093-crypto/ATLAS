@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { constantTimeEqual, extractBearerToken, isAllowedResearchRoute, missingRuntimeConfig } from "./policy.js";
+import { constantTimeEqual, extractBearerToken, isAllowedResearchRoute, missingRuntimeConfig, researchReadiness } from "./policy.js";
 
 test("research Worker parses bearer tokens using whitespace and case-insensitive scheme matching", () => {
   assert.equal(extractBearerToken("Bearer secret-value"), "secret-value");
@@ -43,4 +43,27 @@ test("research Worker requires every provider, service, and durable storage sett
   assert.deepEqual(missingRuntimeConfig({}), required);
   assert.deepEqual(missingRuntimeConfig(Object.fromEntries(required.map((name) => [name, "configured"]))), []);
   assert.deepEqual(missingRuntimeConfig({ ...Object.fromEntries(required.map((name) => [name, "configured"])), EXA_API_KEY: " " }), ["EXA_API_KEY"]);
+});
+
+test("research readiness reports configuration booleans without exposing secret values", () => {
+  const names = ["NVIDIA_API_KEY", "TAVILY_API_KEY", "EXA_API_KEY", "NIMBLE_API_KEY", "YDC_API_KEY", "SERPER_API_KEY", "NEXORA_RESEARCH_API_TOKEN", "NAT_JOB_STORE_DB_URL", "DEEP_RESEARCHER_CHECKPOINT_DB"];
+  const env = Object.fromEntries(names.map((name) => [name, "configured-secret-value"]));
+  env.RESEARCH_STORAGE = {};
+  env.RESEARCH_CONTAINER = {};
+  env.NEXORA_RESEARCH_EVENT_STORE = "cloudflare";
+  const result = researchReadiness(env);
+  assert.equal(result.ready, true);
+  assert.equal(result.providersConfigured, true);
+  assert.equal(result.serviceTokenConfigured, true);
+  assert.equal(result.eventStoreBackend, "cloudflare");
+  assert.equal(JSON.stringify(result).includes("configured-secret-value"), false);
+});
+
+test("research readiness blocks when provider or durable bindings are absent", () => {
+  const result = researchReadiness({});
+  assert.equal(result.ready, false);
+  assert.equal(result.status, "blocked");
+  assert.equal(result.providersConfigured, false);
+  assert.equal(result.storageBindingConfigured, false);
+  assert.equal(result.containerBindingConfigured, false);
 });
