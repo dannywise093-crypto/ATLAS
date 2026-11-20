@@ -515,3 +515,32 @@ test("cloud TTS does not silently use the default voice when clone backend token
   assert.equal(response.status, 503);
   assert.equal(workersAiCalled, false);
 });
+
+test("engineering visual endpoint returns generated image bytes", async () => {
+  let model;
+  const env = envWith(async (id, input) => {
+    model = { id, input };
+    return new Uint8Array([137, 80, 78, 71]);
+  });
+  const response = await worker.fetch(request("/api/engineering/visual", {
+    method: "POST",
+    body: { prompt: "A conceptual electric motor assembly, studio render" }
+  }), env);
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("content-type"), "image/png");
+  assert.equal(model.id, "@cf/black-forest-labs/flux-1-schnell");
+  assert.equal(model.input.steps, 4);
+  assert.deepEqual([...new Uint8Array(await response.arrayBuffer())], [137, 80, 78, 71]);
+});
+
+test("engineering visual endpoint validates prompts and requires configured AI", async () => {
+  const invalid = await worker.fetch(request("/api/engineering/visual", {
+    method: "POST", body: { prompt: " " }
+  }), envWith(async () => new Uint8Array()));
+  assert.equal(invalid.status, 400);
+  const unavailable = await worker.fetch(request("/api/engineering/visual", {
+    method: "POST", body: { prompt: "A concept drawing" }
+  }), { ATLAS_GATEWAY_TOKEN: token });
+  assert.equal(unavailable.status, 503);
+});
+
