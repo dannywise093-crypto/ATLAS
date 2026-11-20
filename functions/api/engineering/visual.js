@@ -22,8 +22,10 @@ function rateLimited(request) {
 }
 
 function decodeBase64(value) {
-  const clean = value.replace(/^data:image\\/[a-zA-Z0-9.+-]+;base64,/, "").replace(/\\s/g, "");
-  if (!clean || !/^[A-Za-z0-9+/]*={0,2}$/.test(clean)) return null;
+  const comma = value.indexOf(",");
+  const clean = (value.startsWith("data:image/") && comma >= 0 ? value.slice(comma + 1) : value)
+    .replaceAll(" ", "").replaceAll("\n", "").replaceAll("\r", "").replaceAll("\t", "");
+  if (!clean || !new RegExp("^[A-Za-z0-9+/]*={0,2}$").test(clean)) return null;
   try {
     const binary = atob(clean);
     const bytes = new Uint8Array(binary.length);
