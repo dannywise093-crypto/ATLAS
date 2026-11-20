@@ -1,5 +1,5 @@
 import { DurableObject } from "cloudflare:workers";
-import { constantTimeEqual, isSafeStorageSegment } from "./storage-policy.js";
+import { constantTimeEqual, extractBearerToken, isSafeStorageSegment } from "./storage-policy.js";
 
 const MAX_RECORD_BYTES = 256 * 1024;
 const MAX_EVENT_BYTES = 64 * 1024;
