@@ -190,6 +190,8 @@ export class D1CheckpointIndex {
   async putWrites(input) {
     const s = scope(input);
     const checkpointId = requiredId(input.checkpointId, "checkpoint ID");
+    const checkpointRow = await this.getCheckpoint({ ...s, checkpointId });
+    if (!checkpointRow) throw new CheckpointIndexError("Pending writes require an existing checkpoint.", "invalid_input");
     if (!Array.isArray(input.writes) || input.writes.length < 1 || input.writes.length > 128) {
       throw new CheckpointIndexError("Writes must contain between 1 and 128 entries.", "invalid_input");
     }
