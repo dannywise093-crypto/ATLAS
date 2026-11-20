@@ -106,7 +106,9 @@ export class CheckpointCoordinator extends DurableObject {
         return json({ checkpoints: await index.listCheckpoints(input) });
       }
       if (route === "/put-writes") {
-        return json(await index.putWrites(input), 201);
+        // Pending writes must pass through the same live-lease and fencing
+        // validation as checkpoint publication. Never call D1 directly here.
+        return json(await core.putWrites(input), 201);
       }
       if (route === "/list-writes") {
         if (typeof input.checkpointId !== "string") return json({ error: "checkpointId is required." }, 400);
