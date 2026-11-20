@@ -249,7 +249,11 @@ async function drainCheckpointGarbage(env) {
   for (const item of due) {
     try {
       if (!item.object_key.startsWith("nexora-checkpoints/" + item.tenant_id + "/")) continue;
-      await env.RESEARCH_CHECKPOINTS_BUCKET.delete(item.object_key);
+      const referenceExists = await index.isObjectReferenced({
+        tenantId: item.tenant_id,
+        objectKey: item.object_key,
+      });
+      if (!referenceExists) await env.RESEARCH_CHECKPOINTS_BUCKET.delete(item.object_key);
       await index.removeGarbage({ tenantId: item.tenant_id, objectKey: item.object_key });
       processed += 1;
     } catch {
