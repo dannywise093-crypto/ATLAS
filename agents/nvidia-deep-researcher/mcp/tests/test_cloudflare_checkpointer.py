@@ -171,3 +171,32 @@ async def test_pending_writes_use_langgraph_reserved_indices(monkeypatch):
 
 async def _resolved_value(value):
     return value
+
+@pytest.mark.asyncio
+async def test_thread_delete_uses_encoded_tenant_and_thread_scope(monkeypatch):
+    saver = _saver()
+    calls = []
+
+    async def call(method, path, payload=None):
+        calls.append((method, path, payload))
+        return {"tombstoned": True}
+
+    monkeypatch.setattr(saver, "_call", call)
+    await saver.adelete_thread("thread/with spaces")
+    assert calls == [(
+        "POST",
+        "/internal/checkpoint-threads/nexora-test/thread%2Fwith%20spaces/delete",
+        {},
+    )]
+
+
+def test_typed_serializer_round_trips_checkpoint_and_metadata():
+    saver = _saver()
+    values = [
+        {"id": "cp-1", "channel_values": {"answer": "durable"}},
+        {"source": "test", "step": 4},
+        ["write", 42, {"ok": True}],
+    ]
+    for value in values:
+        type_name, payload = saver.serde.dumps_typed(value)
+        assert saver.serde.loads_typed((type_name, payload)) == value
