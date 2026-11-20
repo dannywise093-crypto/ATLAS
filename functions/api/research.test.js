@@ -50,7 +50,7 @@ test("research proxy keeps the backend token server-side and streams upstream bo
     assert.equal(response.status, 200);
     assert.equal(response.headers.get("Content-Type"), "text/event-stream");
     assert.equal(captured.url, "https://research.example/v1/jobs/async/job/job-123/stream");
-    assert.equal(captured.init.headers.Authorization, "Bearer server-only-test-token");
+    assert.equal(captured.init.headers.Authorization, "Bearer server-only-test-token-0123456789-abcdefghij");
     assert.equal(await response.text(), "event: stream.mode\ndata: {\"mode\":\"live\"}\n\n");
   } finally {
     globalThis.fetch = originalFetch;
