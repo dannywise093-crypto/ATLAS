@@ -2,6 +2,7 @@ import { DurableObject } from "cloudflare:workers";
 import { ResearchStorage } from "./storage.js";
 import { handleCheckpointObjectRequest } from "./checkpoint-objects.js";
 import { D1CheckpointIndex } from "./checkpoint-index.js";
+import { drainCheckpointGarbage } from "./checkpoint-garbage-collector.js";
 import { CheckpointCoordinator } from "./checkpoint-coordinator.js";
 import { validStorageRequest } from "./storage-policy.js";
 import { constantTimeEqual, extractBearerToken, isAllowedResearchRoute, missingRuntimeConfig, researchReadiness } from "./policy.js";
@@ -242,27 +243,5 @@ export default {
     ctx.waitUntil(drainCheckpointGarbage(env));
   },
 };
-
-async function drainCheckpointGarbage(env) {
-  if (!env.RESEARCH_CHECKPOINTS_DB || !env.RESEARCH_CHECKPOINTS_BUCKET) return { processed: 0 };
-  const index = new D1CheckpointIndex(env.RESEARCH_CHECKPOINTS_DB);
-  const due = await index.listDueGarbage({ limit: 100 });
-  let processed = 0;
-  for (const item of due) {
-    try {
-      if (!item.object_key.startsWith("nexora-checkpoints/" + item.tenant_id + "/")) continue;
-      const referenceExists = await index.isObjectReferenced({
-        tenantId: item.tenant_id,
-        objectKey: item.object_key,
-      });
-      if (!referenceExists) await env.RESEARCH_CHECKPOINTS_BUCKET.delete(item.object_key);
-      await index.removeGarbage({ tenantId: item.tenant_id, objectKey: item.object_key });
-      processed += 1;
-    } catch {
-      // Keep the queue row for a later scheduled retry.
-    }
-  }
-  return { processed };
-}
 
 export const researchWorkerInternals = { isAllowedResearchRoute, missingRuntimeConfig, drainCheckpointGarbage };
