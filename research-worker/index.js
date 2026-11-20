@@ -113,7 +113,7 @@ export default {
     const url = new URL(request.url);
     if (url.pathname.startsWith("/internal/storage/")) {
       const parts = url.pathname.split("/").filter(Boolean);
-      const tenant = parts[3];
+      const tenant = parts[4];
       if (!validStorageRequest(request.method, url.pathname.slice("/internal/storage".length))) {
         return json({ error: "Storage route not found or method not allowed." }, 404);
       }
