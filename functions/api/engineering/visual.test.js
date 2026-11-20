@@ -51,3 +51,14 @@ test("Pages Engineering visual endpoint applies a per-IP request limit", async (
   assert.equal(limited.status, 429);
   assert.equal(limited.headers.get("Retry-After"), "60");
 });
+
+test("Pages Engineering visual endpoint handles Workers AI { image: Uint8Array } output", async () => {
+  const expected = new Uint8Array([137, 80, 78, 71, 1, 2, 3]);
+  const response = await onRequestPost({
+    request: request("A futuristic electric vehicle concept", "192.0.2.24"),
+    env: { AI: { async run() { return { image: expected }; } } }
+  });
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("Content-Type"), "image/png");
+  assert.deepEqual([...new Uint8Array(await response.arrayBuffer())], [...expected]);
+});
