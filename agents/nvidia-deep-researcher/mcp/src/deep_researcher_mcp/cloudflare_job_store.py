@@ -11,9 +11,14 @@ Cloudflare-only production configuration.
 
 from __future__ import annotations
 
+import asyncio
+import json
 import os
 import re
 import uuid
+from urllib.error import HTTPError, URLError
+from urllib.parse import quote, urlencode, urlsplit
+from urllib.request import Request, urlopen
 
 import asyncpg
 from datetime import UTC, datetime, timedelta
@@ -25,6 +30,103 @@ _DEFAULT_TTL_SECONDS = 24 * 60 * 60
 _NAMESPACE = "mcp-jobs"
 _TERMINAL_STATES = frozenset({"complete", "failed"})
 _IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+
+class CloudflareStorageConflict(RuntimeError):
+    """The Durable Object rejected a stale record revision."""
+
+
+class _CloudflareMCPStorageClient:
+    """Small stdlib-only transport so the standalone MCP image needs no API package."""
+
+    def __init__(self, *, tenant: str) -> None:
+        if (
+            not tenant
+            or len(tenant) > 128
+            or not tenant[0].isalnum()
+            or not all(char.isascii() and (char.isalnum() or char in "._-") for char in tenant)
+        ):
+            raise ValueError("Invalid NEXORA_RESEARCH_TENANT")
+        self.tenant = tenant
+        self.base_url = os.environ.get("NEXORA_RESEARCH_STORAGE_URL", "").rstrip("/")
+        self.token = os.environ.get("NEXORA_RESEARCH_API_TOKEN", "")
+        if len(self.token) < 32:
+            raise ValueError("NEXORA_RESEARCH_API_TOKEN must contain at least 32 characters")
+        parsed = urlsplit(self.base_url)
+        local_http = parsed.scheme == "http" and parsed.hostname in {"localhost", "127.0.0.1", "::1"}
+        if parsed.scheme != "https" and not local_http:
+            raise ValueError("NEXORA_RESEARCH_STORAGE_URL must use HTTPS")
+        if (
+            not parsed.hostname
+            or parsed.path not in {"", "/"}
+            or parsed.username
+            or parsed.password
+            or parsed.query
+            or parsed.fragment
+        ):
+            raise ValueError("NEXORA_RESEARCH_STORAGE_URL must be an origin without credentials or query")
+
+    def _url(self, suffix: str) -> str:
+        return (
+            f"{self.base_url}/internal/storage/v1/tenants/"
+            f"{quote(self.tenant, safe='')}/{suffix}"
+        )
+
+    def _request(self, method: str, url: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+        data = None if payload is None else json.dumps(
+            payload, separators=(",", ":"), allow_nan=False
+        ).encode("utf-8")
+        request = Request(
+            url,
+            data=data,
+            method=method,
+            headers={
+                "Authorization": f"Bearer {self.token}",
+                "Accept": "application/json",
+                **({"Content-Type": "application/json"} if data is not None else {}),
+            },
+        )
+        try:
+            with urlopen(request, timeout=15.0) as response:
+                raw = response.read(1024 * 1024 + 1)
+                if len(raw) > 1024 * 1024:
+                    raise RuntimeError("Cloudflare storage response exceeded 1 MiB")
+                return json.loads(raw.decode("utf-8")) if raw else {}
+        except HTTPError as exc:
+            if exc.code == 409:
+                raise CloudflareStorageConflict("Cloudflare storage revision conflict") from exc
+            if exc.code == 404:
+                return {}
+            raise RuntimeError(f"Cloudflare storage returned HTTP {exc.code}") from exc
+        except (URLError, TimeoutError, OSError) as exc:
+            raise RuntimeError("Cloudflare storage request failed") from exc
+
+    async def aget_record(self, namespace: str, key: str) -> dict[str, Any] | None:
+        url = self._url(f"records/{quote(namespace, safe='')}/{quote(key, safe='')}")
+        result = await asyncio.to_thread(self._request, "GET", url)
+        return result or None
+
+    async def aput_record(
+        self, namespace: str, key: str, value: dict[str, Any], *, expected_revision: int
+    ) -> dict[str, Any]:
+        url = self._url(f"records/{quote(namespace, safe='')}/{quote(key, safe='')}")
+        return await asyncio.to_thread(
+            self._request, "PUT", url,
+            {"value": value, "expectedRevision": expected_revision},
+        )
+
+    async def alist_records(
+        self, namespace: str, *, after: str | None = None, limit: int = 200
+    ) -> dict[str, Any]:
+        query = {"limit": min(limit, 200)}
+        if after is not None:
+            query["after"] = after
+        url = self._url(f"records/{quote(namespace, safe='')}?{urlencode(query)}")
+        return await asyncio.to_thread(self._request, "GET", url)
+
+    async def adelete_record(self, namespace: str, key: str) -> dict[str, Any]:
+        url = self._url(f"records/{quote(namespace, safe='')}/{quote(key, safe='')}")
+        return await asyncio.to_thread(self._request, "DELETE", url)
 
 
 class CloudflareMCPJobStore:
@@ -51,14 +153,12 @@ class CloudflareMCPJobStore:
     @classmethod
     def from_env(cls, *, checkpoint_db_url: str) -> "CloudflareMCPJobStore":
         """Build the storage client without ever accepting credentials as arguments."""
-        from deep_researcher_api.jobs.cloudflare_storage import CloudflareStorageClient
-
         tenant = os.environ.get("NEXORA_RESEARCH_TENANT", "").strip()
         if not tenant:
             raise ValueError("NEXORA_RESEARCH_TENANT is required for the Cloudflare MCP job store")
         schema = os.environ.get("DEEP_RESEARCHER_CHECKPOINT_SCHEMA", "public").strip()
         return cls(
-            CloudflareStorageClient(tenant=tenant),
+            _CloudflareMCPStorageClient(tenant=tenant),
             checkpoint_db_url=checkpoint_db_url,
             checkpoint_schema=schema,
         )
@@ -191,8 +291,8 @@ class CloudflareMCPJobStore:
             try:
                 await self._write(job_id, self._serialize(job), record["revision"])
                 return True
-            except Exception as exc:
-                if type(exc).__name__ not in {"CloudflareStorageConflict"} or attempt + 1 == self._conflict_retries:
+            except CloudflareStorageConflict:
+                if attempt + 1 == self._conflict_retries:
                     raise
         return False
 
@@ -211,8 +311,8 @@ class CloudflareMCPJobStore:
             try:
                 await self._write(job_id, self._serialize(job), record["revision"])
                 return True
-            except Exception as exc:
-                if type(exc).__name__ != "CloudflareStorageConflict" or attempt + 1 == self._conflict_retries:
+            except CloudflareStorageConflict:
+                if attempt + 1 == self._conflict_retries:
                     raise
         return False
 
