@@ -13,11 +13,11 @@ The Engineering Studio is a first implementation slice connecting the NEXORA mod
 ## Image generation architecture
 
 - Browser: `src/EngineeringStudio.jsx`
-- Same-origin authenticated Pages proxy: `functions/api/engineering/visual.js`
-- Worker endpoint: `POST /api/engineering/visual` in `cloudflare/worker.js`
-- Model: `@cf/black-forest-labs/flux-1-schnell` through the existing Workers AI binding.
-- The Pages proxy requires the existing server-side `ATLAS_GATEWAY_TOKEN`; no provider key is exposed to browser code.
-- The Pages proxy limits image requests per client IP. The Worker applies its own gateway rate limit and validates prompt length.
+- Same-origin server-side endpoint: `functions/api/engineering/visual.js`
+- Cloudflare Pages binds Workers AI as `AI` through `wrangler.jsonc` (`pages_build_output_dir` enables Pages to load the Wrangler configuration).
+- Model: `@cf/black-forest-labs/flux-1-schnell` called from the Pages Function.
+- No provider key or gateway token is exposed to browser code.
+- The Pages Function validates prompt size and limits requests per client IP.
 
 ## Important engineering limitations
 
