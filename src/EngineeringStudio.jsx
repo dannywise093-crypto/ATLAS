@@ -116,9 +116,8 @@ export default function EngineeringStudio() {
         {error&&<p role="alert" className="engineering-error">{error}</p>}
       </article>
       <article className="card engineering-visual-card">
-        <div className="cardtop"><span className="cardicon"><ImageIcon/></span><span className="badge">CONCEPT VISUALIZER</span></div>
+        <div className="cardtop"><span className="cardicon"><ImageIcon/></span><span className="badge">CONCEPT VISUALIZER</span><button type="button" className="secondary" disabled={!idea.trim()||visualBusy} onClick={generateVisual}>{visualBusy?"Generating…":"Generate image"}</button></div>
         <p>Generate an AI concept illustration based on your engineering brief. It is a visual reference, not dimensionally accurate CAD.</p>
-        <button type="button" className="secondary" disabled={!idea.trim()||visualBusy} onClick={generateVisual}>{visualBusy?"Generating concept image…":"Generate design visual"}</button>
         {visualError&&<p role="alert" className="engineering-error">{visualError}</p>}
         {visual&&<div className="engineering-visual"><img src={visual} alt="AI-generated engineering concept illustration"/><button type="button" className="secondary" onClick={saveVisual}>Save image</button></div>}
         {!visual&&<div className="engineering-visual-placeholder"><ImageIcon size={32}/><span>Your concept image will appear here.</span></div>}
