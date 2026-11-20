@@ -19,8 +19,15 @@ async function readJson(request, maxBytes) {
   if (new TextEncoder().encode(raw).byteLength > maxBytes) {
     throw new Response("Payload too large.", { status: 413 });
   }
-  try { return JSON.parse(raw); }
-  catch { throw new Response("Invalid JSON.", { status: 400 }); }
+  try {
+    const value = JSON.parse(raw);
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      throw new Error("Expected a JSON object.");
+    }
+    return value;
+  } catch {
+    throw new Response("Invalid JSON object.", { status: 400 });
+  }
 }
 
 export class ResearchStorage extends DurableObject {
@@ -93,6 +100,9 @@ export class ResearchStorage extends DurableObject {
         tenant, namespace, key
       ).toArray()[0];
       const expected = body.expectedRevision;
+      if (expected !== undefined && expected !== null && (!Number.isSafeInteger(expected) || expected < 0)) {
+        return response({ error: "expectedRevision must be a non-negative safe integer." }, 400);
+      }
       if (expected !== undefined && expected !== null && expected !== (current?.revision ?? 0)) {
         return response({ error: "Revision conflict.", revision: current?.revision ?? 0 }, 409);
       }
@@ -134,8 +144,13 @@ export class ResearchStorage extends DurableObject {
     }
 
     if (request.method === "GET") {
-      const after = Math.max(0, Number(urlParam(request, "after", "0")) || 0);
-      const limit = Math.min(MAX_PAGE_SIZE, Math.max(1, Number(urlParam(request, "limit", "100")) || 100));
+      const rawAfter = Number(urlParam(request, "after", "0"));
+      const rawLimit = Number(urlParam(request, "limit", "100"));
+      if (!Number.isSafeInteger(rawAfter) || rawAfter < 0 || !Number.isSafeInteger(rawLimit) || rawLimit < 1) {
+        return response({ error: "Invalid event pagination parameters." }, 400);
+      }
+      const after = rawAfter;
+      const limit = Math.min(MAX_PAGE_SIZE, rawLimit);
       const rows = this.sql.exec(
         "SELECT seq,event_json,created_at FROM events WHERE tenant=? AND job_id=? AND seq>? ORDER BY seq LIMIT ?",
         tenant, jobId, after, limit
