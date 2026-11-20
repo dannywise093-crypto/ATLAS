@@ -12,7 +12,10 @@ Cloudflare-only production configuration.
 from __future__ import annotations
 
 import os
+import re
 import uuid
+
+import asyncpg
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -21,37 +24,58 @@ from .job_store import Job, JobDepth, JobState
 _DEFAULT_TTL_SECONDS = 24 * 60 * 60
 _NAMESPACE = "mcp-jobs"
 _TERMINAL_STATES = frozenset({"complete", "failed"})
+_IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 
 class CloudflareMCPJobStore:
     """Implements the MCP JobStore API over tenant-scoped DO records."""
 
-    def __init__(self, storage: Any, *, conflict_retries: int = 5) -> None:
+    def __init__(
+        self,
+        storage: Any,
+        *,
+        checkpoint_db_url: str,
+        checkpoint_schema: str = "public",
+        conflict_retries: int = 5,
+    ) -> None:
         if conflict_retries < 1:
             raise ValueError("conflict_retries must be positive")
+        if not _IDENTIFIER_RE.fullmatch(checkpoint_schema):
+            raise ValueError("Invalid checkpoint schema identifier")
         self._storage = storage
+        self._checkpoint_db_url = checkpoint_db_url
+        self._checkpoint_schema = f'"{checkpoint_schema}"'
+        self._pool: asyncpg.Pool | None = None
         self._conflict_retries = conflict_retries
 
     @classmethod
-    def from_env(cls) -> "CloudflareMCPJobStore":
+    def from_env(cls, *, checkpoint_db_url: str) -> "CloudflareMCPJobStore":
         """Build the storage client without ever accepting credentials as arguments."""
         from deep_researcher_api.jobs.cloudflare_storage import CloudflareStorageClient
 
         tenant = os.environ.get("NEXORA_RESEARCH_TENANT", "").strip()
         if not tenant:
             raise ValueError("NEXORA_RESEARCH_TENANT is required for the Cloudflare MCP job store")
-        return cls(CloudflareStorageClient(tenant=tenant))
+        schema = os.environ.get("DEEP_RESEARCHER_CHECKPOINT_SCHEMA", "public").strip()
+        return cls(
+            CloudflareStorageClient(tenant=tenant),
+            checkpoint_db_url=checkpoint_db_url,
+            checkpoint_schema=schema,
+        )
 
     @property
-    def pool(self) -> None:
-        """Cloudflare has no asyncpg pool; checkpoint readers open their own connection."""
-        return None
+    def pool(self) -> asyncpg.Pool | None:
+        """Share the checkpoint DB pool with the todo reader when available."""
+        return self._pool
 
     async def init(self) -> None:
-        return None
+        if self._pool is None:
+            self._pool = await asyncpg.create_pool(dsn=self._checkpoint_db_url)
 
     async def close(self) -> None:
-        return None
+        if self._pool is not None:
+            await self._pool.close()
+            self._pool = None
 
     @staticmethod
     def _job_from_value(value: dict[str, Any]) -> Job:
@@ -303,16 +327,36 @@ class CloudflareMCPJobStore:
                 return marked
 
     async def delete_expired(self) -> int:
+        """Delete expired terminal ledger rows and their SQL checkpoint threads.
+
+        Checkpoints remain PostgreSQL-backed in this migration phase. Remove
+        their writes/blobs/snapshots in one transaction before deleting the
+        Durable Object job capability. If the DO delete fails, retrying is safe:
+        the checkpoint DELETEs are idempotent and the job record remains.
+        """
+        if self._pool is None:
+            raise RuntimeError("CloudflareMCPJobStore.init() must be called before use")
         now = datetime.now(UTC)
         deleted = 0
         cursor: str | None = None
+        checkpoints = f"{self._checkpoint_schema}.checkpoints"
+        blobs = f"{self._checkpoint_schema}.checkpoint_blobs"
+        writes = f"{self._checkpoint_schema}.checkpoint_writes"
         while True:
             page = await self._storage.alist_records(_NAMESPACE, after=cursor, limit=200)
             for item in page.get("records", []):
                 job = self._job_from_value(item["value"])
-                if job.state in _TERMINAL_STATES and job.expires_at < now:
-                    await self._storage.adelete_record(_NAMESPACE, job.job_id)
-                    deleted += 1
+                if job.state not in _TERMINAL_STATES or job.expires_at >= now:
+                    continue
+                async with self._pool.acquire() as conn:
+                    async with conn.transaction():
+                        for table in (writes, blobs, checkpoints):
+                            await conn.execute(
+                                f"DELETE FROM {table} WHERE thread_id = $1",
+                                job.job_id,
+                            )
+                await self._storage.adelete_record(_NAMESPACE, job.job_id)
+                deleted += 1
             cursor = page.get("nextAfter")
             if cursor is None:
                 return deleted
