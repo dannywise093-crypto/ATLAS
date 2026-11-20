@@ -126,3 +126,30 @@ test("pending writes require the current lease and preserve the coordinator scop
     leaseId: "wrong", fencingToken: 99, checkpointId: "cp-1", writes }),
     (error) => error.code === "lease_lost");
 });
+
+test("new coordinator lease recovers the monotonic fencing counter from D1", async () => {
+  let saved = { scope: null, lastFencingToken: 0, lease: null };
+  let claimed;
+  const core = new CheckpointCoordinatorCore({
+    loadState: async () => structuredClone(saved),
+    saveState: async (state) => { saved = structuredClone(state); },
+    checkpointIndex: {
+      async getThread() { return { fencing_token: 12 }; },
+      async claimThread(input) { claimed = input; },
+      async putCheckpoint() { throw new Error("not used"); },
+    },
+    now: () => 50_000,
+    makeLeaseId: () => "lease-recovered",
+  });
+
+  const lease = await core.acquire({
+    tenantId: "acme",
+    threadId: "thread-1",
+    checkpointNs: "",
+    holderId: "runner-a",
+  });
+
+  assert.equal(lease.fencingToken, 13);
+  assert.equal(claimed.fencingToken, 13);
+  assert.equal(saved.lastFencingToken, 13);
+});
