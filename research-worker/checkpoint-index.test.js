@@ -55,7 +55,10 @@ class FakeD1 {
       });
       return { success:true, meta:{changes:1} };
     }
-    if (q.startsWith("DELETE FROM research_checkpoint_r2_gc")) {\n      return { success:true, meta:{changes:0} };\n    }\n    if (q.startsWith("SELECT * FROM research_checkpoints")) {
+    if (q.startsWith("DELETE FROM research_checkpoint_r2_gc")) {
+      return { success:true, meta:{changes:0} };
+    }
+    if (q.startsWith("SELECT * FROM research_checkpoints")) {
       return { row:state.checkpoints.get(a.join("|")) ?? null };
     }
     if (q.startsWith("SELECT tenant_id, thread_id, checkpoint_ns")) {
