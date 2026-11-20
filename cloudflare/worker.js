@@ -193,7 +193,7 @@ function extractAnswer(result) {
 
 function classifyAIError(error) {
   const message = String(error?.message || error || "").slice(0, 300);
-  const code = String(error?.code || error?.cause?.code || (message.match(/\\b(?:30\\d{2}|50\\d{2})\\b/) || [])[0] || "");
+  const code = String(error?.code || error?.cause?.code || (message.match(/\b(?:30\\d{2}|50\\d{2})\\b/) || [])[0] || "");
   const detail = (code + " " + message).toLowerCase();
   if (/3036|daily free allocation|account limited/.test(detail)) return { status: "account_limited", code };
   if (/3040|out of capacity|capacity temporarily exceeded|capacity unavailable/.test(detail)) return { status: "capacity_unavailable", code };
@@ -261,7 +261,7 @@ export default {
       try { body = await request.json(); } catch { return json({ error: "A valid JSON body is required." }, 400); }
       const prompt = typeof body?.prompt === "string" ? body.prompt.trim() : "";
       if (!prompt || prompt.length > 1800) return json({ error: "Provide an image prompt between 1 and 1,800 characters." }, 400);
-      if (/\\b(?:gun|firearm|weapon|ammunition|explosive|bomb|knife|drug|cocaine|heroin|methamphetamine|self[- ]harm)\\b/i.test(prompt)) {
+      if (/\b(?:gun|firearm|weapon|ammunition|explosive|bomb|knife|drug|cocaine|heroin|methamphetamine|self[- ]harm)\b/i.test(prompt)) {
         return json({ error: "This image request is not supported." }, 400);
       }
       try {
