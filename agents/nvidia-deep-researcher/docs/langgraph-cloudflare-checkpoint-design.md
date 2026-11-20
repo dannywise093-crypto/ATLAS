@@ -141,3 +141,19 @@ Do not remove `DEEP_RESEARCHER_CHECKPOINT_DB`, change production policy, or enab
 ## Resource provisioning
 
 See [Cloudflare checkpoint storage provisioning](./cloudflare-checkpoint-provisioning.md) for the dedicated D1/R2 resource creation commands, schema application, and the current account blocker. The production checkpoint backend must remain unchanged until those steps and live recovery tests are complete.
+
+## Conformance hardening
+
+The Worker coordinator exposes the `get-thread` read used by latest-checkpoint
+restore and parent-revision checks. Pending-write publication is routed through
+the coordinator core (not directly to D1), so it must hold the active lease.
+Checkpoint history listing paginates through all D1 pages when LangGraph does
+not provide a limit. Pending writes are returned in the D1 query's
+`task_path, task_id, write_index` order.
+
+The fencing counter is recovered from the D1 thread row before issuing a new
+lease. This preserves monotonic fencing if the Durable Object is recreated
+while D1 checkpoint rows survive. R2 uploads are registered as delayed-GC
+candidates before the upload attempt; committed checkpoint/write publication
+removes candidates for referenced objects, and the scheduled collector checks
+references again before deleting anything.
