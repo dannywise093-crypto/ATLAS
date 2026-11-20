@@ -136,9 +136,12 @@ export class CheckpointCoordinatorCore {
       const state = await this.loadState();
       const scope = await this.bindScope(state, input);
       const lease = this.requireLease(state, input);
+      if (!input.checkpoint || typeof input.checkpoint !== "object" || Array.isArray(input.checkpoint)) {
+        throw new CheckpointLeaseError("Checkpoint publication payload is required.", "invalid_checkpoint", 400);
+      }
       const result = await this.checkpointIndex.putCheckpoint({
-        ...scope,
         ...input.checkpoint,
+        ...scope,
         fencingToken: lease.fencingToken,
       });
       return { ...result, fencingToken: lease.fencingToken };
