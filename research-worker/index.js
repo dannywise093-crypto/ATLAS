@@ -6,13 +6,14 @@ const START_TIMEOUT_MS = 120_000;
 const HEALTH_RETRY_MS = 1_000;
 const INACTIVITY_TIMEOUT_MS = 10 * 60 * 1000;
 
-function json(body, status = 200) {
+function json(body, status = 200, extraHeaders = {}) {
   return new Response(JSON.stringify(body), {
     status,
     headers: {
       "content-type": "application/json; charset=utf-8",
       "cache-control": "no-store",
       "x-content-type-options": "nosniff",
+      ...extraHeaders,
     },
   });
 }
