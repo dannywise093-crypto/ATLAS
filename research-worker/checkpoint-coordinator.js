@@ -64,7 +64,7 @@ export class CheckpointCoordinator extends DurableObject {
     }
     if (request.method !== "POST") return json({ error: "Method not allowed." }, 405);
     const route = new URL(request.url).pathname;
-    if (!["/acquire", "/renew", "/release", "/publish"].includes(route)) {
+    if (!["/acquire", "/renew", "/release", "/publish", "/get", "/list", "/put-writes", "/list-writes"].includes(route)) {
       return json({ error: "Coordinator route not found." }, 404);
     }
     const declared = Number(request.headers.get("content-length") || 0);
@@ -95,7 +95,23 @@ export class CheckpointCoordinator extends DurableObject {
       if (route === "/acquire") return json(await core.acquire(input), 201);
       if (route === "/renew") return json(await core.renew(input));
       if (route === "/release") return json(await core.release(input));
-      return json(await core.publish(input));
+      if (route === "/publish") return json(await core.publish(input));
+      const index = new D1CheckpointIndex(this.env.RESEARCH_CHECKPOINTS_DB);
+      if (route === "/get") {
+        if (typeof input.checkpointId !== "string") return json({ error: "checkpointId is required." }, 400);
+        const checkpoint = await index.getCheckpoint(input);
+        return checkpoint ? json({ checkpoint }) : json({ error: "Checkpoint not found." }, 404);
+      }
+      if (route === "/list") {
+        return json({ checkpoints: await index.listCheckpoints(input) });
+      }
+      if (route === "/put-writes") {
+        return json(await index.putWrites(input), 201);
+      }
+      if (route === "/list-writes") {
+        if (typeof input.checkpointId !== "string") return json({ error: "checkpointId is required." }, 400);
+        return json({ writes: await index.listWrites(input) });
+      }
     } catch (error) {
       if (error instanceof CheckpointLeaseError) {
         return json({ error: error.message, code: error.code }, error.status);
