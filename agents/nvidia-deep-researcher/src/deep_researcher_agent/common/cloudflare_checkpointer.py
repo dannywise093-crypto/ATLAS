@@ -212,27 +212,44 @@ class CloudflareCheckpointSaver(BaseCheckpointSaver):
     ) -> AsyncIterator[CheckpointTuple]:
         if config is None:
             raise ValueError("Tenant-scoped checkpoint listing requires a thread config")
-        _, _, _, _ = self._scope(config)
-        payload: dict[str, Any] = {"limit": min(max(limit or 20, 1), 100)}
-        before_id = get_checkpoint_id(before) if before else None
-        if before_id:
-            payload["beforeCheckpointId"] = before_id
-        response = await self._coordinator(config, "list", payload)
-        count = 0
-        for row in (response or {}).get("checkpoints", []):
-            item_config = {"configurable": {
-                **(config.get("configurable") or {}),
-                "checkpoint_id": row["checkpoint_id"],
-            }}
-            item = await self.aget_tuple(item_config)
-            if item is None:
-                continue
-            if filter and any(item.metadata.get(key) != value for key, value in filter.items()):
-                continue
-            yield item
-            count += 1
-            if limit is not None and count >= limit:
-                break
+        self._scope(config)
+        if limit is not None and (isinstance(limit, bool) or not isinstance(limit, int) or limit < 1):
+            raise ValueError("Checkpoint list limit must be a positive integer")
+
+        page_size = min(limit, 100) if limit is not None else 100
+        cursor = get_checkpoint_id(before) if before else None
+        yielded = 0
+
+        while True:
+            payload: dict[str, Any] = {"limit": page_size}
+            if cursor:
+                payload["beforeCheckpointId"] = cursor
+            response = await self._coordinator(config, "list", payload)
+            rows = (response or {}).get("checkpoints", [])
+            if not rows:
+                return
+
+            for row in rows:
+                item_config = {"configurable": {
+                    **(config.get("configurable") or {}),
+                    "checkpoint_id": row["checkpoint_id"],
+                }}
+                item = await self.aget_tuple(item_config)
+                if item is None:
+                    continue
+                if filter and any(item.metadata.get(key) != value for key, value in filter.items()):
+                    continue
+                yield item
+                yielded += 1
+                if limit is not None and yielded >= limit:
+                    return
+
+            if len(rows) < page_size:
+                return
+            next_cursor = rows[-1]["checkpoint_id"]
+            if next_cursor == cursor:
+                raise CloudflareCheckpointError("Checkpoint listing did not advance its pagination cursor")
+            cursor = next_cursor
 
     async def aput(
         self, config: RunnableConfig, checkpoint: dict[str, Any], metadata: dict[str, Any],
