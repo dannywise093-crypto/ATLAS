@@ -198,11 +198,11 @@ export class D1CheckpointIndex {
       const taskId = requiredId(write.taskId, "task ID");
       const channel = requiredId(write.channel, "write channel");
       const taskPath = typeof write.taskPath === "string" ? write.taskPath.slice(0, 1024) : "";
-      if (!Number.isSafeInteger(write.writeIndex) || write.writeIndex < 0) {
+      if (!Number.isSafeInteger(write.writeIndex) || write.writeIndex < -16 || write.writeIndex > 4096) {
         throw new CheckpointIndexError("Invalid write index.", "invalid_input");
       }
       return this.db.prepare(`
-        INSERT OR IGNORE INTO research_checkpoint_writes (
+        INSERT INTO research_checkpoint_writes (
           tenant_id, thread_id, checkpoint_ns, checkpoint_id, task_id, task_path,
           write_index, channel, value_type, value_r2_key, value_sha256, value_bytes, created_at
         )
@@ -211,6 +211,16 @@ export class D1CheckpointIndex {
           SELECT 1 FROM research_checkpoints
           WHERE tenant_id = ? AND thread_id = ? AND checkpoint_ns = ? AND checkpoint_id = ?
         )
+        ON CONFLICT(tenant_id, thread_id, checkpoint_ns, checkpoint_id, task_id, write_index)
+        DO UPDATE SET
+          task_path = excluded.task_path,
+          channel = excluded.channel,
+          value_type = excluded.value_type,
+          value_r2_key = excluded.value_r2_key,
+          value_sha256 = excluded.value_sha256,
+          value_bytes = excluded.value_bytes,
+          created_at = excluded.created_at
+        WHERE excluded.write_index < 0
       `).bind(
         s.tenantId, s.threadId, s.checkpointNs, checkpointId, taskId, taskPath,
         write.writeIndex, channel, payload.type, payload.key, payload.sha256, payload.bytes,
