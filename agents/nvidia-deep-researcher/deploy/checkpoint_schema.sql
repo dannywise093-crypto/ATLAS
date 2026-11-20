@@ -3,6 +3,13 @@
 -- Apply to a dedicated D1 database. This file is not part of the shared ATLAS knowledge migrations.
 PRAGMA foreign_keys = ON;
 
+CREATE TABLE IF NOT EXISTS research_checkpoint_thread_tombstones (
+  tenant_id TEXT NOT NULL,
+  thread_id TEXT NOT NULL,
+  deleted_at INTEGER NOT NULL,
+  PRIMARY KEY (tenant_id, thread_id)
+);
+
 CREATE TABLE IF NOT EXISTS research_checkpoint_threads (
   tenant_id TEXT NOT NULL,
   thread_id TEXT NOT NULL,
