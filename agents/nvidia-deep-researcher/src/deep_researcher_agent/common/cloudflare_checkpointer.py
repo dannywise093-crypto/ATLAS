@@ -13,6 +13,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 import uuid
 from collections.abc import AsyncIterator, Iterator, Sequence
 from typing import Any
@@ -129,7 +130,7 @@ class CloudflareCheckpointSaver(BaseCheckpointSaver):
         configurable = config.get("configurable") or {}
         thread_id = configurable.get("thread_id")
         namespace = configurable.get("checkpoint_ns", "")
-        if not isinstance(thread_id, str) or not thread_id or len(thread_id) > 256:
+        if not isinstance(thread_id, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,255}", thread_id):
             raise ValueError("LangGraph config requires a valid thread_id")
         if not isinstance(namespace, str) or len(namespace) > 256:
             raise ValueError("LangGraph checkpoint_ns is invalid")
@@ -310,7 +311,7 @@ class CloudflareCheckpointSaver(BaseCheckpointSaver):
             await self._release(config, lease)
 
     async def adelete_thread(self, thread_id: str) -> None:
-        if not isinstance(thread_id, str) or not thread_id or len(thread_id) > 256:
+        if not isinstance(thread_id, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,255}", thread_id):
             raise ValueError("A valid thread_id is required")
         path = (
             f"/internal/checkpoint-threads/{quote(self.tenant, safe='')}/"
