@@ -1,6 +1,7 @@
 import { DurableObject } from "cloudflare:workers";
 import { ResearchStorage } from "./storage.js";
 import { handleCheckpointObjectRequest } from "./checkpoint-objects.js";
+import { CheckpointCoordinator } from "./checkpoint-coordinator.js";
 import { validStorageRequest } from "./storage-policy.js";
 import { constantTimeEqual, extractBearerToken, isAllowedResearchRoute, missingRuntimeConfig, researchReadiness } from "./policy.js";
 
@@ -102,6 +103,7 @@ export class ResearchContainer extends DurableObject {
 }
 
 export class ResearchStorageObject extends ResearchStorage {}
+export { CheckpointCoordinator };
 
 export default {
   async fetch(request, env) {
