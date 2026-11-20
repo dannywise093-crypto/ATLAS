@@ -9,7 +9,6 @@ import pytest
 from deep_researcher_api.jobs.cloudflare_storage import (
     CloudflareStorageClient,
     CloudflareStorageConflict,
-    CloudflareStorageNotFound,
 )
 
 
