@@ -1,81 +1,140 @@
-# NEXORA × NVIDIA Deep Researcher deployment
+# NEXORA × NVIDIA Deep Researcher — Cloudflare-only deployment
 
-This document connects the vendored NVIDIA Deep Researcher 2.2.0 backend to
-NEXORA without moving Python dependencies into the React application or
-Cloudflare Worker.
+This document is the NEXORA deployment contract for the vendored NVIDIA Deep
+Researcher source. Preserve the upstream NVIDIA source, licenses, workflows,
+and package boundaries. Do not move the Python dependencies into the React app
+or an ordinary Workers JavaScript runtime.
 
-## Architecture
+## Required architecture
 
 ```text
 NEXORA browser
-  -> same-origin /api/research/* (Cloudflare Pages Function)
-  -> authenticated server-to-server request
-  -> NVIDIA Deep Researcher API (separate Python service)
-  -> NeMo Agent Toolkit + research workflows + search tools
-  -> persistent async job store and cited report
+  -> Cloudflare Pages Function: /api/research/*
+  -> private Cloudflare Worker service binding
+  -> Cloudflare Durable Object Container
+  -> NVIDIA Deep Researcher Python API (port 8000)
+  -> NeMo Agent Toolkit + Nemotron + provider tools
 ```
 
-The browser never receives `NEXORA_RESEARCH_API_TOKEN`. The backend uses the
-NEXORA-owned `nexora-research-auth` entry-point package to validate that token.
-The initial integration uses one service principal (`nexora-pages-gateway`);
-it is not per-account identity because the current NEXORA workspace has no
-server-authenticated user accounts. Job IDs are random and the API is not
-intended to be exposed directly to browsers.
+The browser must never receive provider API keys or
+`NEXORA_RESEARCH_API_TOKEN`. The Pages Function authenticates to the research
+Worker; the Durable Object passes only the required secrets to the container
+when it starts. The container must not expose an unauthenticated public API.
 
-## Backend container
+Cloudflare Containers require a Workers Paid plan and a Linux/amd64 image.
+Build and deployment must run in an environment with Docker available (for
+example, a secured GitHub Actions runner); the user's Android phone does not
+need to run the Docker build itself.
 
-Build the existing NVIDIA Dockerfile with this directory as the build context:
+## NEXORA provider profile
 
-- Context: `agents/nvidia-deep-researcher`
-- Dockerfile: `deploy/Dockerfile`
-- Target: `release`
-- Port: `8000`
+Use:
 
-The Dockerfile installs the small NEXORA auth adapter in addition to the
-upstream NVIDIA packages. Keep the NVIDIA source tree and its license files.
+`CONFIG_FILE=/app/configs/config_nexora_all_providers.yml`
 
-## Required backend environment
+This profile enables:
+- NVIDIA Nemotron inference using `NVIDIA_API_KEY`.
+- Tavily web search using `TAVILY_API_KEY`.
+- Exa web search using `EXA_API_KEY`.
+- Nimble web search using `NIMBLE_API_KEY`.
+- You.com web search, research, contents, and finance research using `YDC_API_KEY`.
+- Academic paper search through Serper using `SERPER_API_KEY`.
 
-Set these as private environment variables in the backend hosting service:
+These are separate tools made available to the research agents. This is
+multi-provider tool availability, not a guarantee that a failed provider call
+is transparently retried against every other provider. Agent selection and
+provider-level retry behavior remain governed by the upstream tool
+implementations.
 
-- `CONFIG_FILE=/app/configs/config_web_frag.yml`
+The You.com source package must be installed in the backend image; the
+NEXORA Dockerfile includes it explicitly. Keep the provider API keys in
+Cloudflare Worker secrets and pass them into the Container process at startup.
+Secrets configured on `atlas-model-gateway` do not automatically become
+available to a separate research Worker or Container. Add the same named
+secrets to the research Worker (or use Cloudflare Secrets Store) and map them
+to the container's startup environment.
+
+## Required secrets and runtime settings
+
+Provider secrets:
+- `NVIDIA_API_KEY`
+- `TAVILY_API_KEY`
+- `EXA_API_KEY`
+- `NIMBLE_API_KEY`
+- `YDC_API_KEY`
+- `SERPER_API_KEY`
+
+NEXORA service authentication:
+- `NEXORA_RESEARCH_API_TOKEN`: generate a unique random value of at least 32
+  characters. Configure it as a secret on both the Pages Function and research
+  Worker/container. Never expose it to browser code.
+
+Non-secret runtime configuration:
+- `CONFIG_FILE=/app/configs/config_nexora_all_providers.yml`
 - `HOST=0.0.0.0`
 - `PORT=8000`
 - `APP_ENV=production`
 - `REQUIRE_AUTH=true`
-- `DEEP_RESEARCHER_EXTERNAL_HOSTNAMES`: the backend service hostname only (for example, `your-service.onrender.com`, without scheme or port); this makes the API enforce its external path allowlist and token validation.
 - `DEEP_RESEARCHER_ENABLE_DEBUG=false`
-- `NEXORA_RESEARCH_API_TOKEN`: generate a unique random value of at least 32 characters.
-- `NVIDIA_API_KEY`: NVIDIA API Catalog credential for the models in the selected workflow.
-- `TAVILY_API_KEY`: web-search provider credential (the default profile uses Tavily).
-- `NAT_JOB_STORE_DB_URL`: durable PostgreSQL URL for production jobs and event storage.
+- `DEEP_RESEARCHER_EXTERNAL_HOSTNAMES`: the internal hostname used by the
+  Cloudflare service-binding request. Set only after the research Worker
+  routing contract is implemented and verified.
 
-Do not paste credentials into chat or commit them. Generate the token in the
-hosting provider's secret manager. Set the exact same token as a Cloudflare
-Pages secret named `NEXORA_RESEARCH_API_TOKEN`.
+## Persistence — production blocker to resolve before deployment
 
-The container's startup script and API health endpoints should be checked after
-deployment. Do not expose port 8000 publicly without HTTPS and the auth
-validator enabled. Configure the service's health check against its documented
-health/readiness endpoint only after confirming the selected config registers
-that endpoint.
+The NVIDIA async API's JobStore/EventStore uses SQLAlchemy async drivers. The
+vendored code documents SQLite for local development and PostgreSQL for
+production through `NAT_JOB_STORE_DB_URL`. A Cloudflare Container's local disk
+is ephemeral; it must not be treated as durable storage for jobs, events,
+checkpoints, or reports.
 
-## Cloudflare Pages environment
+Cloudflare D1 is not a drop-in SQLAlchemy/asyncpg replacement for the upstream
+JobStore. The vendored repository does not include a D1 or Durable Object
+JobStore adapter. Therefore, do not deploy this profile in production with
+SQLite on container disk, and do not claim persistent research history is ready.
+For the strict Cloudflare-only requirement, implement and test a supported
+Durable Object-backed persistence adapter (including job events and workflow
+checkpoints) before enabling production traffic. R2 can be used for artifact
+blobs where the upstream S3-compatible artifact provider is configured, but R2
+does not replace the transactional job database.
 
-Configure these server-side Pages variables/secrets:
+Local development may use:
+`NAT_JOB_STORE_DB_URL=sqlite+aiosqlite:///./jobs.db`
+and a local checkpoint file. Those defaults are not production settings.
 
-- `DEEP_RESEARCHER_URL`: HTTPS origin of the deployed backend, without a trailing slash.
-- `NEXORA_RESEARCH_API_TOKEN`: the same secret configured on the backend.
+## Existing Pages proxy
 
-The Pages Function exposes only the approved async research routes under
-`/api/research/`, applies request validation and per-IP limits, and streams
-server-sent events without buffering the report stream.
+The current `functions/api/research/[[path]].js` proxy validates requests,
+keeps the service token server-side, and streams the NVIDIA SSE response. It
+currently expects `DEEP_RESEARCHER_URL` as an HTTPS origin. The Cloudflare-only
+Container integration still needs a private service-binding route and the
+matching Pages binding; do not point it at Render, Vercel, or an unprotected
+public backend URL.
 
-## Current integration boundary
+The approved API surface is the upstream async job API:
+- `POST /v1/jobs/async/submit`
+- `GET /v1/jobs/async/job/{job_id}`
+- `GET /v1/jobs/async/job/{job_id}/stream`
+- `GET /v1/jobs/async/job/{job_id}/report`
+- `GET /v1/jobs/async/agents`
 
-The API proxy and backend authentication adapter are the first integration
-slice. The NEXORA interface still needs a Research Center that submits jobs,
-shows progress from SSE, recovers a job after refresh, and renders the final
-report with source citations. Backend deployment and live end-to-end research
-are not complete until the hosting secrets, database, model credential, and
-search credential are configured and the service passes a real test query.
+## Deployment gates
+
+Do not deploy or switch production routing until all of these are true:
+
+1. Cloudflare Container Worker and private Pages service binding are implemented.
+2. All six provider secrets are present on the research Worker and passed to the
+   Container process at startup without logging or returning values.
+3. The Python image builds for linux/amd64 and starts the API on port 8000.
+4. The Cloudflare-native durable JobStore/EventStore and checkpoint design is
+   implemented and tested; ephemeral SQLite is not accepted.
+5. The NEXORA auth validator is loaded and rejects missing/invalid tokens.
+6. Provider smoke tests verify each configured provider without returning
+   credentials in logs or API responses.
+7. The Pages proxy passes request, SSE, report, and error-contract tests.
+
+The current repository contains the vendored NVIDIA source, NEXORA auth
+adapter, Pages proxy, dedicated research chat, and all-provider configuration.
+It does not yet contain a deployed Cloudflare research Container, a
+Cloudflare-native durable JobStore adapter, or a verified live end-to-end
+research run.
