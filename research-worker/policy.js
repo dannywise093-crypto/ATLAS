@@ -90,5 +90,16 @@ export function missingRuntimeConfig(env) {
   ]) {
     if (typeof env[name] !== "string" || !env[name].trim()) missing.push(name);
   }
+  if ((env.NEXORA_RESEARCH_CHECKPOINT_BACKEND || "postgres").trim().toLowerCase() === "cloudflare") {
+    for (const [binding, label] of [
+      ["RESEARCH_CHECKPOINTS_DB", "RESEARCH_CHECKPOINTS_DB (D1)"],
+      ["RESEARCH_CHECKPOINTS_BUCKET", "RESEARCH_CHECKPOINTS_BUCKET (R2)"],
+      ["RESEARCH_CHECKPOINT_COORDINATOR", "RESEARCH_CHECKPOINT_COORDINATOR (Durable Object)"],
+      ["NEXORA_RESEARCH_PUBLIC_URL", "NEXORA_RESEARCH_PUBLIC_URL"],
+      ["NEXORA_RESEARCH_TENANT", "NEXORA_RESEARCH_TENANT"],
+    ]) {
+      if (!env[binding]) missing.push(label);
+    }
+  }
   return missing;
 }
