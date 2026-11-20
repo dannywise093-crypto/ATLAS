@@ -1,7 +1,8 @@
-"""Cloudflare Durable Object event persistence adapter prototype.
+"""Cloudflare Durable Object event persistence adapter.
 
-It preserves the event payload and the monotonically increasing per-job cursor
-used by SSE clients. It is not wired into the existing FastAPI routes yet.
+The job runner can select this writer together with the shared event reader
+when NEXORA_RESEARCH_EVENT_STORE=cloudflare. It preserves event payloads and
+monotonically increasing per-job cursors used by SSE clients.
 """
 
 from __future__ import annotations
