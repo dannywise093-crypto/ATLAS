@@ -143,3 +143,30 @@ async def test_cloudflare_reader_collects_multiple_durable_object_pages(monkeypa
     assert len(events) == 450
     assert events[0]["_id"] == 1
     assert events[-1]["_id"] == 450
+
+
+@pytest.mark.asyncio
+async def test_runner_uses_shared_event_writer_factory(monkeypatch):
+    from deep_researcher_api.jobs import runner
+
+    marker = object()
+    captured = {}
+
+    def writer_factory(db_url, job_id, *, content_cipher=None):
+        captured.update(db_url=db_url, job_id=job_id, content_cipher=content_cipher)
+        return marker
+
+    monkeypatch.setattr(event_reader, "build_event_store_for_job", writer_factory)
+    cipher = object()
+    writer = await runner._create_event_store_for_job(
+        "sqlite:///jobs.db",
+        "job_789",
+        content_cipher=cipher,
+    )
+
+    assert writer is marker
+    assert captured == {
+        "db_url": "sqlite:///jobs.db",
+        "job_id": "job_789",
+        "content_cipher": cipher,
+    }
