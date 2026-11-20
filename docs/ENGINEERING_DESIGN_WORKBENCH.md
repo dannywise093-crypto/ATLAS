@@ -14,7 +14,8 @@ The Engineering Studio is a first implementation slice connecting the NEXORA mod
 
 - Browser: `src/EngineeringStudio.jsx`
 - Same-origin server-side endpoint: `functions/api/engineering/visual.js`
-- Cloudflare Pages binds Workers AI as `AI` through `wrangler.jsonc` (`pages_build_output_dir` enables Pages to load the Wrangler configuration).
+- Cloudflare Pages binds Workers AI as `AI` through its Pages-specific `wrangler.jsonc` configuration.
+- The standalone gateway Worker keeps its separate `wrangler.worker.jsonc` configuration; the deploy script explicitly selects it.
 - Model: `@cf/black-forest-labs/flux-1-schnell` called from the Pages Function.
 - No provider key or gateway token is exposed to browser code.
 - The Pages Function validates prompt size and limits requests per client IP.
