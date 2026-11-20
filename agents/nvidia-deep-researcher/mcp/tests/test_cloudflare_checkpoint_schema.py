@@ -23,6 +23,7 @@ def test_schema_creates_tenant_scoped_checkpoint_and_write_tables():
         )
     }
     assert {
+        "research_checkpoint_thread_tombstones",
         "research_checkpoint_threads",
         "research_checkpoints",
         "research_checkpoint_writes",
@@ -100,3 +101,19 @@ def test_schema_is_idempotent():
     db = sqlite3.connect(":memory:")
     db.executescript(SCHEMA.read_text(encoding="utf-8"))
     db.executescript(SCHEMA.read_text(encoding="utf-8"))
+
+
+def test_deleted_thread_tombstones_are_tenant_scoped_and_persist_without_thread_rows():
+    db = connect()
+    db.execute(
+        "INSERT INTO research_checkpoint_thread_tombstones (tenant_id,thread_id,deleted_at) VALUES(?,?,?)",
+        ("tenant-a", "thread-1", 100),
+    )
+    assert db.execute(
+        "SELECT deleted_at FROM research_checkpoint_thread_tombstones WHERE tenant_id=? AND thread_id=?",
+        ("tenant-a", "thread-1"),
+    ).fetchone() == (100,)
+    assert db.execute(
+        "SELECT COUNT(*) FROM research_checkpoint_threads WHERE tenant_id=? AND thread_id=?",
+        ("tenant-a", "thread-1"),
+    ).fetchone()[0] == 0
