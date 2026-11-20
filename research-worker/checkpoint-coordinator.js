@@ -81,6 +81,16 @@ export class CheckpointCoordinator extends DurableObject {
       return json({ error: "A valid JSON object is required." }, 400);
     }
     try {
+      const coordinatorUrl = new URL(request.url);
+      const tenantId = coordinatorUrl.searchParams.get("tenant");
+      const threadId = coordinatorUrl.searchParams.get("thread");
+      const checkpointNs = coordinatorUrl.searchParams.get("namespace") ?? "";
+      if (!tenantId || !threadId || checkpointNs.length > 256) {
+        return json({ error: "Coordinator identity is missing or invalid." }, 400);
+      }
+      input.tenantId = tenantId;
+      input.threadId = threadId;
+      input.checkpointNs = checkpointNs;
       const core = this.getCore();
       if (route === "/acquire") return json(await core.acquire(input), 201);
       if (route === "/renew") return json(await core.renew(input));
