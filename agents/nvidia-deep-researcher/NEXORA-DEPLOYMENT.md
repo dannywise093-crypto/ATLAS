@@ -307,25 +307,37 @@ Batch append is not atomic, and no cross-job event cleanup/retention policy has
 been migrated. Do not disable the SQL EventStore based on this adapter alone.
 
 
-### Shared tenant-aware event reader milestone
+### Coordinated tenant-aware Cloudflare event backend milestone
 
-Added `deep_researcher_api.jobs.event_reader` as a common SQL/Cloudflare
-read boundary. SQL remains the default. Cloudflare reads require the explicit
-`NEXORA_RESEARCH_EVENT_STORE=cloudflare` setting and derive the tenant key
-from the persisted `job_access.owner_auth_type` and `owner_subject` values.
-The tenant key is a stable SHA-256-derived identifier and does not expose the
-owner subject. Missing owner metadata or invalid Cloudflare configuration
-fails closed rather than falling back to another tenant.
+The shared `event_reader` now selects SQL or Cloudflare reads, and the job
+runner now uses the matching `build_event_store_for_job` factory for its
+primary writer and all cancellation/error fallback writers. The same
+`NEXORA_RESEARCH_EVENT_STORE` setting therefore switches event reads and
+writes together; SQL remains the default. Source-failure final-report events
+also flow through the selected writer rather than bypassing it with a direct
+SQL EventStore write.
 
-The job-artifact reader and SSE polling reader now use this boundary. When
-Cloudflare reads are selected, SSE deliberately uses polling because Durable
-Objects do not implement PostgreSQL LISTEN/NOTIFY. The PostgreSQL pub/sub
-path remains unchanged for the default SQL backend.
+Cloudflare tenant identity is derived only from persisted
+`job_access.owner_auth_type` and `owner_subject` metadata. The stable tenant
+key is SHA-256-derived; the raw owner subject is not sent as the tenant key.
+Missing owner metadata or invalid Cloudflare configuration fails closed.
+Artifact and SSE polling readers use the same boundary. Cloudflare SSE uses
+polling, not PostgreSQL LISTEN/NOTIFY.
 
-**Do not enable Cloudflare event reads in a live environment yet.** The runner
-still writes through SQL `EventStore` and `BatchingEventStore`; enabling
-Cloudflare reads before the matching Cloudflare writer is integrated would
-produce an empty/split event stream. The new reader and its tests are an
-integration milestone, not a completed storage migration. The NAT JobStore,
-Dask future recovery, cancellation/status metadata, admission/access tables,
-artifact store, and LangGraph checkpoint saver remain SQL-backed.
+This is a **partial event-store migration, not a production-ready NVIDIA
+runtime**. The following remain SQL-backed or incomplete:
+
+- NAT async JobStore ORM contract, Dask scheduler future tracking, cancellation
+  metadata, expiry and interrupted-job recovery.
+- Admission limits, ownership/access transactions and direct SQL consumers.
+- LangGraph workflow checkpoint saver and checkpoint thread isolation.
+- Durable artifact blob storage, cross-job event retention/cleanup and
+  transactional coordination between terminal status and final events.
+- Cloudflare Durable Object runtime integration tests and live end-to-end
+  Container/provider verification.
+
+Do not enable `NEXORA_RESEARCH_EVENT_STORE=cloudflare` in production until
+these remaining storage contracts are implemented and tested together. The
+flag is intentionally not set by this change. No secrets, DNS, production
+routing, or Cloudflare deployment were changed.
+
