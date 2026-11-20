@@ -19,6 +19,18 @@ function fakeBucket() {
   };
 }
 
+function fakeDb() {
+  return {
+    prepare() {
+      return {
+        bind() { return this; },
+        async run() { return { success: true, meta: { changes: 1 } }; },
+      };
+    },
+    async batch() { return []; },
+  };
+}
+
 function request(path, method = "GET", body = undefined) {
   return new Request("https://research.internal" + path, {
     method,
@@ -32,7 +44,7 @@ test("R2 checkpoint payload upload returns a server-generated object ID and SHA-
   const bytes = new TextEncoder().encode("typed checkpoint bytes");
   const response = await handleCheckpointObjectRequest(
     request("/internal/checkpoint-objects/tenant-a/objects", "POST", bytes),
-    { RESEARCH_CHECKPOINTS_BUCKET: bucket },
+    { RESEARCH_CHECKPOINTS_BUCKET: bucket, RESEARCH_CHECKPOINTS_DB: fakeDb() },
     "tenant-a",
   );
   assert.equal(response.status, 201);
