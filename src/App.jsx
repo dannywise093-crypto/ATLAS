@@ -303,27 +303,42 @@ function AtlasWorkspace() {
     setResearchReport(null);
     setResearchProgress(["Submitting research request…"]);
     setResearchStatus("Submitting to NVIDIA Deep Researcher…");
+    let streamController=null;
     try{
-      const submit=await fetch("/api/research/submit",{
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({agent_type:"deep_researcher",input:question})
-      });
+      const submitController=new AbortController();
+      const submitTimer=setTimeout(()=>submitController.abort(),30000);
+      let submit;
+      try{
+        submit=await fetch("/api/research/submit",{
+          method:"POST",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({agent_type:"deep_researcher",input:question}),
+          signal:submitController.signal
+        });
+      }finally{clearTimeout(submitTimer);}
       const submitted=await submit.json().catch(()=>({}));
-      if(!submit.ok)throw new Error(submitted.detail?.message||submitted.error||"Research submission failed.");
+      if(!submit.ok)throw new Error(submitted.detail?.message||submitted.error||"Research submission failed (HTTP "+submit.status+").");
       const jobId=submitted.job_id;
       if(typeof jobId!=="string"||!jobId)throw new Error("The research service did not return a job ID.");
       setResearchJobId(jobId);
       setResearchProgress(items=>[...items,"Research job created: "+jobId]);
-      setResearchStatus("Research is running. Receiving live progress…");
+      setResearchStatus("Research is running. Checking job status while live progress streams…");
 
-      try{
-        const stream=await fetch("/api/research/job/"+encodeURIComponent(jobId)+"/stream");
-        if(stream.ok&&stream.body){
+      // Consume SSE in the background. Never await stream closure before polling:
+      // many SSE servers intentionally keep the connection open for the job's lifetime.
+      streamController=new AbortController();
+      const progressController=streamController;
+      (async()=>{
+        try{
+          const stream=await fetch("/api/research/job/"+encodeURIComponent(jobId)+"/stream",{signal:progressController.signal});
+          if(!stream.ok||!stream.body){
+            setResearchProgress(items=>[...items,"Live progress stream unavailable (HTTP "+stream.status+"); checking job status."]);
+            return;
+          }
           const reader=stream.body.getReader();
           const decoder=new TextDecoder();
           let buffer="";
-          while(true){
+          while(!progressController.signal.aborted){
             const part=await reader.read();
             if(part.done)break;
             buffer+=decoder.decode(part.value,{stream:true});
@@ -339,37 +354,57 @@ function AtlasWorkspace() {
               setResearchProgress(items=>[...items.slice(-29),eventName+": "+String(detail).slice(0,240)]);
             }
           }
-        }else{
-          setResearchProgress(items=>[...items,"Live progress stream unavailable; checking job status instead."]);
+          if(buffer.trim()&&!progressController.signal.aborted){
+            setResearchProgress(items=>[...items.slice(-29),"progress: "+buffer.trim().slice(0,240)]);
+          }
+        }catch(streamError){
+          if(streamError.name!=="AbortError"){
+            setResearchProgress(items=>[...items.slice(-29),"Live progress stream interrupted; status checks continue."]);
+          }
         }
-      }catch(streamError){
-        setResearchProgress(items=>[...items,"Live stream interrupted; checking job status."]);
-      }
+      })();
 
       let completed=false;
       for(let attempt=0;attempt<90;attempt++){
-        const statusResponse=await fetch("/api/research/job/"+encodeURIComponent(jobId));
-        const statusData=await statusResponse.json().catch(()=>({}));
-        if(statusResponse.ok){
-          const status=String(statusData.status||statusData.job?.status||statusData.job_info?.status||"").toLowerCase();
-          if(["success","completed","complete"].includes(status)){
-            completed=true;
-            break;
+        const statusController=new AbortController();
+        const statusTimer=setTimeout(()=>statusController.abort(),15000);
+        try{
+          const statusResponse=await fetch("/api/research/job/"+encodeURIComponent(jobId),{signal:statusController.signal});
+          const statusData=await statusResponse.json().catch(()=>({}));
+          if(statusResponse.ok){
+            const status=String(statusData.status||statusData.job?.status||statusData.job_info?.status||"").toLowerCase();
+            if(["success","completed","complete"].includes(status)){
+              completed=true;
+              break;
+            }
+            if(["failure","failed","error","cancelled","interrupted"].includes(status)){
+              throw new Error(statusData.error||statusData.detail?.message||"The research job ended with status: "+status);
+            }
+            if(attempt===0||attempt%5===0){
+              setResearchStatus("Research is still running ("+(attempt*2)+" seconds elapsed)…");
+              setResearchProgress(items=>[...items.slice(-29),"Job status: "+(status||"in progress")]);
+            }
+          }else if(attempt===0||attempt%5===0){
+            setResearchProgress(items=>[...items.slice(-29),"Status check returned HTTP "+statusResponse.status+"; retrying."]);
           }
-          if(["failure","failed","error","cancelled","interrupted"].includes(status)){
-            throw new Error(statusData.error||statusData.detail?.message||"The research job ended with status: "+status);
-          }
-        }
+        }catch(statusError){
+          if(statusError.name!=="AbortError"&&statusError.message.startsWith("The research job ended"))throw statusError;
+          if(attempt===0||attempt%5===0)setResearchProgress(items=>[...items.slice(-29),"Status check timed out; retrying."]);
+        }finally{clearTimeout(statusTimer);}
         await new Promise(resolve=>setTimeout(resolve,2000));
       }
-      if(!completed)throw new Error("The research job is still running. Its ID has been saved; use Refresh report to check again.");
+      if(!completed)throw new Error("Research is still running after 3 minutes. The job ID is saved; use Refresh report later rather than waiting indefinitely.");
+      streamController.abort();
       const finalReport=await loadResearchReport(jobId);
       if(!finalReport)throw new Error("The research job finished, but its final report could not be loaded. Use Refresh report to try again.");
       setResearchStatus("Deep research completed.");
     }catch(error){
-      setResearchError(error.message);
+      if(streamController)streamController.abort();
+      const message=error.name==="AbortError"?"The research request timed out while contacting the research service. Please retry.":error.message;
+      setResearchError(message);
       setResearchStatus("Research did not complete.");
     }finally{
+      if(streamController)streamController.abort();
       setResearchBusy(false);
     }
   }
