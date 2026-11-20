@@ -22,7 +22,7 @@ class FakeD1 {
   }
   execute(sql, a, state) {
     const q = sql.replace(/\s+/g, " ").trim();
-    if (q.startsWith("INSERT OR IGNORE INTO research_checkpoint_threads")) {
+    if (q.startsWith("INSERT INTO research_checkpoint_threads")) {
       const k = [a[0], a[1], a[2]].join("|");
       if (!state.threads.has(k)) state.threads.set(k, {
         tenant_id:a[0],thread_id:a[1],checkpoint_ns:a[2],head_checkpoint_id:null,
@@ -32,7 +32,7 @@ class FakeD1 {
     }
     if (q.startsWith("UPDATE research_checkpoint_threads")) {
       const k = [a[2],a[3],a[4]].join("|"), t = state.threads.get(k);
-      const duplicate = state.checkpoints.has([a[8],a[9],a[10],a[11]].join("|"));
+      const duplicate = state.checkpoints.has([a[10],a[11],a[12],a[13]].join("|"));
       if (!t || t.revision !== a[5] || t.fencing_token !== a[6] ||
           t.head_checkpoint_id !== a[7] || t.deleted_at !== null || duplicate) {
         return { success:true, meta:{changes:0} };
@@ -55,7 +55,7 @@ class FakeD1 {
       });
       return { success:true, meta:{changes:1} };
     }
-    if (q.startsWith("SELECT * FROM research_checkpoints")) {
+    if (q.startsWith("DELETE FROM research_checkpoint_r2_gc")) {\n      return { success:true, meta:{changes:0} };\n    }\n    if (q.startsWith("SELECT * FROM research_checkpoints")) {
       return { row:state.checkpoints.get(a.join("|")) ?? null };
     }
     if (q.startsWith("SELECT tenant_id, thread_id, checkpoint_ns")) {
