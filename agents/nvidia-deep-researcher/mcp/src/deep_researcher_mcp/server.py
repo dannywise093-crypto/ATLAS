@@ -284,8 +284,8 @@ def _validate_startup_configuration(settings: ServerSettings) -> None:
     if not settings.config_path.is_file():
         raise ValueError(f"MCP workflow config does not exist: {settings.config_path}")
 
-    # NAT and the MCP job ledger share the same Postgres deployment. Normalize
-    # driver-qualified URLs once before either lifecycle is started.
+    # The NAT workflow checkpointer and MCP todo reader still use PostgreSQL.
+    # Normalize the checkpoint URL even when the MCP job ledger is Cloudflare-backed.
     os.environ[_CHECKPOINT_DB_ENV_VAR] = _resolve_checkpoint_db_url()
 
 
