@@ -109,3 +109,20 @@ test("concurrent acquisitions serialize so only one runner obtains the live leas
   assert.equal(results.filter(r=>r.status==="fulfilled").length,1);
   assert.equal(results.filter(r=>r.status==="rejected" && r.reason.code==="lease_busy").length,1);
 });
+
+test("pending writes require the current lease and preserve the coordinator scope", async () => {
+  const x = setup();
+  const lease = await x.core.acquire({ ...x.scope, holderId: "runner-a" });
+  const writes = [{ taskId: "task-1", taskPath: "research", writeIndex: 0, channel: "result",
+    value: { type: "msgpack", key: "nexora-checkpoints/acme/write", sha256: "c".repeat(64), bytes: 3 } }];
+  let stored;
+  x.index.putWrites = async (input) => { stored = input; return { accepted: 1, requested: 1 }; };
+  const result = await x.core.putWrites({ ...x.scope, holderId: "runner-a", ...lease,
+    checkpointId: "cp-1", writes });
+  assert.equal(result.accepted, 1);
+  assert.equal(stored.tenantId, "acme");
+  assert.equal(stored.threadId, "thread-1");
+  await assert.rejects(x.core.putWrites({ ...x.scope, holderId: "runner-b",
+    leaseId: "wrong", fencingToken: 99, checkpointId: "cp-1", writes }),
+    (error) => error.code === "lease_lost");
+});
