@@ -40,6 +40,14 @@ jobs:
       - name: Check Python gateway syntax
         run: python -m compileall -q server voice-service
 
+      - name: Test Cloudflare research storage adapters
+        working-directory: agents/nvidia-deep-researcher/frontends/deep_researcher_api
+        env:
+          PYTHONPATH: src
+        run: |
+          python -m pip install pytest 'pydantic>=2.0.0'
+          python -m pytest -q tests/test_cloudflare_storage.py tests/test_cloudflare_job_repository.py
+
       - name: Check Cloudflare Pages Functions and Worker syntax
         run: node --check functions/api/_gateway.js && node --check functions/api/chat.js && node --check functions/api/copilot.js && node --check functions/api/health.js && node --check functions/api/nvidia.js && node --check functions/api/providers.js && node --check functions/api/transcribe.js && node --check functions/api/tts.js && node --check cloudflare/worker.js && node --check cloudflare/worker.test.js
 
