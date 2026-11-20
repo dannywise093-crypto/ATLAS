@@ -48,6 +48,9 @@ class _Connection:
     def __init__(self):
         self.deleted_tables: list[str] = []
 
+    def transaction(self):
+        return _Context(self)
+
     async def execute(self, statement: str, job_id: str):
         self.deleted_tables.append(statement.split("DELETE FROM ", 1)[1].split(" ", 1)[0])
 
