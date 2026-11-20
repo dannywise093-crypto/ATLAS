@@ -1,7 +1,7 @@
 import { DurableObject } from "cloudflare:workers";
 import { ResearchStorage } from "./storage.js";
 import { validStorageRequest } from "./storage-policy.js";
-import { constantTimeEqual, extractBearerToken, isAllowedResearchRoute, missingRuntimeConfig } from "./policy.js";
+import { constantTimeEqual, extractBearerToken, isAllowedResearchRoute, missingRuntimeConfig, researchReadiness } from "./policy.js";
 
 const CONTAINER_PORT = 8000;
 const START_TIMEOUT_MS = 120_000;
@@ -111,6 +111,10 @@ export default {
     }
 
     const url = new URL(request.url);
+    if (url.pathname === "/internal/readiness" && request.method === "GET") {
+      const readiness = researchReadiness(env);
+      return json(readiness, readiness.ready ? 200 : 503);
+    }
     if (url.pathname.startsWith("/internal/storage/")) {
       const parts = url.pathname.split("/").filter(Boolean);
       const tenant = parts[4];
