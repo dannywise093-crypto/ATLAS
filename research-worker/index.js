@@ -118,6 +118,37 @@ export default {
       const readiness = researchReadiness(env);
       return json(readiness, readiness.ready ? 200 : 503);
     }
+    if (url.pathname.startsWith("/internal/checkpoint-coordinator/")) {
+      const parts = url.pathname.split("/").filter(Boolean);
+      const tenant = parts[2];
+      const threadId = parts[3];
+      const action = parts[4];
+      const checkpointNs = url.searchParams.get("namespace") ?? "";
+      if (parts.length !== 5 ||
+          !/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(tenant || "") ||
+          !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$/.test(threadId || "") ||
+          !["acquire", "renew", "release", "publish"].includes(action) ||
+          checkpointNs.length > 256 || /[\\u0000-\\u001f]/.test(checkpointNs)) {
+        return json({ error: "Invalid checkpoint coordinator route or namespace." }, 400);
+      }
+      if (request.method !== "POST") return json({ error: "Method not allowed." }, 405);
+      if (!env.RESEARCH_CHECKPOINT_COORDINATOR) {
+        return json({ error: "Checkpoint coordinator is not configured." }, 503);
+      }
+      try {
+        const id = env.RESEARCH_CHECKPOINT_COORDINATOR.idFromName(
+          JSON.stringify([tenant, threadId, checkpointNs])
+        );
+        const stub = env.RESEARCH_CHECKPOINT_COORDINATOR.get(id);
+        const coordinatorUrl = new URL(request.url);
+        coordinatorUrl.protocol = "https:";
+        coordinatorUrl.hostname = "checkpoint-coordinator.internal";
+        coordinatorUrl.pathname = "/" + action;
+        return await stub.fetch(new Request(coordinatorUrl, request));
+      } catch {
+        return json({ error: "Checkpoint coordinator is unavailable." }, 503);
+      }
+    }
     if (url.pathname.startsWith("/internal/checkpoint-objects/")) {
       const parts = url.pathname.split("/").filter(Boolean);
       const tenant = parts[2];
