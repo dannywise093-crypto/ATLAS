@@ -1,6 +1,7 @@
 import { DurableObject } from "cloudflare:workers";
 import { ResearchStorage } from "./storage.js";
 import { handleCheckpointObjectRequest } from "./checkpoint-objects.js";
+import { D1CheckpointIndex } from "./checkpoint-index.js";
 import { CheckpointCoordinator } from "./checkpoint-coordinator.js";
 import { validStorageRequest } from "./storage-policy.js";
 import { constantTimeEqual, extractBearerToken, isAllowedResearchRoute, missingRuntimeConfig, researchReadiness } from "./policy.js";
@@ -121,6 +122,24 @@ export default {
       const readiness = researchReadiness(env);
       return json(readiness, readiness.ready ? 200 : 503);
     }
+    if (url.pathname.startsWith("/internal/checkpoint-threads/")) {
+      const parts = url.pathname.split("/").filter(Boolean);
+      const tenant = parts[2];
+      const threadId = parts[3];
+      if (parts.length !== 5 || parts[4] !== "delete" ||
+          !/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(tenant || "") ||
+          !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$/.test(threadId || "")) {
+        return json({ error: "Invalid checkpoint thread route." }, 400);
+      }
+      if (request.method !== "POST") return json({ error: "Method not allowed." }, 405);
+      if (!env.RESEARCH_CHECKPOINTS_DB) return json({ error: "Checkpoint D1 database is not configured." }, 503);
+      try {
+        const result = await new D1CheckpointIndex(env.RESEARCH_CHECKPOINTS_DB).deleteThread({ tenantId: tenant, threadId });
+        return json(result);
+      } catch {
+        return json({ error: "Checkpoint thread deletion failed." }, 500);
+      }
+    }
     if (url.pathname.startsWith("/internal/checkpoint-coordinator/")) {
       const parts = url.pathname.split("/").filter(Boolean);
       const tenant = parts[2];
@@ -217,6 +236,27 @@ export default {
       }, 503, { "retry-after": "10" });
     }
   },
+  async scheduled(controller, env, ctx) {
+    ctx.waitUntil(drainCheckpointGarbage(env));
+  },
 };
 
-export const researchWorkerInternals = { isAllowedResearchRoute, missingRuntimeConfig };
+async function drainCheckpointGarbage(env) {
+  if (!env.RESEARCH_CHECKPOINTS_DB || !env.RESEARCH_CHECKPOINTS_BUCKET) return { processed: 0 };
+  const index = new D1CheckpointIndex(env.RESEARCH_CHECKPOINTS_DB);
+  const due = await index.listDueGarbage({ limit: 100 });
+  let processed = 0;
+  for (const item of due) {
+    try {
+      if (!item.object_key.startsWith("nexora-checkpoints/" + item.tenant_id + "/")) continue;
+      await env.RESEARCH_CHECKPOINTS_BUCKET.delete(item.object_key);
+      await index.removeGarbage({ tenantId: item.tenant_id, objectKey: item.object_key });
+      processed += 1;
+    } catch {
+      // Keep the queue row for a later scheduled retry.
+    }
+  }
+  return { processed };
+}
+
+export const researchWorkerInternals = { isAllowedResearchRoute, missingRuntimeConfig, drainCheckpointGarbage };
