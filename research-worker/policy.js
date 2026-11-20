@@ -1,6 +1,6 @@
 export function extractBearerToken(header) {
   if (typeof header !== "string") return "";
-  const match = header.match(/^Bearer\s+(.+)$/i);
+  const match = header.match(/^Bearer\\s+(.+)$/i);
   return match ? match[1].trim() : "";
 }
 
@@ -17,10 +17,10 @@ export function isAllowedResearchRoute(pathname, method) {
   if (pathname === "/health") return method === "GET";
   const prefix = "/v1/jobs/async/";
   if (!pathname.startsWith(prefix)) return false;
-  const route = pathname.slice(prefix.length).replace(/\/$/, "");
+  const route = pathname.slice(prefix.length).replace(/\\/$/, "");
   if (route === "agents") return method === "GET";
   if (route === "submit") return method === "POST";
-  const match = route.match(/^job\/[A-Za-z0-9_-]{1,80}(?:\/(stream(?:\/[0-9]+)?|cancel|state|report|report\/edit))?$/);
+  const match = route.match(/^job\\/[A-Za-z0-9_-]{1,80}(?:\\/(stream(?:\\/[0-9]+)?|cancel|state|report|report\\/edit))?$/);
   if (!match) return false;
   const action = match[1] || "";
   if (action === "cancel" || action === "report/edit") return method === "POST";
@@ -41,15 +41,39 @@ export function researchReadiness(env) {
   const checkpointStoreConfigured = typeof env.DEEP_RESEARCHER_CHECKPOINT_DB === "string" && env.DEEP_RESEARCHER_CHECKPOINT_DB.trim().length > 0;
   const storageBindingConfigured = Boolean(env.RESEARCH_STORAGE);
   const containerBindingConfigured = Boolean(env.RESEARCH_CONTAINER);
+  const checkpointBackend = typeof env.NEXORA_RESEARCH_CHECKPOINT_BACKEND === "string"
+    ? env.NEXORA_RESEARCH_CHECKPOINT_BACKEND.trim().toLowerCase() || "postgres"
+    : "postgres";
+  const checkpointBackendSupported = checkpointBackend === "postgres" || checkpointBackend === "cloudflare";
+  const checkpointMigrationMissing = checkpointBackend === "cloudflare"
+    ? [
+        ...(!env.RESEARCH_CHECKPOINTS_DB ? ["RESEARCH_CHECKPOINTS_DB (D1)"] : []),
+        ...(!env.RESEARCH_CHECKPOINTS_BUCKET ? ["RESEARCH_CHECKPOINTS_BUCKET (R2)"] : []),
+        ...(!env.RESEARCH_CHECKPOINT_COORDINATOR ? ["RESEARCH_CHECKPOINT_COORDINATOR (Durable Object)"] : []),
+        "Cloudflare LangGraph checkpoint saver implementation and conformance tests",
+      ]
+    : [];
+  const checkpointBackendReady = checkpointBackend === "postgres" && checkpointStoreConfigured;
+  const checkpointMigrationReady = checkpointBackend === "cloudflare" &&
+    checkpointMigrationMissing.length === 0;
+  const checkpointReady = checkpointBackendReady || checkpointMigrationReady;
+  const ready = missing.length === 0 && storageBindingConfigured && containerBindingConfigured &&
+    checkpointBackendSupported && checkpointReady;
   return {
-    ready: missing.length === 0 && storageBindingConfigured && containerBindingConfigured,
-    status: missing.length || !storageBindingConfigured || !containerBindingConfigured ? "blocked" : "configured",
+    ready,
+    status: ready ? "configured" : "blocked",
     providersConfigured, serviceTokenConfigured, sqlJobStoreConfigured, checkpointStoreConfigured,
     storageBindingConfigured, containerBindingConfigured,
     eventStoreBackend: env.NEXORA_RESEARCH_EVENT_STORE === "cloudflare" ? "cloudflare" : "sql",
+    checkpointBackend,
+    checkpointBackendSupported,
+    checkpointReady,
+    checkpointMigrationReady,
+    checkpointMigrationMissing,
     missingConfiguration: missing,
   };
 }
+
 export function missingRuntimeConfig(env) {
   const missing = [];
   for (const name of [
