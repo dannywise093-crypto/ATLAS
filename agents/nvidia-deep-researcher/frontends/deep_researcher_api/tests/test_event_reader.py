@@ -91,3 +91,21 @@ async def test_cloudflare_reader_fails_closed_without_owner(monkeypatch):
 def test_sql_is_default(monkeypatch):
     monkeypatch.delenv("NEXORA_RESEARCH_EVENT_STORE", raising=False)
     assert event_reader.cloudflare_events_enabled() is False
+
+
+def test_writer_factory_selects_cloudflare_with_persisted_tenant(monkeypatch):
+    from deep_researcher_api.jobs.cloudflare_event_store import CloudflareEventStore
+
+    monkeypatch.setenv("NEXORA_RESEARCH_EVENT_STORE", "cloudflare")
+    writer = event_reader.build_event_store_for_job(
+        "sqlite:///jobs.db",
+        "job_123",
+        owner_lookup=lambda job_id, db_url: {
+            "owner_auth_type": "oauth",
+            "owner_subject": "verified-user-42",
+        },
+        storage_factory=lambda **kwargs: MemoryStorage(**kwargs),
+    )
+
+    assert isinstance(writer, CloudflareEventStore)
+    assert writer.storage.tenant == event_reader.tenant_for_job_owner("oauth", "verified-user-42")
