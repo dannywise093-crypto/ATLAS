@@ -76,10 +76,6 @@ Non-secret runtime configuration:
 - `APP_ENV=production`
 - `REQUIRE_AUTH=true`
 - `DEEP_RESEARCHER_ENABLE_DEBUG=false`
-- `DEEP_RESEARCHER_EXTERNAL_HOSTNAMES`: the internal hostname used by the
-  Cloudflare service-binding request. Set only after the research Worker
-  routing contract is implemented and verified.
-
 ## Persistence — production blocker to resolve before deployment
 
 The NVIDIA async API's JobStore/EventStore uses SQLAlchemy async drivers. The
