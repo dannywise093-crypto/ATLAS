@@ -96,7 +96,6 @@ def _store(storage=None):
 async def test_mcp_job_contract_create_claim_heartbeat_and_finish():
     storage = _MemoryStorage()
     store = _store(storage)
-    await store.init()
     job_id = await store.create(
         principal="anonymous",
         query="research question",
