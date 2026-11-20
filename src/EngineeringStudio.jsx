@@ -47,21 +47,17 @@ export default function EngineeringStudio() {
       const elapsed = Math.floor((Date.now() - startedAt) / 1000);
       setStage("NEXORA is researching and drafting the concept package… " + elapsed + "s elapsed.");
     }, 5000);
-    const deadlineTimer = setTimeout(() => controller.abort(), 75000);
     try {
       const answer = await generateAtlasResponse([{ role: "user", text: prompt }], controller.signal);
       if (controller.signal.aborted) return;
       setReport(answer);
       setStage("Concept package generated. Review assumptions and source references.");
     } catch (err) {
-      const message = controller.signal.aborted || err?.name === "AbortError"
-        ? "This request exceeded the 75-second limit. Try a shorter project brief or submit it again."
-        : (err?.message || "NEXORA could not complete the engineering request.");
-      setError(message);
-      setStage("The design request could not be completed.");
+      const cancelled = controller.signal.aborted || err?.name === "AbortError";
+      setError(cancelled ? "The engineering request was cancelled." : (err?.message || "NEXORA could not complete the engineering request."));
+      setStage(cancelled ? "Request cancelled." : "The design request could not be completed.");
     } finally {
       clearInterval(progressTimer);
-      clearTimeout(deadlineTimer);
       if (designControllerRef.current === controller) designControllerRef.current = null;
       setBusy(false);
     }
