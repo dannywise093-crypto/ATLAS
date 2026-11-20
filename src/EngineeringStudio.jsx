@@ -49,7 +49,23 @@ export default function EngineeringStudio() {
     } finally { setBusy(false); }
   }
 
-  async function saveVisual() {\n    if (!visual) return;\n    try { const response = await fetch(visual); const blob = await response.blob(); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = "nexora-engineering-concept.png"; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); } catch { setVisualError("Could not save the generated image."); }\n  }\n\n  async function generateVisual() {
+  async function saveVisual() {
+    if (!visual) return;
+    try {
+      const response = await fetch(visual);
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "nexora-engineering-concept.png";
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch {
+      setVisualError("Could not save the generated image.");
+    }
+  }
+
+  async function generateVisual() {
     if (!idea.trim() || visualBusy) return;
     setVisualBusy(true); setVisualError("");
     try {
