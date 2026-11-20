@@ -1,9 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "atlas-model-gateway",
-  "main": "cloudflare/worker.js",
+  "pages_build_output_dir": "./dist",
   "compatibility_date": "2026-11-14",
-  "workers_dev": true,
   "ai": {
     "binding": "AI"
   },
@@ -14,14 +12,5 @@
       "database_id": "27a086e4-c14b-4822-9d47-267f68163773",
       "migrations_dir": "migrations"
     }
-  ],
-  "observability": {
-    "enabled": true
-  },
-  "previews": {
-    "ai": {
-      "binding": "AI"
-    }
-  },
-  "pages_build_output_dir": "./dist"
+  ]
 }
