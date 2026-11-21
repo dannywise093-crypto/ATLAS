@@ -192,7 +192,7 @@ function extractAnswer(result) {
 
 function classifyAIError(error) {
   const message = String(error?.message || error || "").slice(0, 300);
-  const code = String(error?.code || error?.cause?.code || (message.match(/\\b(?:30\\d{2}|50\\d{2})\\b/) || [])[0] || "");
+  const code = String(error?.code || error?.cause?.code || (message.match(/\b(?:30\\d{2}|50\\d{2})\\b/) || [])[0] || "");
   const detail = (code + " " + message).toLowerCase();
   if (/3036|daily free allocation|account limited/.test(detail)) return { status: "account_limited", code };
   if (/3040|out of capacity|capacity temporarily exceeded|capacity unavailable/.test(detail)) return { status: "capacity_unavailable", code };
@@ -245,6 +245,33 @@ export default {
     // The private Pages-to-Worker token protects the gateway. End users do
     // not need Google accounts or browser sign-in sessions.
     if (!authorized(request, env)) return json({ error: "Unauthorized." }, 401);
+    if (url.pathname === "/api/research/generate-image") {
+      if (request.method !== "POST") return json({ error: "Method not allowed." }, 405, { allow: "POST" });
+      if (!env.AI) return json({ error: "Cloudflare Workers AI is not configured for image generation." }, 503);
+      const length = Number(request.headers.get("content-length") || 0);
+      if (length > 6 * 1024) return json({ error: "Image prompt is too large." }, 413);
+      let body;
+      try { body = await request.json(); } catch { return json({ error: "A valid JSON body is required." }, 400); }
+      const prompt = typeof body?.prompt === "string" ? body.prompt.trim() : "";
+      if (!prompt || prompt.length > 1800) return json({ error: "Provide an image prompt between 1 and 1,800 characters." }, 400);
+      if (/\b(?:gun|firearm|weapon|ammunition|explosive|bomb|knife|drug|cocaine|heroin|methamphetamine|self[- ]harm)\b/i.test(prompt)) {
+        return json({ error: "This image request is not supported." }, 400);
+      }
+      try {
+        const result = await env.AI.run("@cf/black-forest-labs/flux-1-schnell", { prompt, steps: 4 });
+        const image = typeof result === "string" ? result : result?.image;
+        if (typeof image !== "string" || !image.trim()) throw new Error("The image model returned no image data.");
+        return json({
+          image: "data:image/jpeg;base64," + image,
+          model: "@cf/black-forest-labs/flux-1-schnell",
+          generated: true,
+          note: "AI-generated conceptual illustration. It is not photographic evidence or a measured scientific result."
+        });
+      } catch (error) {
+        console.error("NEXORA research image generation failed:", String(error?.message || error).slice(0, 160));
+        return json({ error: "Image generation failed. Check Workers AI availability and account limits, then retry." }, 503, { "retry-after": "30" });
+      }
+    }
     if (url.pathname === "/api/health") {
       if (request.method !== "GET") return json({ error: "Method not allowed." }, 405, { allow: "GET" });
       if (!authorized(request, env)) return json({ error: "Unauthorized." }, 401);

@@ -139,3 +139,45 @@ export async function proxyTts(request, env) {
     return json({ error: "ATLAS speech gateway could not be reached. Please retry." }, 502);
   }
 }
+
+export async function proxyVisualGeneration(request, env) {
+  if (request.method !== "POST") return json({ error: "Method not allowed." }, 405);
+  if (!env.ATLAS_GATEWAY_TOKEN) return json({ error: "NEXORA image gateway token is not configured in Pages Functions." }, 503);
+  const ip = request.headers.get("CF-Connecting-IP") || "unknown";
+  const now = Date.now();
+  const key = "visual-generation:" + ip;
+  const bucket = buckets.get(key);
+  if (!bucket || now - bucket.start >= 60 * 60_000) buckets.set(key, { start: now, count: 1 });
+  else if (bucket.count >= 3) return json({ error: "Image generation limit reached. Please try again later." }, 429);
+  else bucket.count++;
+  const raw = await request.text();
+  if (raw.length > 6 * 1024) return json({ error: "Image prompt is too large." }, 413);
+  let body;
+  try { body = JSON.parse(raw); } catch { return json({ error: "A valid JSON request body is required." }, 400); }
+  if (!body || typeof body.prompt !== "string" || !body.prompt.trim() || body.prompt.length > 1800) {
+    return json({ error: "Provide an image prompt between 1 and 1,800 characters." }, 400);
+  }
+  try {
+    const upstream = await fetch(GATEWAY_URL + "/api/research/generate-image", {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        Authorization: "Bearer " + env.ATLAS_GATEWAY_TOKEN,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ prompt: body.prompt.trim() }),
+      signal: AbortSignal.timeout(120_000)
+    });
+    const text = await upstream.text();
+    return new Response(text, {
+      status: upstream.status,
+      headers: {
+        "Content-Type": upstream.headers.get("Content-Type") || "application/json",
+        "Cache-Control": "no-store",
+        "X-Content-Type-Options": "nosniff"
+      }
+    });
+  } catch {
+    return json({ error: "NEXORA image generation gateway could not be reached. Please retry." }, 502);
+  }
+}
