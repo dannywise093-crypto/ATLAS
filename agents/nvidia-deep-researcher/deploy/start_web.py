@@ -149,7 +149,7 @@ def main():
     # Read configuration from environment (set by Docker or defaults)
     config_file = os.environ.get(
         "CONFIG_FILE",
-        "/app/configs/config_web_frag.yml",
+        "/app/configs/config_web_default_llamaindex.yml",
     )
     host = os.environ.get("HOST", "0.0.0.0")
     port = int(os.environ.get("PORT", "8000"))
