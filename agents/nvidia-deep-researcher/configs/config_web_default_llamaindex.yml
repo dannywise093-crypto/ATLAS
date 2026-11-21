@@ -134,10 +134,20 @@ functions:
     sources:
       - id: web_search
         name: "Web Search"
-        description: "Search the web for real-time information."
+        description: "Search the web using Tavily, Exa, Nimble, and You.com."
         tools:
           - web_search_tool
           - advanced_web_search_tool
+          - exa_search_tool
+          - nimble_search_tool
+          - you_web_search_tool
+          - you_research_tool
+          - you_contents_tool
+      - id: paper_search
+        name: "Academic Papers"
+        description: "Search scholarly publications through Serper / Google Scholar."
+        tools:
+          - paper_search_tool
       - id: knowledge_layer
         name: "Knowledge Base"
         description: "Search uploaded documents and files."
@@ -159,6 +169,36 @@ functions:
     _type: tavily_web_search
     max_results: 2
     advanced_search: true
+
+  # Independent web providers. Each reads its own server-side environment secret.
+  exa_search_tool:
+    _type: exa_web_search
+    max_results: 5
+    search_type: auto
+    full_text: false
+
+  nimble_search_tool:
+    _type: nimble_web_search
+    max_results: 5
+    search_depth: lite
+    focus: general
+
+  you_web_search_tool:
+    _type: you_web_search
+    max_results: 8
+    safesearch: moderate
+
+  you_research_tool:
+    _type: you_research
+
+  you_contents_tool:
+    _type: you_contents
+
+  # Academic research via Serper / Google Scholar.
+  paper_search_tool:
+    _type: paper_search
+    provider: serper
+    max_results: 5
 
   # Knowledge Retrieval (see sources/knowledge_layer/KNOWLEDGE-LAYER-SETUP.md)
   knowledge_search:
